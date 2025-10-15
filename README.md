@@ -105,7 +105,7 @@ Backend được thiết kế theo mô hình **microservices** phân tán:
 ---
 
 
-## 📁 Cấu Trúc Thư Mục Gợi Ý
+## 📁 Cấu Trúc Thư Mục
 
 ```bash
 foodfast/
