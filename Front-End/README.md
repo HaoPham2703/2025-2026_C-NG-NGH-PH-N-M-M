@@ -1,69 +1,130 @@
-# Xây dựng và phát triển website bán laptop HC.VN
+# 🍔 FoodFast – Drone Delivery System
 
-### Mô tả dự án:
-Dự án là một trang web bán hàng laptop trực tuyến, giúp người dùng tìm kiếm và mua các sản phẩm laptop phù hợp với nhu cầu của họ. Trang web này cung cấp các tính năng như:
-- Đăng nhập, đăng ký và xác thực tài khoản qua gmail đăng ký.
-- Hỗ trợ đăng nhập bên thứ 2 là Google.
-- Quên mật khẩu.
-- Quản lý thông tin cá nhân: thông tin cá nhân, quản lý địa chỉ và người giao nhận hàng, quản lý đơn hàng, cập nhật lại mật khẩu.
-- Xem tất cả sản phẩm và chi tiết từng sản phẩm.
-- Đánh giá sao và nhận xét sau khi mua hàng thành công.
-- Hỏi đáp về sản phẩm: thích, bỏ thích, trả lời, thêm, sửa, xóa bài hỏi đáp.
-- Tìm kiếm bằng từ khóa và tìm kiếm nâng cao: lọc theo khoảng giá, lọc theo tên sản phẩm, màu sắc, cấu hình, nhu cầu.
-- So sánh thông số giữa 2 sản phẩm.
-- Hỗ trợ hai hình thức thanh toán: paypal và trả tiền khi nhận hàng thành công.
+**FoodFast** là nền tảng web đặt đồ ăn nhanh tiên tiến, tích hợp công nghệ **drone** để giao hàng siêu tốc và an toàn.  
+Dự án áp dụng **kiến trúc microservices**, kết hợp **React** cho frontend và **Node.js (Express)** cho backend, sử dụng **GPS** để định tuyến và theo dõi thời gian thực.
 
-### Công nghệ sử dụng:
-- FrontEnd: ReactJS.
-- BackEnd: NodeJS và ExpressJS.
-- Database: MonogoDB.
+---
 
-### Cách cài đặt:
-- Clone repository này bên phía FrontEnd và [Link github bên server](https://github.com/nvh2312/TLCN)
-- Sau khi clone 2 repository này về:
-  - cd vào repository bên phía FrontEnd gõ lệnh `npm i` để cài Node_Module sau khi cài sau gõ lệnh `npm run dev` để chạy.
-  - cd vào repository bên phía BackEnd gõ lệnh `npm i` để cài Node_Module sau khi cài sau gõ lệnh `npm start` để chạy.
+## 🚀 Tổng Quan Sản Phẩm (Product Overview)
 
-### Link project đưa lên hosting
-- Bên FrontEnd: [https://hctech.onrender.com/](https://hctech.onrender.com/)
+FoodFast hướng đến việc **tối ưu hóa quy trình giao thức ăn**, đặc biệt ở khu vực đô thị đông đúc, bằng việc:
 
-### Kết quả đạt được
-#### Trang chủ
-![Trang chủ](https://res.cloudinary.com/dbekkzxtt/image/upload/v1677837972/Screenshot_from_2023-03-03_16-59-45_m3x8bs.png)
-#### Trang đăng nhập
-![Trang đăng nhập](https://res.cloudinary.com/dbekkzxtt/image/upload/v1677837969/Screenshot_from_2023-03-03_16-59-49_orzmfq.png)
-#### Trang đăng ký tài khoản
-![Trang đăng ký](https://res.cloudinary.com/dbekkzxtt/image/upload/v1677837968/Screenshot_from_2023-03-03_16-59-54_cs7fgk.png)
-#### Trang quên mật khẩu
-![Trang quên mật khẩu](https://res.cloudinary.com/dbekkzxtt/image/upload/v1677837969/Screenshot_from_2023-03-03_16-59-58_o56yw4.png)
-#### Trang thông tin tài khoản
-![Trang thông tin tài khoản](https://res.cloudinary.com/dbekkzxtt/image/upload/v1677837967/Screenshot_from_2023-03-03_17-02-57_nid6hv.png)
-#### Trang quản lý đơn hàng
-![Trang quản lý đơn hàng](https://res.cloudinary.com/dbekkzxtt/image/upload/v1677837967/Screenshot_from_2023-03-03_17-03-13_s0ly0q.png)
-#### Trang chi tiết đơn hàng
-![Trang chi tiết đơn hàng](https://res.cloudinary.com/dbekkzxtt/image/upload/v1677837967/Screenshot_from_2023-03-03_17-03-18_zp1yfs.png)
-#### Trang quản lý thông tin giao nhận hàng
-![Trang quản lý thông tin giao nhận hàng](https://res.cloudinary.com/dbekkzxtt/image/upload/v1677837967/Screenshot_from_2023-03-03_17-03-25_bptpla.png)
-#### Trang cập nhật mật khẩu
-![Trang cập nhật mật khẩu](https://res.cloudinary.com/dbekkzxtt/image/upload/v1677837966/Screenshot_from_2023-03-03_17-03-37_ep9nht.png)
-#### Trang lọc sản phẩm nâng cao
-![Trang lọc sản phẩm nâng cao](https://res.cloudinary.com/dbekkzxtt/image/upload/v1677837970/Screenshot_from_2023-03-03_17-00-09_btplie.png)
-#### Trang giỏ hàng
-![Trang giỏ hàng](https://res.cloudinary.com/dbekkzxtt/image/upload/v1677837968/Screenshot_from_2023-03-03_17-02-43_trks35.png)
-#### Chức năng đánh giá sao và nhận xét
-![Đánh giá sao và nhận xét](https://firebasestorage.googleapis.com/v0/b/test-8c816.appspot.com/o/ecom%2Fecom%2Fdanh%20gia%20nhan%20xet.png?alt=media&token=3d6b94d2-7139-46d4-82d2-ed42a1d2dd21)
-![Đánh giá sao và nhận xét](https://res.cloudinary.com/dbekkzxtt/image/upload/v1677837968/Screenshot_from_2023-03-03_17-01-10_aynchs.png)
-#### Chức năng hỏi đáp
-![hỏi đáp](https://firebasestorage.googleapis.com/v0/b/test-8c816.appspot.com/o/ecom%2Fecom%2Fhoi%20dap.png?alt=media&token=226710a4-98e5-4e01-b259-c0648a8f2c8f)
-![Chức năng hỏi đáp](https://res.cloudinary.com/dbekkzxtt/image/upload/v1677837969/Screenshot_from_2023-03-03_17-02-13_hbglgf.png)
-#### Chức năng in báo giá PDF
-![in báo giá](https://res.cloudinary.com/dbekkzxtt/image/upload/v1677837967/Screenshot_from_2023-03-03_17-02-48_zezsng.png)
-#### Chức năng thanh toán
-![thanh toán](https://firebasestorage.googleapis.com/v0/b/test-8c816.appspot.com/o/ecom%2Fecom%2Fthanh%20toan.png?alt=media&token=b8b89829-a51d-4899-b1e3-463eb59bdd78)
-![thanh toán](https://firebasestorage.googleapis.com/v0/b/test-8c816.appspot.com/o/ecom%2Fecom%2Fthanh%20toan%201.png?alt=media&token=69998f93-8579-4943-af2d-64177ca88b72)
-#### Chức năng so sánh thông số giữa 2 sản phẩm
-![so sánh](https://firebasestorage.googleapis.com/v0/b/test-8c816.appspot.com/o/ecom%2Fecom%2Fso%20sanh.png?alt=media&token=6ad0555d-37a2-4bbd-9711-96b687ea029b)
+- Giảm thời gian giao hàng xuống **< 20 phút**.
+- Cung cấp **trải nghiệm theo dõi drone thời gian thực**.
+- Giúp **quán ăn nhỏ** dễ dàng quản lý đơn hàng và khách hàng.
 
+Hệ thống tích hợp:
 
+- Giao diện **React SPA** (Single Page Application).
+- **Microservices backend** dựa trên Node.js + MongoDB.
+- **Kafka/RabbitMQ** cho giao tiếp bất đồng bộ.
+- **Redis caching**, **Docker + Kubernetes**, **Grafana + Prometheus** để giám sát.
 
+---
 
+## 🧩 Kiến Trúc Hệ Thống
+
+### 🔹 Tổng Quan Backend
+
+Backend được thiết kế theo mô hình **microservices** phân tán:
+
+| Dịch vụ                          | Mô tả chính                                                  | Cơ sở dữ liệu | Giao tiếp         |
+| -------------------------------- | ------------------------------------------------------------ | ------------- | ----------------- |
+| **API Gateway**                  | Điểm vào duy nhất cho frontend, xử lý định tuyến & xác thực. | -             | REST / Kafka      |
+| **User Service**                 | Quản lý người dùng, đăng ký, đăng nhập, RBAC.                | Users DB      | REST / Kafka      |
+| **Product Service**              | Quản lý menu món ăn, nhà hàng đối tác.                       | Products DB   | REST              |
+| **Cart Service**                 | Giỏ hàng tạm thời, tính tổng tiền.                           | Carts DB      | REST              |
+| **Order Service**                | Quản lý vòng đời đơn hàng.                                   | Orders DB     | REST / Kafka      |
+| **Payment Service**              | Xử lý thanh toán (VNPay, Momo, COD).                         | Payments DB   | REST / Kafka      |
+| **Drone Dispatcher Service**     | Phân bổ và điều phối drone.                                  | Drones DB     | Kafka             |
+| **Delivery & GPS Service**       | Quản lý hành trình drone, GPS, ETA.                          | GPS Data DB   | REST / WebSocket  |
+| **Monitoring & Logging Service** | Giám sát, ghi log toàn hệ thống.                             | Logs DB       | REST / Prometheus |
+
+---
+
+## 🛠️ Công Nghệ Sử Dụng
+
+| Thành phần            | Công nghệ                |
+| --------------------- | ------------------------ |
+| **Frontend**          | React (SPA)              |
+| **Backend Framework** | Express.js (Node.js)     |
+| **Database**          | MongoDB (Azure)          |
+| **Caching**           | Redis (LRU)              |
+| **Message Broker**    | Kafka / RabbitMQ         |
+| **Containerization**  | Docker + Kubernetes      |
+| **Monitoring**        | Grafana + Prometheus     |
+| **Maps API**          | Google Maps / Azure Maps |
+
+---
+
+## 🧭 Quy Trình Người Dùng (User Flow)
+
+1. **Người dùng mở web app FoodFast** trên trình duyệt (React SPA).
+2. **Đăng nhập hoặc đăng ký** qua `POST /api/auth`.
+3. **Duyệt sản phẩm**, thêm vào giỏ (`GET /products`, `POST /cart/add`).
+4. **Đặt đơn hàng** qua `POST /orders`.
+5. **Thanh toán** xử lý qua `Payment Service`, cập nhật trạng thái.
+6. **Drone giao hàng** theo lộ trình GPS tối ưu (`Delivery & GPS Service`).
+7. **Theo dõi drone thời gian thực** qua `GET /delivery/:orderId/location`.
+8. **Đơn hoàn tất**, trạng thái chuyển thành `DELIVERED`.
+
+---
+
+## 📦 API Chính (Example Endpoints)
+
+| Endpoint                          | Mô tả                            | Service                |
+| --------------------------------- | -------------------------------- | ---------------------- |
+| `POST /api/auth/login`            | Đăng nhập người dùng             | User Service           |
+| `GET /products`                   | Lấy danh sách sản phẩm           | Product Service        |
+| `POST /cart/add`                  | Thêm sản phẩm vào giỏ            | Cart Service           |
+| `POST /orders`                    | Tạo đơn hàng mới                 | Order Service          |
+| `POST /payments/process`          | Thanh toán đơn hàng              | Payment Service        |
+| `GET /delivery/:orderId/location` | Vị trí drone theo thời gian thực | Delivery & GPS Service |
+
+---
+
+## 🎯 Mục Tiêu & Kết Quả Dự Kiến
+
+| Mục tiêu                          | Kết quả mong đợi                    |
+| --------------------------------- | ----------------------------------- |
+| ⏱️ Thời gian xử lý đơn hàng       | < 30 giây                           |
+| 🚁 Thời gian giao hàng trung bình | < 20 phút                           |
+| 💡 Mức độ hài lòng khách hàng     | +50%                                |
+| 🧱 Khả năng mở rộng               | Auto-scaling, microservices độc lập |
+
+---
+
+## 🧠 Các Use Case Chính
+
+| Mã      | Tên Use Case                   | Actor    | Mô tả                               |
+| ------- | ------------------------------ | -------- | ----------------------------------- |
+| **UC1** | Đặt món và thêm vào giỏ hàng   | Customer | Người dùng chọn món và thêm vào giỏ |
+| **UC2** | Đăng ký / Đăng nhập người dùng | Customer | Tạo tài khoản và đăng nhập hệ thống |
+| **UC3** | Thanh toán & xác nhận đơn hàng | Customer | Thực hiện giao dịch thanh toán      |
+| **UC4** | Xem / Theo dõi đơn hàng        | Customer | Xem trạng thái, GPS drone           |
+| **UC5** | Quản lý menu món ăn            | Admin    | Cập nhật món ăn, giá, khuyến mãi    |
+| **UC6** | Giám sát hệ thống              | Admin    | Theo dõi log, hiệu suất dịch vụ     |
+
+---
+
+## 📁 Cấu Trúc Thư Mục
+
+```bash
+foodfast/
+├── backend/
+│   ├── api-gateway/
+│   ├── user-service/
+│   ├── product-service/
+│   ├── order-service/
+│   ├── payment-service/
+│   ├── drone-dispatcher/
+│   ├── delivery-gps-service/
+│   └── monitoring-service/
+├── frontend/
+│   └── react-app/
+├── docs/
+│   ├── PRD.docx
+│   ├── Backend.docx
+│   └── Script.docx
+└── README.md
+```
