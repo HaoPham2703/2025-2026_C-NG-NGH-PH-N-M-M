@@ -1,16 +1,16 @@
-const jwt = require('jsonwebtoken');
-const { services } = require('../config/services');
-const axios = require('axios');
+const jwt = require("jsonwebtoken");
+const { services } = require("../config/services");
+const axios = require("axios");
 
 // JWT verification middleware
 const verifyToken = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    
+    const token = req.headers.authorization?.split(" ")[1];
+
     if (!token) {
       return res.status(401).json({
-        status: 'error',
-        message: 'Access token is required'
+        status: "error",
+        message: "Access token is required",
       });
     }
 
@@ -18,29 +18,29 @@ const verifyToken = async (req, res, next) => {
     try {
       const response = await axios.get(`${services.user}/api/v1/auth/verify`, {
         headers: {
-          'Authorization': `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
 
-      if (response.data.status === 'success') {
+      if (response.data.status === "success") {
         req.user = response.data.data.user;
         next();
       } else {
         return res.status(401).json({
-          status: 'error',
-          message: 'Invalid token'
+          status: "error",
+          message: "Invalid token",
         });
       }
     } catch (error) {
       return res.status(401).json({
-        status: 'error',
-        message: 'Token verification failed'
+        status: "error",
+        message: "Token verification failed",
       });
     }
   } catch (error) {
     return res.status(500).json({
-      status: 'error',
-      message: 'Authentication error'
+      status: "error",
+      message: "Authentication error",
     });
   }
 };
@@ -48,24 +48,27 @@ const verifyToken = async (req, res, next) => {
 // Optional authentication middleware
 const optionalAuth = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    
+    const token = req.headers.authorization?.split(" ")[1];
+
     if (token) {
       try {
-        const response = await axios.get(`${services.user}/api/v1/auth/verify`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
+        const response = await axios.get(
+          `${services.user}/api/v1/auth/verify`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
           }
-        });
+        );
 
-        if (response.data.status === 'success') {
+        if (response.data.status === "success") {
           req.user = response.data.data.user;
         }
       } catch (error) {
         // Token invalid, but continue without user
       }
     }
-    
+
     next();
   } catch (error) {
     next();
@@ -77,23 +80,23 @@ const requireAdmin = async (req, res, next) => {
   try {
     if (!req.user) {
       return res.status(401).json({
-        status: 'error',
-        message: 'Authentication required'
+        status: "error",
+        message: "Authentication required",
       });
     }
 
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== "admin") {
       return res.status(403).json({
-        status: 'error',
-        message: 'Admin access required'
+        status: "error",
+        message: "Admin access required",
       });
     }
 
     next();
   } catch (error) {
     return res.status(500).json({
-      status: 'error',
-      message: 'Authorization error'
+      status: "error",
+      message: "Authorization error",
     });
   }
 };
@@ -101,5 +104,5 @@ const requireAdmin = async (req, res, next) => {
 module.exports = {
   verifyToken,
   optionalAuth,
-  requireAdmin
+  requireAdmin,
 };
