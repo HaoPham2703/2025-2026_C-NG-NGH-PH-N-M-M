@@ -1,28 +1,28 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Minus, Plus, Trash2, ShoppingCart } from 'lucide-react';
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Minus, Plus, Trash2, ShoppingCart } from "lucide-react";
 
 const CartPage = () => {
   // Mock cart data - in real app, this would come from context/state management
   const [cartItems, setCartItems] = useState([
     {
-      id: '1',
+      id: "1",
       product: {
-        _id: '1',
-        title: 'Burger Classic',
+        _id: "1",
+        title: "Burger Classic",
         price: 50000,
         promotion: 45000,
-        images: ['https://via.placeholder.com/150'],
+        images: ["https://via.placeholder.com/150"],
       },
       quantity: 2,
     },
     {
-      id: '2',
+      id: "2",
       product: {
-        _id: '2',
-        title: 'Pizza Margherita',
+        _id: "2",
+        title: "Pizza Margherita",
         price: 120000,
-        images: ['https://via.placeholder.com/150'],
+        images: ["https://via.placeholder.com/150"],
       },
       quantity: 1,
     },
@@ -33,21 +33,21 @@ const CartPage = () => {
       removeItem(id);
       return;
     }
-    setCartItems(items =>
-      items.map(item =>
+    setCartItems((items) =>
+      items.map((item) =>
         item.id === id ? { ...item, quantity: newQuantity } : item
       )
     );
   };
 
   const removeItem = (id) => {
-    setCartItems(items => items.filter(item => item.id !== id));
+    setCartItems((items) => items.filter((item) => item.id !== id));
   };
 
   const getTotalPrice = () => {
     return cartItems.reduce((total, item) => {
       const price = item.product.promotion || item.product.price;
-      return total + (price * item.quantity);
+      return total + price * item.quantity;
     }, 0);
   };
 
@@ -92,7 +92,10 @@ const CartPage = () => {
             <div className="card">
               <div className="space-y-4">
                 {cartItems.map((item) => (
-                  <div key={item.id} className="flex items-center space-x-4 py-4 border-b border-gray-200 last:border-b-0">
+                  <div
+                    key={item.id}
+                    className="flex items-center space-x-4 py-4 border-b border-gray-200 last:border-b-0"
+                  >
                     <div className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
                       {item.product.images?.[0] ? (
                         <img
@@ -104,58 +107,69 @@ const CartPage = () => {
                         <span className="text-gray-400 text-xs">No Image</span>
                       )}
                     </div>
-                    
+
                     <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{item.product.title}</h3>
+                      <h3 className="font-medium text-gray-900">
+                        {item.product.title}
+                      </h3>
                       <div className="flex items-center space-x-2 mt-1">
                         {item.product.promotion ? (
                           <>
                             <span className="text-lg font-bold text-primary-600">
-                              {new Intl.NumberFormat('vi-VN', {
-                                style: 'currency',
-                                currency: 'VND',
+                              {new Intl.NumberFormat("vi-VN", {
+                                style: "currency",
+                                currency: "VND",
                               }).format(item.product.promotion)}
                             </span>
                             <span className="text-sm text-gray-500 line-through">
-                              {new Intl.NumberFormat('vi-VN', {
-                                style: 'currency',
-                                currency: 'VND',
+                              {new Intl.NumberFormat("vi-VN", {
+                                style: "currency",
+                                currency: "VND",
                               }).format(item.product.price)}
                             </span>
                           </>
                         ) : (
                           <span className="text-lg font-bold text-primary-600">
-                            {new Intl.NumberFormat('vi-VN', {
-                              style: 'currency',
-                              currency: 'VND',
+                            {new Intl.NumberFormat("vi-VN", {
+                              style: "currency",
+                              currency: "VND",
                             }).format(item.product.price)}
                           </span>
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                        onClick={() =>
+                          updateQuantity(item.id, item.quantity - 1)
+                        }
                         className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100"
                       >
                         <Minus className="w-4 h-4" />
                       </button>
-                      <span className="w-12 text-center font-medium">{item.quantity}</span>
+                      <span className="w-12 text-center font-medium">
+                        {item.quantity}
+                      </span>
                       <button
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                        onClick={() =>
+                          updateQuantity(item.id, item.quantity + 1)
+                        }
                         className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100"
                       >
                         <Plus className="w-4 h-4" />
                       </button>
                     </div>
-                    
+
                     <div className="text-right">
                       <div className="text-lg font-bold text-primary-600">
-                        {new Intl.NumberFormat('vi-VN', {
-                          style: 'currency',
-                          currency: 'VND',
-                        }).format((item.product.promotion || item.product.price) * item.quantity)}
+                        {new Intl.NumberFormat("vi-VN", {
+                          style: "currency",
+                          currency: "VND",
+                        }).format(
+                          (item.product.promotion || item.product.price) *
+                            item.quantity
+                        )}
                       </div>
                       <button
                         onClick={() => removeItem(item.id)}
@@ -175,14 +189,14 @@ const CartPage = () => {
           <div>
             <div className="card">
               <h2 className="text-xl font-semibold mb-4">Tóm tắt đơn hàng</h2>
-              
+
               <div className="space-y-3 mb-6">
                 <div className="flex justify-between">
                   <span>Tạm tính:</span>
                   <span>
-                    {new Intl.NumberFormat('vi-VN', {
-                      style: 'currency',
-                      currency: 'VND',
+                    {new Intl.NumberFormat("vi-VN", {
+                      style: "currency",
+                      currency: "VND",
                     }).format(getTotalPrice())}
                   </span>
                 </div>
@@ -198,9 +212,9 @@ const CartPage = () => {
                   <div className="flex justify-between text-lg font-bold">
                     <span>Tổng cộng:</span>
                     <span className="text-primary-600">
-                      {new Intl.NumberFormat('vi-VN', {
-                        style: 'currency',
-                        currency: 'VND',
+                      {new Intl.NumberFormat("vi-VN", {
+                        style: "currency",
+                        currency: "VND",
                       }).format(getTotalPrice())}
                     </span>
                   </div>
