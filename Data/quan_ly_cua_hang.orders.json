@@ -1,0 +1,98 @@
+[{
+  "_id": {
+    "$oid": "68e7200f258d17468216ccc0"
+  },
+  "user": {
+    "$oid": "68e53bdd732309e1de28536a"
+  },
+  "address": "Số 123, Ngõ 45, Phường Hàng Bạc, Quận Hoàn Kiếm, Hà Nội",
+  "receiver": "HaoKuTe",
+  "phone": "0912345678",
+  "cart": [
+    {
+      "product": {
+        "_id": "68e37adbceeb790b23e5379f",
+        "title": "ASUS ROG Flow Z13 (2026) GZ302 - Hero",
+        "price": 54990000,
+        "promotion": 49990000,
+        "description": "ROG Flow Z13 2025 dạng tablet-laptop, màn 13.4\" 2.5K 180Hz, Ryzen AI MAX+ 395, Radeon 8060S.",
+        "ratingsAverage": 4.7,
+        "ratingsQuantity": 320,
+        "eachRating": [
+          5,
+          5,
+          4,
+          5,
+          5
+        ],
+        "images": [
+          "https://dlcdnwebimgs.asus.com/gain/28B9A554-E0DD-4C29-A4BF-A548A11E3DF2"
+        ],
+        "createdBy": null,
+        "inventory": 25,
+        "color": "Black",
+        "cpu": "AMD Ryzen AI MAX+ 395",
+        "ram": "32GB LPDDR5X",
+        "os": "Windows 11",
+        "weight": 1.2,
+        "screen": "13.4\" 2560x1600 180Hz",
+        "graphicCard": "Radeon 8060S",
+        "battery": "70Wh",
+        "demand": "Gaming - Sáng tạo",
+        "updatedAt": "2025-10-06T08:00:00.000Z",
+        "updatedBy": "64b7f2b8c9d1a3e5f0a1b2c4",
+        "brand": null,
+        "review": [],
+        "percent": 9,
+        "reviews": [],
+        "id": "68e37adbceeb790b23e5379f"
+      },
+      "quantity": 1,
+      "_id": {
+        "$oid": "68e7200f258d17468216ccc1"
+      }
+    },
+    {
+      "product": {
+        "eachRating": [],
+        "review": [],
+        "_id": "68e374d5e38613b12df376f6",
+        "title": "ASUS TUF Gaming F15 FX507ZC4 i7 12700H RTX3050",
+        "price": 23500000,
+        "promotion": 21500000,
+        "description": "Laptop gaming 15.6 inch, Intel Core i7-12700H, GPU RTX 3050, RAM 16GB, SSD 512GB, màn 144Hz, vỏ kim loại.",
+        "images": [
+          "https://cdn.tgdd.vn/Products/Images/44/327974/asus-fx507zc4-i7-hn181w-1-750x500.jpg"
+        ],
+        "ratingsAverage": 4.5,
+        "ratingsQuantity": 12,
+        "inventory": 20,
+        "color": "Đen",
+        "cpu": "Intel Core i7-12700H",
+        "ram": "16GB DDR5",
+        "os": "Windows 11 Home",
+        "weight": 2.3,
+        "screen": "15.6 inch FHD 144Hz",
+        "graphicCard": "NVIDIA RTX 3050 4GB",
+        "battery": "90Wh",
+        "demand": "Gaming",
+        "brand": null,
+        "category": null,
+        "percent": 9,
+        "reviews": [],
+        "id": "68e374d5e38613b12df376f6"
+      },
+      "quantity": 1,
+      "_id": {
+        "$oid": "68e7200f258d17468216ccc2"
+      }
+    }
+  ],
+  "totalPrice": 71490000,
+  "payments": "tiền mặt",
+  "status": "Success",
+  "createdAt": {
+    "$date": "2025-10-09T02:38:07.356Z"
+  },
+  "__v": 0
+}]

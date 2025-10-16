@@ -1,0 +1,32 @@
+[{
+  "_id": {
+    "$oid": "68e371a3e38613b12df37646"
+  },
+  "name": "KFC Nguyễn Huệ",
+  "address": "120 Nguyễn Huệ, Q1, TP.HCM",
+  "lat": 10.7765,
+  "lng": 106.7009
+},
+{
+  "_id": {
+    "$oid": "68e371a3e38613b12df37647"
+  },
+  "name": "Lotteria Phan Xích Long",
+  "address": "45 Phan Xích Long, Phú Nhuận",
+  "lat": 10.8015,
+  "lng": 106.6841
+},
+{
+  "_id": {
+    "$oid": "68e3725ce38613b12df37669"
+  },
+  "name": "Kho Hà Nội",
+  "address": "Số 12 Nguyễn Văn Cừ, Long Biên, Hà Nội"
+},
+{
+  "_id": {
+    "$oid": "68e3725ce38613b12df3766a"
+  },
+  "name": "Kho Hồ Chí Minh",
+  "address": "45 Lê Văn Việt, Quận 9, TP.HCM"
+}]

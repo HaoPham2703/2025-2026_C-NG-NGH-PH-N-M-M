@@ -1,0 +1,20 @@
+[{
+  "_id": {
+    "$oid": "68e7207b258d17468216cda2"
+  },
+  "review": "Hàng xịn",
+  "rating": 2,
+  "product": {
+    "$oid": "68e37adbceeb790b23e5379f"
+  },
+  "user": {
+    "$oid": "68e53bdd732309e1de28536a"
+  },
+  "createdAt": {
+    "$date": "2025-10-09T02:39:55.272Z"
+  },
+  "__v": 0,
+  "updateAt": {
+    "$date": "2025-10-09T02:40:21.684Z"
+  }
+}]

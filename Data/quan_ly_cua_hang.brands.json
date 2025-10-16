@@ -1,0 +1,56 @@
+[{
+  "_id": {
+    "$oid": "68e37227e38613b12df37650"
+  },
+  "name": "ASUS",
+  "country": "Taiwan",
+  "founded": 1989
+},
+{
+  "_id": {
+    "$oid": "68e37227e38613b12df37651"
+  },
+  "name": "MSI",
+  "country": "Taiwan",
+  "founded": 1986
+},
+{
+  "_id": {
+    "$oid": "68e37227e38613b12df37652"
+  },
+  "name": "Acer",
+  "country": "Taiwan",
+  "founded": 1976
+},
+{
+  "_id": {
+    "$oid": "68e37227e38613b12df37653"
+  },
+  "name": "Dell",
+  "country": "USA",
+  "founded": 1984
+},
+{
+  "_id": {
+    "$oid": "68e37227e38613b12df37654"
+  },
+  "name": "HP",
+  "country": "USA",
+  "founded": 1939
+},
+{
+  "_id": {
+    "$oid": "68e37227e38613b12df37655"
+  },
+  "name": "Lenovo",
+  "country": "China",
+  "founded": 1984
+},
+{
+  "_id": {
+    "$oid": "68e37227e38613b12df37656"
+  },
+  "name": "Apple",
+  "country": "USA",
+  "founded": 1976
+}]

@@ -1,0 +1,18 @@
+[{
+  "_id": {
+    "$oid": "68e37245e38613b12df37661"
+  },
+  "productId": "1",
+  "userId": "1",
+  "content": "Máy chạy rất êm, pin tốt, đáng tiền!",
+  "createdAt": "2025-09-01T10:00:00Z"
+},
+{
+  "_id": {
+    "$oid": "68e37245e38613b12df37662"
+  },
+  "productId": "2",
+  "userId": "2",
+  "content": "Màn hình đẹp, loa hơi nhỏ một chút.",
+  "createdAt": "2025-09-02T09:00:00Z"
+}]

@@ -1,0 +1,58 @@
+[
+  {
+    "_id": {
+      "$oid": "68e37227e38613b12df37650"
+    },
+    "name": "KFC",
+    "country": "USA",
+    "founded": 1952
+  },
+  {
+    "_id": {
+      "$oid": "68e37227e38613b12df37651"
+    },
+    "name": "McDonald's",
+    "country": "USA",
+    "founded": 1940
+  },
+  {
+    "_id": {
+      "$oid": "68e37227e38613b12df37652"
+    },
+    "name": "Lotteria",
+    "country": "South Korea",
+    "founded": 1972
+  },
+  {
+    "_id": {
+      "$oid": "68e37227e38613b12df37653"
+    },
+    "name": "Pizza Hut",
+    "country": "USA",
+    "founded": 1958
+  },
+  {
+    "_id": {
+      "$oid": "68e37227e38613b12df37654"
+    },
+    "name": "Domino's",
+    "country": "USA",
+    "founded": 1960
+  },
+  {
+    "_id": {
+      "$oid": "68e37227e38613b12df37655"
+    },
+    "name": "Jollibee",
+    "country": "Philippines",
+    "founded": 1975
+  },
+  {
+    "_id": {
+      "$oid": "68e37227e38613b12df37656"
+    },
+    "name": "Burger King",
+    "country": "USA",
+    "founded": 1954
+  }
+]

@@ -1,0 +1,406 @@
+[{
+  "_id": {
+    "$oid": "68e331e714164e734156f77f"
+  },
+  "title": "Laptop Dell Inspiron 15 5510",
+  "price": 20000000,
+  "promotion": 18000000,
+  "description": "Laptop Dell cấu hình mạnh, màn hình 15.6 inch Full HD",
+  "ratingsAverage": 4.7,
+  "inventory": 10,
+  "color": "Silver",
+  "cpu": "Intel Core i7-11800H",
+  "ram": "16GB DDR4",
+  "os": "Windows 11",
+  "weight": 1.8,
+  "screen": "15.6 inch Full HD",
+  "graphicCard": "NVIDIA RTX 3050",
+  "battery": "6-cell 56Wh",
+  "demand": "High"
+},
+{
+  "_id": {
+    "$oid": "68e331e714164e734156f780"
+  },
+  "title": "MacBook Air M2 2023",
+  "price": 25000000,
+  "promotion": 23000000,
+  "description": "MacBook Air chip M2, siêu mỏng nhẹ, pin lâu",
+  "ratingsAverage": 4.8,
+  "inventory": 15,
+  "color": "Space Gray",
+  "cpu": "Apple M2",
+  "ram": "16GB",
+  "os": "macOS Ventura",
+  "weight": 1.2,
+  "screen": "13.6 inch Retina",
+  "graphicCard": "Apple Integrated",
+  "battery": "52.6Wh",
+  "demand": "High"
+},
+{
+  "_id": {
+    "$oid": "68e331e714164e734156f781"
+  },
+  "title": "Samsung Galaxy Book 2 Pro 360",
+  "price": 22000000,
+  "promotion": 21000000,
+  "description": "Laptop 2-in-1, màn hình cảm ứng AMOLED, nhẹ nhàng",
+  "ratingsAverage": 4.6,
+  "inventory": 8,
+  "color": "Graphite",
+  "cpu": "Intel Core i7-1260P",
+  "ram": "16GB",
+  "os": "Windows 11",
+  "weight": 1.17,
+  "screen": "15.6 inch AMOLED",
+  "graphicCard": "Intel Iris Xe",
+  "battery": "63Wh",
+  "demand": "Medium"
+},
+{
+  "_id": {
+    "$oid": "68e37a25ceeb790b23e53799"
+  },
+  "title": "ASUS ROG Flow Z13 (2025) GZ302 - Hero",
+  "price": 54990000,
+  "promotion": 49990000,
+  "description": "ROG Flow Z13 2025 dạng tablet-laptop, màn 13.4\" 2.5K 180Hz, Ryzen AI MAX+ 395, Radeon 8060S.",
+  "ratingsAverage": 4.7,
+  "ratingsQuantity": 320,
+  "eachRating": [
+    5,
+    5,
+    4,
+    5,
+    5
+  ],
+  "images": [
+    "https://rog.asus.com/laptops/rog-flow/rog-flow-z13-2025/gallery/",
+    "https://rog.asus.com/vn/laptops/rog-flow/rog-flow-z13-2025/gallery/"
+  ],
+  "createdAt": "2025-10-01T09:00:00.000Z",
+  "createdBy": "64b7f2b8c9d1a3e5f0a1b2c3",
+  "inventory": 25,
+  "color": "Black",
+  "cpu": "AMD Ryzen AI MAX+ 395",
+  "ram": "32GB LPDDR5X",
+  "os": "Windows 11",
+  "weight": 1.2,
+  "screen": "13.4\" 2560x1600 180Hz",
+  "graphicCard": "Radeon 8060S",
+  "battery": "70Wh",
+  "demand": "Gaming - Sáng tạo",
+  "updatedAt": "2025-10-06T08:00:00.000Z",
+  "updatedBy": "64b7f2b8c9d1a3e5f0a1b2c4",
+  "brand": "64b7f2b8c9d1a3e5f0a1b2dA",
+  "category": "64b7f2b8c9d1a3e5f0a1b2eLaptop",
+  "review": []
+},
+{
+  "_id": {
+    "$oid": "68e37a25ceeb790b23e5379a"
+  },
+  "title": "ASUS ROG Flow Z13 (2025) GZ302 - Closeups",
+  "price": 54990000,
+  "promotion": 0,
+  "description": "Bộ ảnh chi tiết nhiều góc chụp của ROG Flow Z13 2025.",
+  "ratingsAverage": 4.6,
+  "ratingsQuantity": 140,
+  "eachRating": [
+    5,
+    4,
+    5,
+    4,
+    5
+  ],
+  "images": [
+    "https://rog.asus.com/laptops/rog-flow/rog-flow-z13-2025/",
+    "https://rog.asus.com/laptops/rog-flow/rog-flow-z13-2025/spec/"
+  ],
+  "createdAt": "2025-10-01T09:10:00.000Z",
+  "createdBy": "64b7f2b8c9d1a3e5f0a1b2c3",
+  "inventory": 12,
+  "color": "Black",
+  "cpu": "AMD Ryzen AI MAX+ 395",
+  "ram": "64GB LPDDR5X",
+  "os": "Windows 11",
+  "weight": 1.2,
+  "screen": "13.4\" 2560x1600 180Hz",
+  "graphicCard": "Radeon 8060S",
+  "battery": "70Wh",
+  "demand": "Gaming - Di động",
+  "updatedAt": "2025-10-06T08:00:00.000Z",
+  "updatedBy": "64b7f2b8c9d1a3e5f0a1b2c4",
+  "brand": "64b7f2b8c9d1a3e5f0a1b2dA",
+  "category": "64b7f2b8c9d1a3e5f0a1b2eLaptop",
+  "review": []
+},
+{
+  "_id": {
+    "$oid": "68e37a25ceeb790b23e5379b"
+  },
+  "title": "Dell XPS 13 (9345) - Gallery",
+  "price": 38990000,
+  "promotion": 35990000,
+  "description": "Dell XPS 13 9345 với Snapdragon X Elite/Copilot+, mỏng nhẹ, pin dài, ảnh gallery chính hãng.",
+  "ratingsAverage": 4.5,
+  "ratingsQuantity": 220,
+  "eachRating": [
+    4,
+    5,
+    4,
+    5,
+    4
+  ],
+  "images": [
+    "https://www.dell.com/en-us/shop/dell-laptops/xps-13-laptop/spd/xps-13-9345-laptop",
+    "https://www.dell.com/en-uk/shop/laptops-2-in-1-pcs/xps-13-laptop/spd/xps-13-9345-laptop"
+  ],
+  "createdAt": "2025-09-30T03:20:00.000Z",
+  "createdBy": "64b7f2b8c9d1a3e5f0a1b2c3",
+  "inventory": 30,
+  "color": "Platinum",
+  "cpu": "Snapdragon X Elite",
+  "ram": "16GB LPDDR5X",
+  "os": "Windows 11",
+  "weight": 1.19,
+  "screen": "13.4\" FHD+ 1920x1200",
+  "graphicCard": "Qualcomm Adreno",
+  "battery": "Long battery life",
+  "demand": "Di động - Văn phòng",
+  "updatedAt": "2025-10-06T08:00:00.000Z",
+  "updatedBy": "64b7f2b8c9d1a3e5f0a1b2c5",
+  "brand": "64b7f2b8c9d1a3e5f0a1b2dB",
+  "category": "64b7f2b8c9d1a3e5f0a1b2eLaptop",
+  "review": []
+},
+{
+  "_id": {
+    "$oid": "68e37adbceeb790b23e5379f"
+  },
+  "title": "ASUS ROG Flow Z13 (2026) GZ302 - Hero",
+  "price": 54990000,
+  "promotion": 49990000,
+  "description": "ROG Flow Z13 2025 dạng tablet-laptop, màn 13.4\" 2.5K 180Hz, Ryzen AI MAX+ 395, Radeon 8060S.",
+  "ratingsAverage": 2,
+  "ratingsQuantity": 1,
+  "eachRating": [
+    0,
+    1,
+    0,
+    0,
+    0
+  ],
+  "images": [
+    "https://dlcdnwebimgs.asus.com/gain/28B9A554-E0DD-4C29-A4BF-A548A11E3DF2"
+  ],
+  "createdAt": "2025-10-01T09:00:00.000Z",
+  "createdBy": "64b7f2b8c9d1a3e5f0a1b2c3",
+  "inventory": 24,
+  "color": "Black",
+  "cpu": "AMD Ryzen AI MAX+ 395",
+  "ram": "32GB LPDDR5X",
+  "os": "Windows 11",
+  "weight": 1.2,
+  "screen": "13.4\" 2560x1600 180Hz",
+  "graphicCard": "Radeon 8060S",
+  "battery": "70Wh",
+  "demand": "Gaming - Sáng tạo",
+  "updatedAt": "2025-10-06T08:00:00.000Z",
+  "updatedBy": "64b7f2b8c9d1a3e5f0a1b2c4",
+  "brand": "64b7f2b8c9d1a3e5f0a1b2dA",
+  "category": "64b7f2b8c9d1a3e5f0a1b2eLaptop",
+  "review": [
+    [
+      {
+        "_id": {
+          "$oid": "68e7207b258d17468216cda2"
+        },
+        "review": "Hàng xịn",
+        "rating": 2,
+        "product": {
+          "$oid": "68e37adbceeb790b23e5379f"
+        },
+        "user": {
+          "$oid": "68e53bdd732309e1de28536a"
+        },
+        "createdAt": {
+          "$date": "2025-10-09T02:39:55.272Z"
+        },
+        "__v": 0,
+        "updateAt": {
+          "$date": "2025-10-09T02:40:21.684Z"
+        }
+      }
+    ]
+  ]
+},
+{
+  "_id": {
+    "$oid": "68e374d5e38613b12df376f6"
+  },
+  "title": "ASUS TUF Gaming F15 FX507ZC4 i7 12700H RTX3050",
+  "price": 23500000,
+  "promotion": 21500000,
+  "description": "Laptop gaming 15.6 inch, Intel Core i7-12700H, GPU RTX 3050, RAM 16GB, SSD 512GB, màn 144Hz, vỏ kim loại.",
+  "images": [
+    "https://cdn.tgdd.vn/Products/Images/44/327974/asus-fx507zc4-i7-hn181w-1-750x500.jpg"
+  ],
+  "ratingsAverage": 4.5,
+  "ratingsQuantity": 12,
+  "inventory": 19,
+  "color": "Đen",
+  "cpu": "Intel Core i7-12700H",
+  "ram": "16GB DDR5",
+  "os": "Windows 11 Home",
+  "weight": 2.3,
+  "screen": "15.6 inch FHD 144Hz",
+  "graphicCard": "NVIDIA RTX 3050 4GB",
+  "battery": "90Wh",
+  "demand": "Gaming",
+  "brand": null,
+  "category": null
+},
+{
+  "_id": {
+    "$oid": "68e374d5e38613b12df376f7"
+  },
+  "title": "MSI Modern 14 C12M i5 1240P 16GB 512GB",
+  "price": 18500000,
+  "promotion": 16500000,
+  "description": "Laptop mỏng nhẹ, Intel Core i5-1240P, RAM 16GB, SSD 512GB, trọng lượng 1.3kg, pin 10 tiếng, phù hợp văn phòng.",
+  "images": [
+    "https://bizweb.dktcdn.net/thumb/grande/100/386/607/products/80021857b25b807aab57155f41a7240b-380e8c5f-e32c-4d0d-b949-a9aac9bad5e7.png?v=1731638267053",
+    "https://bizweb.dktcdn.net/thumb/grande/100/410/941/products/msi-modern-14-c12mo-i5-660vn-3.jpg?v=1754039260543",
+    "https://bizweb.dktcdn.net/thumb/1024x1024/100/410/941/products/msi-modern-14-c12mo-i5-660vn-4.jpg?v=1754039260543"
+  ],
+  "ratingsAverage": 4.3,
+  "ratingsQuantity": 10,
+  "inventory": 15,
+  "color": "Bạc",
+  "cpu": "Intel Core i5-1240P",
+  "ram": "16GB LPDDR4X",
+  "os": "Windows 11 Home",
+  "weight": 1.3,
+  "screen": "14 inch FHD IPS",
+  "graphicCard": "Intel Iris Xe",
+  "battery": "52Wh",
+  "demand": "Văn phòng",
+  "brand": null,
+  "category": null
+},
+{
+  "_id": {
+    "$oid": "68e374d5e38613b12df376f8"
+  },
+  "title": "Dell Ultrasharp U2722D 27 inch QHD IPS 75Hz",
+  "price": 9500000,
+  "promotion": 8900000,
+  "description": "Màn hình Dell Ultrasharp 27 inch 2K, tấm nền IPS, tần số quét 75Hz, viền siêu mỏng, hỗ trợ DisplayPort và HDMI.",
+  "images": [
+    "https://tanthanhdanh.vn/wp-content/uploads/2023/12/u2722d-product-6.png",
+    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ6mgLT14kNhaJY_eFeXIFBdfJRQg8WWNmZwA&s",
+    "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQhZGs78sBV-kG191Fj09infY462d2MG5NWd5o0bydJKYeHWjUBdocfoQwr4uumheUT04Q&usqp=CAU"
+  ],
+  "ratingsAverage": 4.7,
+  "ratingsQuantity": 20,
+  "inventory": 30,
+  "color": "Xám bạc",
+  "cpu": null,
+  "ram": null,
+  "os": null,
+  "weight": 4.5,
+  "screen": "27 inch QHD IPS 75Hz",
+  "graphicCard": null,
+  "battery": null,
+  "demand": "Màn hình đồ họa",
+  "brand": null,
+  "category": null
+},
+{
+  "_id": {
+    "$oid": "68e717eca9d7c61ab8798aa3"
+  },
+  "title": "Laptop gaming xịn",
+  "price": 25000000,
+  "promotion": 24000000,
+  "description": "",
+  "ratingsAverage": 4.5,
+  "ratingsQuantity": 0,
+  "eachRating": [],
+  "images": [],
+  "createdAt": {
+    "$date": "2025-10-09T02:01:54.175Z"
+  },
+  "createdBy": {
+    "$oid": "68e494b9d8fa16a3706eed65"
+  },
+  "inventory": 200,
+  "color": "Đen",
+  "cpu": "",
+  "ram": "",
+  "os": "",
+  "weight": 2,
+  "screen": "",
+  "graphicCard": "",
+  "battery": "",
+  "demand": "Gaming",
+  "brand": {
+    "$oid": "68e37227e38613b12df37655"
+  },
+  "category": {
+    "$oid": "68e37238e38613b12df37659"
+  },
+  "review": [],
+  "__v": 0,
+  "updatedAt": {
+    "$date": "2025-10-09T02:20:45.966Z"
+  },
+  "updatedBy": {
+    "$oid": "68e494b9d8fa16a3706eed65"
+  }
+},
+{
+  "_id": {
+    "$oid": "68e71c44258d17468216cbf3"
+  },
+  "title": "Laptop gaming lenovo 15iah7",
+  "price": 27000000,
+  "promotion": 27000000,
+  "description": "<p>M&aacute;y Gaming hiện đại 2022</p>",
+  "ratingsAverage": 4.5,
+  "ratingsQuantity": 0,
+  "eachRating": [],
+  "images": [],
+  "createdAt": {
+    "$date": "2025-10-09T02:19:37.587Z"
+  },
+  "createdBy": {
+    "$oid": "68e494b9d8fa16a3706eed65"
+  },
+  "inventory": 999,
+  "color": "Đen",
+  "cpu": "",
+  "ram": "",
+  "os": "",
+  "weight": 2.5,
+  "screen": "",
+  "graphicCard": "",
+  "battery": "",
+  "demand": "Gaming",
+  "brand": {
+    "$oid": "68e37227e38613b12df37655"
+  },
+  "category": {
+    "$oid": "68e37238e38613b12df37659"
+  },
+  "review": [],
+  "__v": 0,
+  "updatedAt": {
+    "$date": "2025-10-09T02:47:52.296Z"
+  },
+  "updatedBy": {
+    "$oid": "68e494b9d8fa16a3706eed65"
+  }
+}]
