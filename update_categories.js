@@ -6,9 +6,9 @@ const productsPath = path.join(__dirname, 'Data', 'fastfood.products.json');
 // Read the products file
 const products = JSON.parse(fs.readFileSync(productsPath, 'utf8'));
 
-// Update all products with laptop category to fast food category
+// Update all products with old food category to new standardized food category
 products.forEach(product => {
-  if (product.category === '64b7f2b8c9d1a3e5f0a1b2eLaptop') {
+  if (typeof product.category === 'string' && product.category.startsWith('64b7')) {
     product.category = '68e37238e38613b12df37659';
   }
 });

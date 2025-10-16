@@ -168,12 +168,12 @@ const FilterProduct = ({ data }) => {
                   <td className="text-base font-semibold">Nguyên liệu</td>
                   <td>
                     <span className="text-base font-normal">
-                      {selectedItems[0]?.cpu}
+                      {selectedItems[0]?.ingredients}
                     </span>
                   </td>
                   <td>
                     <span className="text-base font-normal">
-                      {selectedItems[1]?.cpu}
+                      {selectedItems[1]?.ingredients}
                     </span>
                   </td>
                 </tr>
@@ -181,25 +181,25 @@ const FilterProduct = ({ data }) => {
                   <td className="text-base font-semibold">Xuất xứ</td>
                   <td>
                     <span className="text-base font-normal">
-                      {selectedItems[0]?.screen}
+                      {selectedItems[0]?.origin}
                     </span>
                   </td>
                   <td>
                     <span className="text-base font-normal">
-                      {selectedItems[1]?.screen}
+                      {selectedItems[1]?.origin}
                     </span>
                   </td>
                 </tr>
                 <tr>
-                  <td className="text-base font-semibold">Graphic Card</td>
+                  <td className="text-base font-semibold">Calo</td>
                   <td>
                     <span className="text-base font-normal">
-                      {selectedItems[0]?.graphicCard}
+                      {selectedItems[0]?.calories}
                     </span>
                   </td>
                   <td>
                     <span className="text-base font-normal">
-                      {selectedItems[1]?.graphicCard}
+                      {selectedItems[1]?.calories}
                     </span>
                   </td>
                 </tr>
@@ -233,9 +233,9 @@ const FilterProduct = ({ data }) => {
                   <td className="text-base font-semibold">Khẩu phần</td>
                   <td>
                     <span className="text-base font-normal flex items-center gap-x-2">
-                      {selectedItems[0]?.ram}
-                      {Number(selectedItems[0]?.ram) -
-                        Number(selectedItems[1]?.ram) >=
+                      {selectedItems[0]?.weight}
+                      {Number(selectedItems[0]?.weight) -
+                        Number(selectedItems[1]?.weight) >=
                         0 && (
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -256,9 +256,9 @@ const FilterProduct = ({ data }) => {
                   </td>
                   <td>
                     <span className="text-base font-normal flex items-center gap-x-2">
-                      {selectedItems[1]?.ram}
-                      {Number(selectedItems[1]?.ram) -
-                        Number(selectedItems[0]?.ram) >=
+                      {selectedItems[1]?.weight}
+                      {Number(selectedItems[1]?.weight) -
+                        Number(selectedItems[0]?.weight) >=
                         0 && (
                         <svg
                           xmlns="http://www.w3.org/2000/svg"

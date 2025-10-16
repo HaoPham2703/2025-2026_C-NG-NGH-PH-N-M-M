@@ -1,1 +1,29 @@
-[]
+[
+	{
+		"_id": { "$oid": "68e999e714164e734156f77f" },
+		"review": "Burger rất ngon, thịt bò mềm và sốt đậm vị!",
+		"rating": 5,
+		"createdAt": { "$date": "2025-10-10T10:00:00.000Z" },
+		"product": { "$oid": "68e331e714164e734156f77f" },
+		"updateAt": { "$date": "2025-10-10T12:00:00.000Z" },
+		"user": { "$oid": "68e888e714164e734156f77f" }
+	},
+	{
+		"_id": { "$oid": "68e999e714164e734156f780" },
+		"review": "Gà rán giòn, giao hàng nhanh, rất hài lòng!",
+		"rating": 4,
+		"createdAt": { "$date": "2025-10-11T09:30:00.000Z" },
+		"product": { "$oid": "68e331e714164e734156f780" },
+		"updateAt": { "$date": "2025-10-11T10:00:00.000Z" },
+		"user": { "$oid": "68e888e714164e734156f781" }
+	},
+	{
+		"_id": { "$oid": "68e999e714164e734156f781" },
+		"review": "Pizza phô mai thơm, vỏ bánh giòn, sẽ đặt lại lần sau.",
+		"rating": 5,
+		"createdAt": { "$date": "2025-10-12T14:00:00.000Z" },
+		"product": { "$oid": "68e331e714164e734156f781" },
+		"updateAt": { "$date": "2025-10-12T15:00:00.000Z" },
+		"user": { "$oid": "68e888e714164e734156f782" }
+	}
+]

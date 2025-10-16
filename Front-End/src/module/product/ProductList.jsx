@@ -49,7 +49,7 @@ const ProductList = ({ data, handlePageClick, page, totalPage }) => {
       <div className="mt-20">
         <div className="flex flex-col container rounded-lg bg-white ">
           <div className="flex items-center justify-between p-5 ">
-            <span className="font-bold text-xl">Laptop</span>
+            <span className="font-bold text-xl">Đồ ăn nổi bật</span>
             <div className="flex items-center gap-x-1 cursor-pointer">
               <span
                 className="text-base text-[#a497a2] font-semibold "
