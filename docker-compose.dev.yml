@@ -1,0 +1,179 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:latest
+    container_name: fastfood-mongodb-dev
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: fastfood
+    volumes:
+      - mongodb_data_dev:/data/db
+    networks:
+      - fastfood-network-dev
+
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: fastfood-zookeeper-dev
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - fastfood-network-dev
+
+  # Kafka Message Broker
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: fastfood-kafka-dev
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+    networks:
+      - fastfood-network-dev
+
+  # API Gateway
+  api-gateway:
+    build: 
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: fastfood-api-gateway-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - USER_SERVICE_URL=http://user-service:3001
+      - PRODUCT_SERVICE_URL=http://product-service:3002
+      - ORDER_SERVICE_URL=http://order-service:3003
+      - PAYMENT_SERVICE_URL=http://payment-service:3004
+      - JWT_SECRET=dev-jwt-secret-key
+    volumes:
+      - ./services/api-gateway/src:/app/src
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+      - payment-service
+    networks:
+      - fastfood-network-dev
+
+  # User Service
+  user-service:
+    build: 
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: fastfood-user-service-dev
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DB_URL=mongodb://mongodb:27017/fastfood_users
+      - JWT_SECRET=dev-jwt-secret-key
+      - JWT_EXPIRES_IN=7d
+      - JWT_COOKIE_EXPIRES_IN=7
+    volumes:
+      - ./services/user-service/src:/app/src
+    depends_on:
+      - mongodb
+    networks:
+      - fastfood-network-dev
+
+  # Product Service
+  product-service:
+    build: 
+      context: ./services/product-service
+      dockerfile: Dockerfile
+    container_name: fastfood-product-service-dev
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - DB_URL=mongodb://mongodb:27017/fastfood_products
+      - CLOUDINARY_NAME=dev-cloudinary-name
+      - CLOUDINARY_API_KEY=dev-cloudinary-api-key
+      - CLOUDINARY_API_SECRET=dev-cloudinary-api-secret
+    volumes:
+      - ./services/product-service/src:/app/src
+    depends_on:
+      - mongodb
+    networks:
+      - fastfood-network-dev
+
+  # Order Service
+  order-service:
+    build: 
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    container_name: fastfood-order-service-dev
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - DB_URL=mongodb://mongodb:27017/fastfood_orders
+      - PRODUCT_SERVICE_URL=http://product-service:3002
+      - PAYMENT_SERVICE_URL=http://payment-service:3004
+      - KAFKA_URL=kafka:9092
+    volumes:
+      - ./services/order-service/src:/app/src
+    depends_on:
+      - mongodb
+      - kafka
+      - product-service
+    networks:
+      - fastfood-network-dev
+
+  # Payment Service
+  payment-service:
+    build: 
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: fastfood-payment-service-dev
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=development
+      - PORT=3004
+      - DB_URL=mongodb://mongodb:27017/fastfood_payments
+      - KAFKA_URL=kafka:9092
+      - vnp_TmnCode=dev-vnpay-tmn-code
+      - vnp_HashSecret=dev-vnpay-hash-secret
+      - vnp_Url=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+      - vnp_ReturnUrl=http://localhost:3000/payment/return
+      - vnp_Locale=vn
+      - STRIPE_PUBLISHABLE_KEY=dev-stripe-publishable-key
+      - STRIPE_SECRET_KEY=dev-stripe-secret-key
+    volumes:
+      - ./services/payment-service/src:/app/src
+    depends_on:
+      - mongodb
+      - kafka
+    networks:
+      - fastfood-network-dev
+
+volumes:
+  mongodb_data_dev:
+
+networks:
+  fastfood-network-dev:
+    driver: bridge
