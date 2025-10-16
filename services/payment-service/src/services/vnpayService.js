@@ -64,7 +64,7 @@ const createPaymentUrl = (req, orderId) => {
   let signed = hmac.update(new Buffer.from(signData, "utf-8")).digest("hex");
   vnp_Params["vnp_SecureHash"] = signed;
   
-  let vnpUrl = vnpUrl + "?" + qs.stringify(vnp_Params, { encode: false });
+  vnpUrl = vnpUrl + "?" + qs.stringify(vnp_Params, { encode: false });
   
   return vnpUrl;
 };

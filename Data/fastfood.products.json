@@ -1,386 +1,356 @@
-[
-  {
-    "_id": {
-      "$oid": "68e331e714164e734156f77f"
-    },
-    "title": "Burger Bò KFC",
-    "price": 45000,
-    "promotion": 40000,
-    "description": "Burger bò ngon tuyệt với thịt bò tươi, rau xanh và sốt đặc biệt",
-    "ratingsAverage": 4.7,
-    "inventory": 50,
-    "origin": "Việt Nam",
-    "ingredients": "Bánh mì, thịt bò, rau xà lách, cà chua, hành tây, sốt KFC",
-    "weight": 0.3,
-    "shelfLife": "30 phút",
-    "storage": "Giữ nóng",
-    "calories": 520,
-    "nutrition": "Protein: 25g, Carb: 35g, Fat: 28g",
-    "allergen": "Gluten, sữa",
-    "demand": "Cao",
-    "images": [
-      "/images/foods/burger-bo-kfc.jpg",
-      "/images/foods/burger-bo-kfc-2.jpg"
-    ]
+[{
+  "_id": {
+    "$oid": "68e331e714164e734156f77f"
   },
-  {
-    "_id": {
-      "$oid": "68e331e714164e734156f780"
-    },
-    "title": "Gà Rán McDonald's",
-    "price": 35000,
-    "promotion": 30000,
-    "description": "Gà rán giòn tan, thơm ngon với công thức đặc biệt",
-    "ratingsAverage": 4.8,
-    "inventory": 40,
-    "origin": "Việt Nam",
-    "ingredients": "Thịt gà, bột chiên, gia vị đặc biệt",
-    "weight": 0.25,
-    "shelfLife": "45 phút",
-    "storage": "Giữ nóng",
-    "calories": 480,
-    "nutrition": "Protein: 30g, Carb: 20g, Fat: 32g",
-    "allergen": "Gluten",
-    "demand": "Cao"
+  "title": "Burger Bò KFC",
+  "price": 45000,
+  "promotion": 40000,
+  "description": "Burger bò ngon tuyệt với thịt bò tươi, rau xanh và sốt đặc biệt",
+  "ratingsAverage": 4.7,
+  "inventory": 50,
+  "origin": "Việt Nam",
+  "ingredients": "Bánh mì, thịt bò, rau xà lách, cà chua, hành tây, sốt KFC",
+  "weight": 0.3,
+  "shelfLife": "30 phút",
+  "storage": "Giữ nóng",
+  "calories": 520,
+  "nutrition": "Protein: 25g, Carb: 35g, Fat: 28g",
+  "allergen": "Gluten, sữa",
+  "demand": "Cao"
+},
+{
+  "_id": {
+    "$oid": "68e331e714164e734156f780"
   },
-  {
-    "_id": {
-      "$oid": "68e331e714164e734156f781"
-    },
-    "title": "Pizza Margherita",
-    "price": 120000,
-    "promotion": 100000,
-    "description": "Pizza truyền thống Ý với phô mai mozzarella và cà chua tươi",
-    "ratingsAverage": 4.6,
-    "inventory": 20,
-    "origin": "Ý",
-    "ingredients": "Bột pizza, phô mai mozzarella, cà chua, lá basil",
-    "weight": 0.8,
-    "shelfLife": "2 giờ",
-    "storage": "Giữ nóng",
-    "calories": 280,
-    "nutrition": "Protein: 12g, Carb: 35g, Fat: 10g",
-    "allergen": "Gluten, sữa",
-    "demand": "Trung bình"
+  "title": "Gà Rán McDonald's",
+  "price": 35000,
+  "promotion": 30000,
+  "description": "Gà rán giòn tan, thơm ngon với công thức đặc biệt",
+  "ratingsAverage": 4.8,
+  "inventory": 40,
+  "origin": "Việt Nam",
+  "ingredients": "Thịt gà, bột chiên, gia vị đặc biệt",
+  "weight": 0.25,
+  "shelfLife": "45 phút",
+  "storage": "Giữ nóng",
+  "calories": 480,
+  "nutrition": "Protein: 30g, Carb: 20g, Fat: 32g",
+  "allergen": "Gluten",
+  "demand": "Cao"
+},
+{
+  "_id": {
+    "$oid": "68e331e714164e734156f781"
   },
-  {
-    "_id": {
-      "$oid": "68e37a25ceeb790b23e53799"
-    },
-    "title": "Combo Gà Rán + Khoai Tây Chiên",
-    "price": 65000,
-    "promotion": 58000,
-    "description": "Combo đầy đủ với gà rán giòn tan và khoai tây chiên vàng ruộm",
-    "ratingsAverage": 4.7,
-    "ratingsQuantity": 320,
-    "eachRating": [
-      5,
-      5,
-      4,
-      5,
-      5
-    ],
-    "images": [
-      "https://example.com/chicken-fries-combo.jpg",
-      "https://example.com/chicken-fries-combo-2.jpg"
-    ],
-    "createdAt": "2025-10-01T09:00:00.000Z",
-    "createdBy": "64b7f2b8c9d1a3e5f0a1b2c3",
-    "inventory": 25,
-    "origin": "Việt Nam",
-    "ingredients": "Thịt gà, khoai tây, bột chiên, gia vị",
-    "weight": 0.4,
-    "shelfLife": "1 giờ",
-    "storage": "Giữ nóng",
-    "calories": 650,
-    "nutrition": "Protein: 35g, Carb: 45g, Fat: 35g",
-    "allergen": "Gluten",
-    "demand": "Cao",
-    "updatedAt": "2025-10-06T08:00:00.000Z",
-    "updatedBy": "64b7f2b8c9d1a3e5f0a1b2c4",
-    "brand": "64b7f2b8c9d1a3e5f0a1b2dA",
-    "category": "68e37238e38613b12df37659",
-    "review": []
+  "title": "Pizza Margherita",
+  "price": 120000,
+  "promotion": 100000,
+  "description": "Pizza truyền thống Ý với phô mai mozzarella và cà chua tươi",
+  "ratingsAverage": 4.6,
+  "inventory": 20,
+  "origin": "Ý",
+  "ingredients": "Bột pizza, phô mai mozzarella, cà chua, lá basil",
+  "weight": 0.8,
+  "shelfLife": "2 giờ",
+  "storage": "Giữ nóng",
+  "calories": 280,
+  "nutrition": "Protein: 12g, Carb: 35g, Fat: 10g",
+  "allergen": "Gluten, sữa",
+  "demand": "Trung bình"
+},
+{
+  "_id": {
+    "$oid": "68e37a25ceeb790b23e53799"
   },
-  {
-    "_id": {
-      "$oid": "68e37a25ceeb790b23e5379a"
-    },
-    "title": "Bánh Mì Thịt Nướng",
-    "price": 25000,
-    "promotion": 22000,
-    "description": "Bánh mì thịt nướng truyền thống với thịt heo tươi ngon",
-    "ratingsAverage": 4.6,
-    "ratingsQuantity": 140,
-    "eachRating": [
-      5,
-      4,
-      5,
-      4,
-      5
-    ],
-    "images": [
-      "https://example.com/banh-mi-thit-nuong.jpg",
-      "https://example.com/banh-mi-thit-nuong-2.jpg"
-    ],
-    "createdAt": "2025-10-01T09:10:00.000Z",
-    "createdBy": "64b7f2b8c9d1a3e5f0a1b2c3",
-    "inventory": 12,
-    "origin": "Việt Nam",
-    "ingredients": "Bánh mì, thịt heo, rau sống, gia vị",
-    "weight": 0.2,
-    "shelfLife": "2 giờ",
-    "storage": "Nhiệt độ phòng",
-    "calories": 350,
-    "nutrition": "Protein: 18g, Carb: 40g, Fat: 12g",
-    "allergen": "Gluten",
-    "demand": "Cao",
-    "updatedAt": "2025-10-06T08:00:00.000Z",
-    "updatedBy": "64b7f2b8c9d1a3e5f0a1b2c4",
-    "brand": "64b7f2b8c9d1a3e5f0a1b2dA",
-    "category": "68e37238e38613b12df37659",
-    "review": []
+  "title": "Combo Gà Rán + Khoai Tây Chiên",
+  "price": 65000,
+  "promotion": 58000,
+  "description": "Combo đầy đủ với gà rán giòn tan và khoai tây chiên vàng ruộm",
+  "ratingsAverage": 4.7,
+  "ratingsQuantity": 320,
+  "eachRating": [5, 5, 4, 5, 5],
+  "images": [
+    "https://example.com/chicken-fries-combo.jpg",
+    "https://example.com/chicken-fries-combo-2.jpg"
+  ],
+  "createdAt": "2025-10-01T09:00:00.000Z",
+  "createdBy": "64b7f2b8c9d1a3e5f0a1b2c3",
+  "inventory": 25,
+  "origin": "Việt Nam",
+  "ingredients": "Thịt gà, khoai tây, bột chiên, gia vị",
+  "weight": 0.4,
+  "shelfLife": "1 giờ",
+  "storage": "Giữ nóng",
+  "calories": 650,
+  "nutrition": "Protein: 35g, Carb: 45g, Fat: 35g",
+  "allergen": "Gluten",
+  "demand": "Cao",
+  "updatedAt": "2025-10-06T08:00:00.000Z",
+  "updatedBy": "64b7f2b8c9d1a3e5f0a1b2c4",
+  "brand": "64b7f2b8c9d1a3e5f0a1b2dA",
+  "category": "64b7f2b8c9d1a3e5f0a1b2eLaptop",
+  "review": []
+},
+{
+  "_id": {
+    "$oid": "68e37a25ceeb790b23e5379a"
   },
-  {
-    "_id": {
-      "$oid": "68e37a25ceeb790b23e5379b"
-    },
-    "title": "Trà Sữa Trân Châu",
-    "price": 35000,
-    "promotion": 30000,
-    "description": "Trà sữa đen thơm ngon với trân châu dai giòn",
-    "ratingsAverage": 4.5,
-    "ratingsQuantity": 220,
-    "eachRating": [
-      4,
-      5,
-      4,
-      5,
-      4
-    ],
-    "images": [
-      "https://example.com/tra-sua-tran-chau.jpg",
-      "https://example.com/tra-sua-tran-chau-2.jpg"
-    ],
-    "createdAt": "2025-09-30T03:20:00.000Z",
-    "createdBy": "64b7f2b8c9d1a3e5f0a1b2c3",
-    "inventory": 30,
-    "origin": "Đài Loan",
-    "ingredients": "Trà đen, sữa tươi, trân châu, đường",
-    "weight": 0.5,
-    "shelfLife": "4 giờ",
-    "storage": "Lạnh",
-    "calories": 280,
-    "nutrition": "Protein: 8g, Carb: 55g, Fat: 6g",
-    "allergen": "Sữa",
-    "demand": "Cao",
-    "updatedAt": "2025-10-06T08:00:00.000Z",
-    "updatedBy": "64b7f2b8c9d1a3e5f0a1b2c5",
-    "brand": "64b7f2b8c9d1a3e5f0a1b2dB",
-    "category": "68e37238e38613b12df37659",
-    "review": []
+  "title": "Bánh Mì Thịt Nướng",
+  "price": 25000,
+  "promotion": 22000,
+  "description": "Bánh mì thịt nướng truyền thống với thịt heo tươi ngon",
+  "ratingsAverage": 4.6,
+  "ratingsQuantity": 140,
+  "eachRating": [5, 4, 5, 4, 5],
+  "images": [
+    "https://example.com/banh-mi-thit-nuong.jpg",
+    "https://example.com/banh-mi-thit-nuong-2.jpg"
+  ],
+  "createdAt": "2025-10-01T09:10:00.000Z",
+  "createdBy": "64b7f2b8c9d1a3e5f0a1b2c3",
+  "inventory": 12,
+  "origin": "Việt Nam",
+  "ingredients": "Bánh mì, thịt heo, rau sống, gia vị",
+  "weight": 0.2,
+  "shelfLife": "2 giờ",
+  "storage": "Nhiệt độ phòng",
+  "calories": 350,
+  "nutrition": "Protein: 18g, Carb: 40g, Fat: 12g",
+  "allergen": "Gluten",
+  "demand": "Cao",
+  "updatedAt": "2025-10-06T08:00:00.000Z",
+  "updatedBy": "64b7f2b8c9d1a3e5f0a1b2c4",
+  "brand": "64b7f2b8c9d1a3e5f0a1b2dA",
+  "category": "64b7f2b8c9d1a3e5f0a1b2eLaptop",
+  "review": []
+},
+{
+  "_id": {
+    "$oid": "68e37a25ceeb790b23e5379b"
   },
-  {
-    "_id": {
-      "$oid": "68e37adbceeb790b23e5379f"
-    },
-    "title": "Phở Bò Tái",
-    "price": 55000,
-    "promotion": 50000,
-    "description": "Phở bò tái truyền thống với nước dùng đậm đà",
-    "ratingsAverage": 4.8,
-    "ratingsQuantity": 150,
-    "eachRating": [
-      5,
-      5,
-      5,
-      4,
-      5
-    ],
-    "images": [
-      "https://example.com/pho-bo-tai.jpg"
-    ],
-    "createdAt": "2025-10-01T09:00:00.000Z",
-    "createdBy": "64b7f2b8c9d1a3e5f0a1b2c3",
-    "inventory": 24,
-    "origin": "Việt Nam",
-    "ingredients": "Bánh phở, thịt bò, rau thơm, nước dùng",
-    "weight": 0.6,
-    "shelfLife": "1 giờ",
-    "storage": "Nóng",
-    "calories": 420,
-    "nutrition": "Protein: 22g, Carb: 50g, Fat: 15g",
-    "allergen": "Không",
-    "demand": "Cao",
-    "updatedAt": "2025-10-06T08:00:00.000Z",
-    "updatedBy": "64b7f2b8c9d1a3e5f0a1b2c4",
-    "brand": "64b7f2b8c9d1a3e5f0a1b2dA",
-    "category": "68e37238e38613b12df37659",
-    "review": []
+  "title": "Trà Sữa Trân Châu",
+  "price": 35000,
+  "promotion": 30000,
+  "description": "Trà sữa đen thơm ngon với trân châu dai giòn",
+  "ratingsAverage": 4.5,
+  "ratingsQuantity": 220,
+  "eachRating": [4, 5, 4, 5, 4],
+  "images": [
+    "https://example.com/tra-sua-tran-chau.jpg",
+    "https://example.com/tra-sua-tran-chau-2.jpg"
+  ],
+  "createdAt": "2025-09-30T03:20:00.000Z",
+  "createdBy": "64b7f2b8c9d1a3e5f0a1b2c3",
+  "inventory": 30,
+  "origin": "Đài Loan",
+  "ingredients": "Trà đen, sữa tươi, trân châu, đường",
+  "weight": 0.5,
+  "shelfLife": "4 giờ",
+  "storage": "Lạnh",
+  "calories": 280,
+  "nutrition": "Protein: 8g, Carb: 55g, Fat: 6g",
+  "allergen": "Sữa",
+  "demand": "Cao",
+  "updatedAt": "2025-10-06T08:00:00.000Z",
+  "updatedBy": "64b7f2b8c9d1a3e5f0a1b2c5",
+  "brand": "64b7f2b8c9d1a3e5f0a1b2dB",
+  "category": "64b7f2b8c9d1a3e5f0a1b2eLaptop",
+  "review": []
+},
+{
+  "_id": {
+    "$oid": "68e37adbceeb790b23e5379f"
   },
-  {
-    "_id": {
-      "$oid": "68e374d5e38613b12df376f6"
-    },
-    "title": "Bún Chả Hà Nội",
-    "price": 40000,
-    "promotion": 35000,
-    "description": "Bún chả Hà Nội với thịt nướng thơm ngon và nước chấm đặc biệt",
-    "images": [
-      "https://example.com/bun-cha-ha-noi.jpg"
-    ],
-    "ratingsAverage": 4.5,
-    "ratingsQuantity": 12,
-    "inventory": 19,
-    "origin": "Hà Nội",
-    "ingredients": "Bún tươi, thịt heo nướng, rau sống, nước chấm",
-    "weight": 0.5,
-    "shelfLife": "2 giờ",
-    "storage": "Nhiệt độ phòng",
-    "calories": 380,
-    "nutrition": "Protein: 20g, Carb: 45g, Fat: 12g",
-    "allergen": "Không",
-    "demand": "Trung bình",
-    "brand": null,
-    "category": null
+  "title": "Phở Bò Tái",
+  "price": 55000,
+  "promotion": 50000,
+  "description": "Phở bò tái truyền thống với nước dùng đậm đà",
+  "ratingsAverage": 4.8,
+  "ratingsQuantity": 150,
+  "eachRating": [5, 5, 5, 4, 5],
+  "images": [
+    "https://example.com/pho-bo-tai.jpg"
+  ],
+  "createdAt": "2025-10-01T09:00:00.000Z",
+  "createdBy": "64b7f2b8c9d1a3e5f0a1b2c3",
+  "inventory": 24,
+  "origin": "Việt Nam",
+  "ingredients": "Bánh phở, thịt bò, rau thơm, nước dùng",
+  "weight": 0.6,
+  "shelfLife": "1 giờ",
+  "storage": "Nóng",
+  "calories": 420,
+  "nutrition": "Protein: 22g, Carb: 50g, Fat: 15g",
+  "allergen": "Không",
+  "demand": "Cao",
+  "updatedAt": "2025-10-06T08:00:00.000Z",
+  "updatedBy": "64b7f2b8c9d1a3e5f0a1b2c4",
+  "brand": "64b7f2b8c9d1a3e5f0a1b2dA",
+  "category": "64b7f2b8c9d1a3e5f0a1b2eLaptop",
+  "review": []
+},
+{
+  "_id": {
+    "$oid": "68e374d5e38613b12df376f6"
   },
-  {
-    "_id": {
-      "$oid": "68e374d5e38613b12df376f7"
-    },
-    "title": "Cà Phê Sữa Đá",
-    "price": 15000,
-    "promotion": 12000,
-    "description": "Cà phê sữa đá truyền thống Việt Nam",
-    "images": [
-      "https://example.com/ca-phe-sua-da.jpg",
-      "https://example.com/ca-phe-sua-da-2.jpg"
-    ],
-    "ratingsAverage": 4.3,
-    "ratingsQuantity": 10,
-    "inventory": 15,
-    "origin": "Việt Nam",
-    "ingredients": "Cà phê phin, sữa đặc, đá",
-    "weight": 0.3,
-    "shelfLife": "6 giờ",
-    "storage": "Lạnh",
-    "calories": 120,
-    "nutrition": "Protein: 3g, Carb: 18g, Fat: 4g",
-    "allergen": "Sữa",
-    "demand": "Cao",
-    "brand": null,
-    "category": null
+  "title": "Bún Chả Hà Nội",
+  "price": 40000,
+  "promotion": 35000,
+  "description": "Bún chả Hà Nội với thịt nướng thơm ngon và nước chấm đặc biệt",
+  "images": [
+    "https://example.com/bun-cha-ha-noi.jpg"
+  ],
+  "ratingsAverage": 4.5,
+  "ratingsQuantity": 12,
+  "inventory": 19,
+  "origin": "Hà Nội",
+  "ingredients": "Bún tươi, thịt heo nướng, rau sống, nước chấm",
+  "weight": 0.5,
+  "shelfLife": "2 giờ",
+  "storage": "Nhiệt độ phòng",
+  "calories": 380,
+  "nutrition": "Protein: 20g, Carb: 45g, Fat: 12g",
+  "allergen": "Không",
+  "demand": "Trung bình",
+  "brand": null,
+  "category": null
+},
+{
+  "_id": {
+    "$oid": "68e374d5e38613b12df376f7"
   },
-  {
-    "_id": {
-      "$oid": "68e374d5e38613b12df376f8"
-    },
-    "title": "Chả Cá Lã Vọng",
-    "price": 75000,
-    "promotion": 65000,
-    "description": "Chả cá Lã Vọng nổi tiếng với cá lăng tươi ngon",
-    "images": [
-      "https://example.com/cha-ca-la-vong.jpg"
-    ],
-    "ratingsAverage": 4.7,
-    "ratingsQuantity": 20,
-    "inventory": 30,
-    "origin": "Hà Nội",
-    "ingredients": "Cá lăng, nghệ, dầu điều, rau thơm",
-    "weight": 0.4,
-    "shelfLife": "1 giờ",
-    "storage": "Nóng",
-    "calories": 320,
-    "nutrition": "Protein: 28g, Carb: 15g, Fat: 18g",
-    "allergen": "Cá",
-    "demand": "Trung bình",
-    "brand": null,
-    "category": null
+  "title": "Cà Phê Sữa Đá",
+  "price": 15000,
+  "promotion": 12000,
+  "description": "Cà phê sữa đá truyền thống Việt Nam",
+  "images": [
+    "https://example.com/ca-phe-sua-da.jpg",
+    "https://example.com/ca-phe-sua-da-2.jpg"
+  ],
+  "ratingsAverage": 4.3,
+  "ratingsQuantity": 10,
+  "inventory": 15,
+  "origin": "Việt Nam",
+  "ingredients": "Cà phê phin, sữa đặc, đá",
+  "weight": 0.3,
+  "shelfLife": "6 giờ",
+  "storage": "Lạnh",
+  "calories": 120,
+  "nutrition": "Protein: 3g, Carb: 18g, Fat: 4g",
+  "allergen": "Sữa",
+  "demand": "Cao",
+  "brand": null,
+  "category": null
+},
+{
+  "_id": {
+    "$oid": "68e374d5e38613b12df376f8"
   },
-  {
-    "_id": {
-      "$oid": "68e717eca9d7c61ab8798aa3"
-    },
-    "title": "Bánh Xèo Miền Tây",
-    "price": 30000,
-    "promotion": 25000,
-    "description": "Bánh xèo giòn tan với nhân tôm thịt đầy đặn",
-    "ratingsAverage": 4.5,
-    "ratingsQuantity": 0,
-    "eachRating": [],
-    "images": [],
-    "createdAt": {
-      "$date": "2025-10-09T02:01:54.175Z"
-    },
-    "createdBy": {
-      "$oid": "68e494b9d8fa16a3706eed65"
-    },
-    "inventory": 200,
-    "origin": "Miền Tây",
-    "ingredients": "Bột gạo, tôm, thịt, giá đỗ, nước cốt dừa",
-    "weight": 0.3,
-    "shelfLife": "2 giờ",
-    "storage": "Nóng",
-    "calories": 280,
-    "nutrition": "Protein: 15g, Carb: 35g, Fat: 8g",
-    "allergen": "Tôm, dừa",
-    "demand": "Cao",
-    "brand": {
-      "$oid": "68e37227e38613b12df37655"
-    },
-    "category": {
-      "$oid": "68e37238e38613b12df37659"
-    },
-    "review": [],
-    "__v": 0,
-    "updatedAt": {
-      "$date": "2025-10-09T02:20:45.966Z"
-    },
-    "updatedBy": {
-      "$oid": "68e494b9d8fa16a3706eed65"
-    }
+  "title": "Chả Cá Lã Vọng",
+  "price": 75000,
+  "promotion": 65000,
+  "description": "Chả cá Lã Vọng nổi tiếng với cá lăng tươi ngon",
+  "images": [
+    "https://example.com/cha-ca-la-vong.jpg"
+  ],
+  "ratingsAverage": 4.7,
+  "ratingsQuantity": 20,
+  "inventory": 30,
+  "origin": "Hà Nội",
+  "ingredients": "Cá lăng, nghệ, dầu điều, rau thơm",
+  "weight": 0.4,
+  "shelfLife": "1 giờ",
+  "storage": "Nóng",
+  "calories": 320,
+  "nutrition": "Protein: 28g, Carb: 15g, Fat: 18g",
+  "allergen": "Cá",
+  "demand": "Trung bình",
+  "brand": null,
+  "category": null
+},
+{
+  "_id": {
+    "$oid": "68e717eca9d7c61ab8798aa3"
   },
-  {
-    "_id": {
-      "$oid": "68e71c44258d17468216cbf3"
-    },
-    "title": "Gỏi Cuốn Tôm Thịt",
-    "price": 20000,
-    "promotion": 18000,
-    "description": "Gỏi cuốn tươi ngon với tôm thịt và rau sống",
-    "ratingsAverage": 4.5,
-    "ratingsQuantity": 0,
-    "eachRating": [],
-    "images": [],
-    "createdAt": {
-      "$date": "2025-10-09T02:19:37.587Z"
-    },
-    "createdBy": {
-      "$oid": "68e494b9d8fa16a3706eed65"
-    },
-    "inventory": 999,
-    "origin": "Việt Nam",
-    "ingredients": "Bánh tráng, tôm, thịt, rau sống, bún",
-    "weight": 0.15,
-    "shelfLife": "4 giờ",
-    "storage": "Lạnh",
-    "calories": 150,
-    "nutrition": "Protein: 12g, Carb: 20g, Fat: 3g",
-    "allergen": "Tôm",
-    "demand": "Cao",
-    "brand": {
-      "$oid": "68e37227e38613b12df37655"
-    },
-    "category": {
-      "$oid": "68e37238e38613b12df37659"
-    },
-    "review": [],
-    "__v": 0,
-    "updatedAt": {
-      "$date": "2025-10-09T02:47:52.296Z"
-    },
-    "updatedBy": {
-      "$oid": "68e494b9d8fa16a3706eed65"
-    }
+  "title": "Bánh Xèo Miền Tây",
+  "price": 30000,
+  "promotion": 25000,
+  "description": "Bánh xèo giòn tan với nhân tôm thịt đầy đặn",
+  "ratingsAverage": 4.5,
+  "ratingsQuantity": 0,
+  "eachRating": [],
+  "images": [],
+  "createdAt": {
+    "$date": "2025-10-09T02:01:54.175Z"
+  },
+  "createdBy": {
+    "$oid": "68e494b9d8fa16a3706eed65"
+  },
+  "inventory": 200,
+  "origin": "Miền Tây",
+  "ingredients": "Bột gạo, tôm, thịt, giá đỗ, nước cốt dừa",
+  "weight": 0.3,
+  "shelfLife": "2 giờ",
+  "storage": "Nóng",
+  "calories": 280,
+  "nutrition": "Protein: 15g, Carb: 35g, Fat: 8g",
+  "allergen": "Tôm, dừa",
+  "demand": "Cao",
+  "brand": {
+    "$oid": "68e37227e38613b12df37655"
+  },
+  "category": {
+    "$oid": "68e37238e38613b12df37659"
+  },
+  "review": [],
+  "__v": 0,
+  "updatedAt": {
+    "$date": "2025-10-09T02:20:45.966Z"
+  },
+  "updatedBy": {
+    "$oid": "68e494b9d8fa16a3706eed65"
   }
-]
+},
+{
+  "_id": {
+    "$oid": "68e71c44258d17468216cbf3"
+  },
+  "title": "Gỏi Cuốn Tôm Thịt",
+  "price": 20000,
+  "promotion": 18000,
+  "description": "Gỏi cuốn tươi ngon với tôm thịt và rau sống",
+  "ratingsAverage": 4.5,
+  "ratingsQuantity": 0,
+  "eachRating": [],
+  "images": [],
+  "createdAt": {
+    "$date": "2025-10-09T02:19:37.587Z"
+  },
+  "createdBy": {
+    "$oid": "68e494b9d8fa16a3706eed65"
+  },
+  "inventory": 999,
+  "origin": "Việt Nam",
+  "ingredients": "Bánh tráng, tôm, thịt, rau sống, bún",
+  "weight": 0.15,
+  "shelfLife": "4 giờ",
+  "storage": "Lạnh",
+  "calories": 150,
+  "nutrition": "Protein: 12g, Carb: 20g, Fat: 3g",
+  "allergen": "Tôm",
+  "demand": "Cao",
+  "brand": {
+    "$oid": "68e37227e38613b12df37655"
+  },
+  "category": {
+    "$oid": "68e37238e38613b12df37659"
+  },
+  "review": [],
+  "__v": 0,
+  "updatedAt": {
+    "$date": "2025-10-09T02:47:52.296Z"
+  },
+  "updatedBy": {
+    "$oid": "68e494b9d8fa16a3706eed65"
+  }
+}]

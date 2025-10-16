@@ -2,7 +2,7 @@ const { Kafka } = require('kafkajs');
 
 const kafka = new Kafka({
   clientId: 'order-service',
-  brokers: [process.env.KAFKA_URL || 'localhost:9092']
+  brokers: [process.env.KAFKA_URL || '127.0.0.1:9092']
 });
 
 const producer = kafka.producer();
@@ -14,7 +14,8 @@ const connectKafka = async () => {
     await consumer.connect();
     console.log('✅ Kafka connected successfully');
   } catch (error) {
-    console.error('❌ Kafka connection error:', error);
+    console.warn('⚠️ Kafka connection failed (continuing without Kafka):', error.message);
+    // Don't throw error, continue without Kafka
   }
 };
 
