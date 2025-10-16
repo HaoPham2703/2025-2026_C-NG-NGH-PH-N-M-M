@@ -116,7 +116,7 @@ const InformationService = () => {
           />
         </svg>
 
-        <span>Vệ sinh máy tính, laptop.</span>
+        <span>Đảm bảo vệ sinh an toàn thực phẩm.</span>
       </div>
       <div className="flex items-center  mb-4 gap-x-8">
         <svg

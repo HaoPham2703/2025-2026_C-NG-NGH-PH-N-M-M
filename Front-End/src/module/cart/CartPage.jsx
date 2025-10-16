@@ -18,7 +18,7 @@ const CartPage = () => {
   const componentRef = useRef();
   const handlePrint = useReactToPrint({
     content: () => componentRef.current,
-    documentTitle: "HC.VN chuyên bán cung cấp máy tính xách tay",
+    documentTitle: "FoodFast - Dịch vụ giao đồ ăn nhanh",
     onAfterPrint: () => {
       toast.dismiss();
       toast.success("In thành công báo giá sản phẩm", { pauseOnHover: false });

@@ -165,7 +165,7 @@ const FilterProduct = ({ data }) => {
                   </td>
                 </tr>
                 <tr>
-                  <td className="text-base font-semibold">CPU</td>
+                  <td className="text-base font-semibold">Nguyên liệu</td>
                   <td>
                     <span className="text-base font-normal">
                       {selectedItems[0]?.cpu}
@@ -178,7 +178,7 @@ const FilterProduct = ({ data }) => {
                   </td>
                 </tr>
                 <tr>
-                  <td className="text-base font-semibold">Màn hình</td>
+                  <td className="text-base font-semibold">Xuất xứ</td>
                   <td>
                     <span className="text-base font-normal">
                       {selectedItems[0]?.screen}
@@ -230,7 +230,7 @@ const FilterProduct = ({ data }) => {
                   </td>
                 </tr>
                 <tr>
-                  <td className="text-base font-semibold">Ram</td>
+                  <td className="text-base font-semibold">Khẩu phần</td>
                   <td>
                     <span className="text-base font-normal flex items-center gap-x-2">
                       {selectedItems[0]?.ram}
