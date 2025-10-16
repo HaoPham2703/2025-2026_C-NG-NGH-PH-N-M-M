@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # MongoDB Database
@@ -46,7 +46,7 @@ services:
 
   # API Gateway
   api-gateway:
-    build: 
+    build:
       context: ./services/api-gateway
       dockerfile: Dockerfile
     container_name: fastfood-api-gateway-dev
@@ -73,7 +73,7 @@ services:
 
   # User Service
   user-service:
-    build: 
+    build:
       context: ./services/user-service
       dockerfile: Dockerfile
     container_name: fastfood-user-service-dev
@@ -96,7 +96,7 @@ services:
 
   # Product Service
   product-service:
-    build: 
+    build:
       context: ./services/product-service
       dockerfile: Dockerfile
     container_name: fastfood-product-service-dev
@@ -119,7 +119,7 @@ services:
 
   # Order Service
   order-service:
-    build: 
+    build:
       context: ./services/order-service
       dockerfile: Dockerfile
     container_name: fastfood-order-service-dev
@@ -144,7 +144,7 @@ services:
 
   # Payment Service
   payment-service:
-    build: 
+    build:
       context: ./services/payment-service
       dockerfile: Dockerfile
     container_name: fastfood-payment-service-dev

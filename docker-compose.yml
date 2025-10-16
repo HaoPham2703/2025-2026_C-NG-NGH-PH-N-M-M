@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # MongoDB Database
@@ -148,6 +148,20 @@ services:
     depends_on:
       - mongodb
       - kafka
+    networks:
+      - fastfood-network
+
+  # Frontend
+  frontend:
+    build: ./frontend-microservices
+    container_name: fastfood-frontend
+    restart: unless-stopped
+    ports:
+      - "5175:5175"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:3000/api/v1
+    depends_on:
+      - api-gateway
     networks:
       - fastfood-network
 
