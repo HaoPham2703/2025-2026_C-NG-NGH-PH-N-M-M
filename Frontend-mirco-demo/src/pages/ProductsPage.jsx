@@ -1,17 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "react-query";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { productApi } from "../api/productApi";
 import { Search, Filter, Star, ShoppingCart } from "lucide-react";
 import Breadcrumb from "../components/Breadcrumb";
 import "../styles/ProductsPage.css";
 
 const ProductsPage = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [limit] = useState(10);
+
+  // Đọc search term từ URL params
+  useEffect(() => {
+    const urlSearchTerm = searchParams.get("search");
+    if (urlSearchTerm) {
+      setSearchTerm(urlSearchTerm);
+    }
+  }, [searchParams]);
 
   // Thử sử dụng endpoint đơn giản như HomePage trước
   const { data: topProducts } = useQuery(
@@ -59,6 +68,18 @@ const ProductsPage = () => {
   const handleSearch = (e) => {
     e.preventDefault();
     setCurrentPage(1);
+    // Cập nhật URL params với search term
+    if (searchTerm.trim()) {
+      setSearchParams({ search: searchTerm.trim() });
+    } else {
+      setSearchParams({});
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm("");
+    setSearchParams({});
+    setCurrentPage(1);
   };
 
   const handleSortChange = (newSortBy) => {
@@ -95,7 +116,25 @@ const ProductsPage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Sản Phẩm</h1>
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-3xl font-bold text-gray-900">Sản Phẩm</h1>
+            {searchTerm && (
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">
+                  Kết quả tìm kiếm cho:{" "}
+                  <span className="font-semibold text-orange-600">
+                    "{searchTerm}"
+                  </span>
+                </span>
+                <button
+                  onClick={handleClearSearch}
+                  className="text-sm text-orange-600 hover:text-orange-800 font-medium"
+                >
+                  Xóa bộ lọc
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Search and Filter */}
           <div className="flex flex-col md:flex-row gap-4">
