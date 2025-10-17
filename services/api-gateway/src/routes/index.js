@@ -11,10 +11,10 @@ router.get('/health', (req, res) => {
     message: 'API Gateway is running',
     timestamp: new Date().toISOString(),
     services: {
-      user: process.env.USER_SERVICE_URL || 'http://localhost:3001',
-      product: process.env.PRODUCT_SERVICE_URL || 'http://localhost:3002',
-      order: process.env.ORDER_SERVICE_URL || 'http://localhost:3003',
-      payment: process.env.PAYMENT_SERVICE_URL || 'http://localhost:3004'
+      user: process.env.USER_SERVICE_URL || 'http://localhost:4001',
+      product: process.env.PRODUCT_SERVICE_URL || 'http://localhost:4002',
+      order: process.env.ORDER_SERVICE_URL || 'http://localhost:4003',
+      payment: process.env.PAYMENT_SERVICE_URL || 'http://localhost:4004'
     }
   });
 });

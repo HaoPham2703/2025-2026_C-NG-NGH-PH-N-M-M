@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { CreditCard, Banknote, Smartphone, MapPin } from 'lucide-react';
+import Breadcrumb from '../components/Breadcrumb';
 
 const CheckoutPage = () => {
   const { user } = useAuth();
@@ -53,8 +55,15 @@ const CheckoutPage = () => {
     }
   };
 
+  const breadcrumbItems = [
+    { label: "Trang Chủ", path: "/" },
+    { label: "Giỏ Hàng", path: "/cart" },
+    { label: "Thanh Toán", path: "/checkout" },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <Breadcrumb items={breadcrumbItems} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Thanh Toán</h1>

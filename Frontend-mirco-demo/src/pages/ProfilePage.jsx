@@ -1,19 +1,21 @@
-import { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { useAuth } from '../hooks/useAuth';
-import { User, Mail, Phone, MapPin, Edit, Save, X } from 'lucide-react';
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { Link } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
+import { User, Mail, Phone, MapPin, Edit, Save, X } from "lucide-react";
+import Breadcrumb from "../components/Breadcrumb";
 
 const ProfilePage = () => {
   const { user, updateProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [newAddress, setNewAddress] = useState({
-    name: '',
-    phone: '',
-    province: '',
-    district: '',
-    ward: '',
-    detail: '',
+    name: "",
+    phone: "",
+    province: "",
+    district: "",
+    ward: "",
+    detail: "",
   });
 
   const {
@@ -22,11 +24,11 @@ const ProfilePage = () => {
     formState: { errors, isSubmitting },
   } = useForm({
     defaultValues: {
-      name: user?.name || '',
-      email: user?.email || '',
-      phone: user?.phone || '',
-      gender: user?.gender || '',
-      dateOfBirth: user?.dateOfBirth || '',
+      name: user?.name || "",
+      email: user?.email || "",
+      phone: user?.phone || "",
+      gender: user?.gender || "",
+      dateOfBirth: user?.dateOfBirth || "",
     },
   });
 
@@ -37,29 +39,37 @@ const ProfilePage = () => {
         setIsEditing(false);
       }
     } catch (error) {
-      console.error('Update profile error:', error);
+      console.error("Update profile error:", error);
     }
   };
 
   const handleAddAddress = () => {
     // TODO: Implement add address functionality
-    console.log('Add address:', newAddress);
+    console.log("Add address:", newAddress);
     setNewAddress({
-      name: '',
-      phone: '',
-      province: '',
-      district: '',
-      ward: '',
-      detail: '',
+      name: "",
+      phone: "",
+      province: "",
+      district: "",
+      ward: "",
+      detail: "",
     });
     setIsEditingAddress(false);
   };
 
+  const breadcrumbItems = [
+    { label: "Trang Chủ", path: "/" },
+    { label: "Hồ Sơ Cá Nhân", path: "/profile" },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <Breadcrumb items={breadcrumbItems} />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Hồ Sơ Cá Nhân</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            Hồ Sơ Cá Nhân
+          </h1>
           <p className="text-gray-600">
             Quản lý thông tin cá nhân và địa chỉ giao hàng
           </p>
@@ -97,12 +107,16 @@ const ProfilePage = () => {
                         Họ và tên
                       </label>
                       <input
-                        {...register('name', { required: 'Họ và tên là bắt buộc' })}
+                        {...register("name", {
+                          required: "Họ và tên là bắt buộc",
+                        })}
                         type="text"
                         className="input-field"
                       />
                       {errors.name && (
-                        <p className="text-sm text-red-600 mt-1">{errors.name.message}</p>
+                        <p className="text-sm text-red-600 mt-1">
+                          {errors.name.message}
+                        </p>
                       )}
                     </div>
 
@@ -126,7 +140,7 @@ const ProfilePage = () => {
                         Số điện thoại
                       </label>
                       <input
-                        {...register('phone')}
+                        {...register("phone")}
                         type="tel"
                         className="input-field"
                       />
@@ -136,10 +150,7 @@ const ProfilePage = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Giới tính
                       </label>
-                      <select
-                        {...register('gender')}
-                        className="input-field"
-                      >
+                      <select {...register("gender")} className="input-field">
                         <option value="">Chọn giới tính</option>
                         <option value="male">Nam</option>
                         <option value="female">Nữ</option>
@@ -152,7 +163,7 @@ const ProfilePage = () => {
                         Ngày sinh
                       </label>
                       <input
-                        {...register('dateOfBirth')}
+                        {...register("dateOfBirth")}
                         type="date"
                         className="input-field"
                       />
@@ -208,7 +219,9 @@ const ProfilePage = () => {
                       <Phone className="w-5 h-5 text-gray-400" />
                       <div>
                         <p className="text-sm text-gray-500">Số điện thoại</p>
-                        <p className="font-medium">{user?.phone || 'Chưa cập nhật'}</p>
+                        <p className="font-medium">
+                          {user?.phone || "Chưa cập nhật"}
+                        </p>
                       </div>
                     </div>
 
@@ -218,7 +231,11 @@ const ProfilePage = () => {
                         <div>
                           <p className="text-sm text-gray-500">Giới tính</p>
                           <p className="font-medium">
-                            {user.gender === 'male' ? 'Nam' : user.gender === 'female' ? 'Nữ' : 'Khác'}
+                            {user.gender === "male"
+                              ? "Nam"
+                              : user.gender === "female"
+                              ? "Nữ"
+                              : "Khác"}
                           </p>
                         </div>
                       </div>
@@ -248,7 +265,7 @@ const ProfilePage = () => {
                   onClick={() => setIsEditingAddress(!isEditingAddress)}
                   className="btn-primary text-sm"
                 >
-                  {isEditingAddress ? 'Hủy' : 'Thêm địa chỉ'}
+                  {isEditingAddress ? "Hủy" : "Thêm địa chỉ"}
                 </button>
               </div>
 
@@ -260,14 +277,18 @@ const ProfilePage = () => {
                       type="text"
                       placeholder="Họ và tên"
                       value={newAddress.name}
-                      onChange={(e) => setNewAddress({ ...newAddress, name: e.target.value })}
+                      onChange={(e) =>
+                        setNewAddress({ ...newAddress, name: e.target.value })
+                      }
                       className="input-field"
                     />
                     <input
                       type="tel"
                       placeholder="Số điện thoại"
                       value={newAddress.phone}
-                      onChange={(e) => setNewAddress({ ...newAddress, phone: e.target.value })}
+                      onChange={(e) =>
+                        setNewAddress({ ...newAddress, phone: e.target.value })
+                      }
                       className="input-field"
                     />
                     <div className="grid grid-cols-2 gap-2">
@@ -275,14 +296,24 @@ const ProfilePage = () => {
                         type="text"
                         placeholder="Tỉnh/Thành phố"
                         value={newAddress.province}
-                        onChange={(e) => setNewAddress({ ...newAddress, province: e.target.value })}
+                        onChange={(e) =>
+                          setNewAddress({
+                            ...newAddress,
+                            province: e.target.value,
+                          })
+                        }
                         className="input-field"
                       />
                       <input
                         type="text"
                         placeholder="Quận/Huyện"
                         value={newAddress.district}
-                        onChange={(e) => setNewAddress({ ...newAddress, district: e.target.value })}
+                        onChange={(e) =>
+                          setNewAddress({
+                            ...newAddress,
+                            district: e.target.value,
+                          })
+                        }
                         className="input-field"
                       />
                     </div>
@@ -291,14 +322,21 @@ const ProfilePage = () => {
                         type="text"
                         placeholder="Phường/Xã"
                         value={newAddress.ward}
-                        onChange={(e) => setNewAddress({ ...newAddress, ward: e.target.value })}
+                        onChange={(e) =>
+                          setNewAddress({ ...newAddress, ward: e.target.value })
+                        }
                         className="input-field"
                       />
                       <input
                         type="text"
                         placeholder="Địa chỉ chi tiết"
                         value={newAddress.detail}
-                        onChange={(e) => setNewAddress({ ...newAddress, detail: e.target.value })}
+                        onChange={(e) =>
+                          setNewAddress({
+                            ...newAddress,
+                            detail: e.target.value,
+                          })
+                        }
                         className="input-field"
                       />
                     </div>
@@ -326,7 +364,9 @@ const ProfilePage = () => {
                     <div
                       key={index}
                       className={`p-4 border rounded-lg ${
-                        addr.setDefault ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
+                        addr.setDefault
+                          ? "border-primary-500 bg-primary-50"
+                          : "border-gray-200"
                       }`}
                     >
                       <div className="flex items-start justify-between">
@@ -342,7 +382,8 @@ const ProfilePage = () => {
                           </div>
                           <p className="text-sm text-gray-600">{addr.phone}</p>
                           <p className="text-sm text-gray-600">
-                            {addr.detail}, {addr.ward}, {addr.district}, {addr.province}
+                            {addr.detail}, {addr.ward}, {addr.district},{" "}
+                            {addr.province}
                           </p>
                         </div>
                         <div className="flex space-x-2">
@@ -360,7 +401,9 @@ const ProfilePage = () => {
                   <div className="text-center py-8">
                     <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                     <p className="text-gray-600">Chưa có địa chỉ nào</p>
-                    <p className="text-sm text-gray-500">Thêm địa chỉ để giao hàng</p>
+                    <p className="text-sm text-gray-500">
+                      Thêm địa chỉ để giao hàng
+                    </p>
                   </div>
                 )}
               </div>

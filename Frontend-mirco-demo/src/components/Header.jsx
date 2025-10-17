@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useCart } from "../contexts/CartContext";
 import {
   ShoppingCart,
   User,
@@ -16,6 +17,7 @@ import {
 
 const Header = () => {
   const { user, logout } = useAuth();
+  const { getTotalItems } = useCart();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -130,12 +132,13 @@ const Header = () => {
                 {/* Cart */}
                 <Link
                   to="/cart"
-                  className="relative p-2 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all duration-200"
+                  className="relative p-3 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-all duration-200 group"
                 >
-                  <ShoppingCart className="w-5 h-5" />
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
-                    3
+                  <ShoppingCart className="w-6 h-6 group-hover:scale-110 transition-transform duration-200" />
+                  <span className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shadow-lg">
+                    {getTotalItems()}
                   </span>
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-0 h-0.5 bg-orange-500 group-hover:w-full transition-all duration-200"></div>
                 </Link>
 
                 {/* User Menu */}
@@ -191,6 +194,18 @@ const Header = () => {
               </>
             ) : (
               <div className="flex items-center space-x-3">
+                {/* Cart for non-logged users */}
+                <Link
+                  to="/cart"
+                  className="relative p-3 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-xl transition-all duration-200 group"
+                >
+                  <ShoppingCart className="w-6 h-6 group-hover:scale-110 transition-transform duration-200" />
+                  <span className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shadow-lg">
+                    {getTotalItems()}
+                  </span>
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-0 h-0.5 bg-orange-500 group-hover:w-full transition-all duration-200"></div>
+                </Link>
+
                 <Link
                   to="/login"
                   className="px-4 py-2 text-gray-700 hover:text-orange-600 transition-colors font-medium"
@@ -280,9 +295,14 @@ const Header = () => {
                   <Link
                     to="/cart"
                     onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:text-orange-600 hover:bg-white rounded-lg transition-all duration-200 font-medium"
+                    className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:text-orange-600 hover:bg-white rounded-lg transition-all duration-200 font-medium relative group"
                   >
-                    <ShoppingCart className="w-5 h-5" />
+                    <div className="relative">
+                      <ShoppingCart className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" />
+                      <span className="absolute -top-2 -right-2 w-5 h-5 bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shadow-lg">
+                        {getTotalItems()}
+                      </span>
+                    </div>
                     <span>Giỏ hàng</span>
                   </Link>
                   <Link

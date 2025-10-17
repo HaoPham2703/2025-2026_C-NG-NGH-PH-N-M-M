@@ -2,6 +2,7 @@ import { useQuery } from 'react-query';
 import { Link } from 'react-router-dom';
 import { orderApi } from '../api/orderApi';
 import { Package, Clock, CheckCircle, XCircle, Truck } from 'lucide-react';
+import Breadcrumb from '../components/Breadcrumb';
 
 const OrdersPage = () => {
   const { data: orders, isLoading, error } = useQuery(
@@ -82,8 +83,14 @@ const OrdersPage = () => {
     );
   }
 
+  const breadcrumbItems = [
+    { label: "Trang Chủ", path: "/" },
+    { label: "Đơn Hàng", path: "/orders" },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <Breadcrumb items={breadcrumbItems} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Đơn Hàng Của Tôi</h1>

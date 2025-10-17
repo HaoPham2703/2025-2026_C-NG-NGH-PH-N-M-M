@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from 'react-query';
+import { Link } from 'react-router-dom';
 import { orderApi, productApi } from '../api';
 import { BarChart3, Package, Users, DollarSign, TrendingUp, Activity } from 'lucide-react';
+import Breadcrumb from '../components/Breadcrumb';
 
 const AdminPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -177,8 +179,14 @@ const AdminPage = () => {
     }
   };
 
+  const breadcrumbItems = [
+    { label: "Trang Chủ", path: "/" },
+    { label: "Admin Panel", path: "/admin" },
+  ];
+
   return (
     <div className="min-h-screen bg-gray-50">
+      <Breadcrumb items={breadcrumbItems} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Admin Panel</h1>

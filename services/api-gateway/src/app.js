@@ -97,22 +97,22 @@ app.listen(PORT, () => {
   console.log(`🔗 Services configured:`);
   console.log(
     `   - User Service: ${
-      process.env.USER_SERVICE_URL || "http://localhost:3001"
+      process.env.USER_SERVICE_URL || "http://localhost:4001"
     }`
   );
   console.log(
     `   - Product Service: ${
-      process.env.PRODUCT_SERVICE_URL || "http://localhost:3002"
+      process.env.PRODUCT_SERVICE_URL || "http://localhost:4002"
     }`
   );
   console.log(
     `   - Order Service: ${
-      process.env.ORDER_SERVICE_URL || "http://localhost:3003"
+      process.env.ORDER_SERVICE_URL || "http://localhost:4003"
     }`
   );
   console.log(
     `   - Payment Service: ${
-      process.env.PAYMENT_SERVICE_URL || "http://localhost:3004"
+      process.env.PAYMENT_SERVICE_URL || "http://localhost:4004"
     }`
   );
 });

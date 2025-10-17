@@ -1,63 +1,34 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Minus, Plus, Trash2, ShoppingCart } from "lucide-react";
+import { useCart } from "../contexts/CartContext";
+import Breadcrumb from "../components/Breadcrumb";
 
 const CartPage = () => {
-  // Mock cart data - in real app, this would come from context/state management
-  const [cartItems, setCartItems] = useState([
-    {
-      id: "1",
-      product: {
-        _id: "1",
-        title: "Burger Classic",
-        price: 50000,
-        promotion: 45000,
-        images: ["https://via.placeholder.com/150"],
-      },
-      quantity: 2,
-    },
-    {
-      id: "2",
-      product: {
-        _id: "2",
-        title: "Pizza Margherita",
-        price: 120000,
-        images: ["https://via.placeholder.com/150"],
-      },
-      quantity: 1,
-    },
-  ]);
+  const {
+    items: cartItems,
+    updateQuantity,
+    removeFromCart,
+    getTotalPrice,
+    getTotalItems,
+  } = useCart();
 
-  const updateQuantity = (id, newQuantity) => {
-    if (newQuantity <= 0) {
-      removeItem(id);
-      return;
-    }
-    setCartItems((items) =>
-      items.map((item) =>
-        item.id === id ? { ...item, quantity: newQuantity } : item
-      )
-    );
+  const handleUpdateQuantity = (productId, newQuantity) => {
+    updateQuantity(productId, newQuantity);
   };
 
-  const removeItem = (id) => {
-    setCartItems((items) => items.filter((item) => item.id !== id));
+  const handleRemoveItem = (productId) => {
+    removeFromCart(productId);
   };
 
-  const getTotalPrice = () => {
-    return cartItems.reduce((total, item) => {
-      const price = item.product.promotion || item.product.price;
-      return total + price * item.quantity;
-    }, 0);
-  };
-
-  const getTotalItems = () => {
-    return cartItems.reduce((total, item) => total + item.quantity, 0);
-  };
+  const breadcrumbItems = [
+    { label: "Trang Chủ", path: "/" },
+    { label: "Giỏ Hàng", path: "/cart" },
+  ];
 
   if (cartItems.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50">
+        <Breadcrumb items={breadcrumbItems} />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center py-12">
             <ShoppingCart className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -78,6 +49,7 @@ const CartPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Breadcrumb items={breadcrumbItems} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Giỏ Hàng</h1>
@@ -93,7 +65,7 @@ const CartPage = () => {
               <div className="space-y-4">
                 {cartItems.map((item) => (
                   <div
-                    key={item.id}
+                    key={item.product._id}
                     className="flex items-center space-x-4 py-4 border-b border-gray-200 last:border-b-0"
                   >
                     <div className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
@@ -142,7 +114,10 @@ const CartPage = () => {
                     <div className="flex items-center space-x-2">
                       <button
                         onClick={() =>
-                          updateQuantity(item.id, item.quantity - 1)
+                          handleUpdateQuantity(
+                            item.product._id,
+                            item.quantity - 1
+                          )
                         }
                         className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100"
                       >
@@ -153,7 +128,10 @@ const CartPage = () => {
                       </span>
                       <button
                         onClick={() =>
-                          updateQuantity(item.id, item.quantity + 1)
+                          handleUpdateQuantity(
+                            item.product._id,
+                            item.quantity + 1
+                          )
                         }
                         className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100"
                       >
@@ -172,7 +150,7 @@ const CartPage = () => {
                         )}
                       </div>
                       <button
-                        onClick={() => removeItem(item.id)}
+                        onClick={() => handleRemoveItem(item.product._id)}
                         className="text-red-600 hover:text-red-700 text-sm mt-1"
                       >
                         <Trash2 className="w-4 h-4 inline mr-1" />
