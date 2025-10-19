@@ -108,6 +108,34 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const createAddress = async (addressData) => {
+    try {
+      const response = await authApi.createAddress(addressData);
+      if (response.status === 'success') {
+        setUser(response.data);
+        localStorage.setItem('user', JSON.stringify(response.data));
+        toast.success('Address added successfully!');
+        return { success: true };
+      }
+    } catch (error) {
+      console.error('Create address failed:', error);
+      toast.error('Failed to add address');
+      return { success: false, error: error.message };
+    }
+  };
+
+  const getAddresses = async () => {
+    try {
+      const response = await authApi.getAddresses();
+      if (response.status === 'success') {
+        return { success: true, data: response.data.address };
+      }
+    } catch (error) {
+      console.error('Get addresses failed:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   const value = {
     user,
     loading,
@@ -115,6 +143,8 @@ export const AuthProvider = ({ children }) => {
     signup,
     logout,
     updateProfile,
+    createAddress,
+    getAddresses,
   };
 
   return (

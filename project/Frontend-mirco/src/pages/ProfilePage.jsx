@@ -6,7 +6,7 @@ import { User, Mail, Phone, MapPin, Edit, Save, X } from "lucide-react";
 import Breadcrumb from "../components/Breadcrumb";
 
 const ProfilePage = () => {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, createAddress } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingAddress, setIsEditingAddress] = useState(false);
   const [newAddress, setNewAddress] = useState({
@@ -43,18 +43,29 @@ const ProfilePage = () => {
     }
   };
 
-  const handleAddAddress = () => {
-    // TODO: Implement add address functionality
-    console.log("Add address:", newAddress);
-    setNewAddress({
-      name: "",
-      phone: "",
-      province: "",
-      district: "",
-      ward: "",
-      detail: "",
-    });
-    setIsEditingAddress(false);
+  const handleAddAddress = async () => {
+    // Validate required fields
+    if (!newAddress.name || !newAddress.phone || !newAddress.province || !newAddress.district || !newAddress.ward || !newAddress.detail) {
+      alert("Vui lòng điền đầy đủ thông tin địa chỉ");
+      return;
+    }
+
+    try {
+      const result = await createAddress(newAddress);
+      if (result.success) {
+        setNewAddress({
+          name: "",
+          phone: "",
+          province: "",
+          district: "",
+          ward: "",
+          detail: "",
+        });
+        setIsEditingAddress(false);
+      }
+    } catch (error) {
+      console.error("Add address error:", error);
+    }
   };
 
   const breadcrumbItems = [

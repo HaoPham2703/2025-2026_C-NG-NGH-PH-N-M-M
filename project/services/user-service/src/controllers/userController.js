@@ -114,7 +114,7 @@ exports.updateAddress = catchAsync(async (req, res) => {
     arr[id] = data;
     user.address = arr;
     await user.save({ validateBeforeSave: false });
-    res.status(200).json({
+    return res.status(200).json({
       status: "success",
       message: "You have already updated address successfully.",
     });

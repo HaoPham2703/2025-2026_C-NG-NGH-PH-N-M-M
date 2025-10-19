@@ -32,4 +32,17 @@ router
   )
   .delete(orderController.isOwner, orderController.deleteOrder);
 
+// New specific endpoints for order management
+router.route("/:id/status").patch(orderController.updateOrderStatus);
+router.route("/:id/delivery").patch(orderController.assignDeliveryPerson);
+
+// Order queries by user/restaurant/delivery
+router.route("/user/:userId").get(orderController.getOrdersByUserId);
+router
+  .route("/restaurant/:restaurantId")
+  .get(orderController.getOrdersByRestaurantId);
+router
+  .route("/delivery/:deliveryPersonId")
+  .get(orderController.getOrdersByDeliveryPersonId);
+
 module.exports = router;

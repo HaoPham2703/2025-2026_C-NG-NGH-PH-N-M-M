@@ -399,3 +399,239 @@ exports.sumInRange = catchAsync(async (req, res, next) => {
   ]);
   res.status(200).json(data);
 });
+
+// ===== NEW METHODS FOR ENHANCED ORDER MANAGEMENT =====
+
+// Update order status specifically
+exports.updateOrderStatus = catchAsync(async (req, res, next) => {
+  const { status } = req.body;
+
+  if (!status) {
+    return next(new AppError("Status is required", 400));
+  }
+
+  const order = await Order.findById(req.params.id);
+  if (!order) {
+    return next(new AppError("Order not found", 404));
+  }
+
+  const oldStatus = order.status;
+
+  // Check if status change is allowed
+  if (order.status === "Cancelled" || order.status === "Success") {
+    return next(new AppError(`Order is already ${order.status}`, 400));
+  }
+
+  // Handle inventory restoration for cancelled orders
+  if (status === "Cancelled") {
+    const inventoryUpdate = await updateInventory(order.cart, "increase");
+    if (!inventoryUpdate.success) {
+      return next(new AppError("Failed to restore inventory", 500));
+    }
+  }
+
+  order.status = status;
+  await order.save();
+
+  // Send appropriate events
+  if (status === "Cancelled") {
+    await sendOrderCancelled(order);
+  } else if (status === "Success") {
+    await sendOrderCompleted(order);
+  } else if (oldStatus !== status) {
+    await sendOrderStatusChanged(order, oldStatus, status);
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      order,
+    },
+    message: `Order status updated to ${status}`,
+  });
+});
+
+// Assign delivery person to order
+exports.assignDeliveryPerson = catchAsync(async (req, res, next) => {
+  const { deliveryPersonId, deliveryPersonName } = req.body;
+
+  if (!deliveryPersonId) {
+    return next(new AppError("Delivery person ID is required", 400));
+  }
+
+  const order = await Order.findById(req.params.id);
+  if (!order) {
+    return next(new AppError("Order not found", 404));
+  }
+
+  // Check if order can be assigned
+  if (order.status === "Cancelled" || order.status === "Success") {
+    return next(
+      new AppError(`Cannot assign delivery to ${order.status} order`, 400)
+    );
+  }
+
+  order.deliveryPerson = {
+    id: deliveryPersonId,
+    name: deliveryPersonName || "Unknown Driver",
+  };
+
+  // Update status to "In Delivery" if not already assigned
+  if (order.status === "Processed") {
+    order.status = "In Delivery";
+  }
+
+  await order.save();
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      order,
+    },
+    message: "Delivery person assigned successfully",
+  });
+});
+
+// Get orders by user ID
+exports.getOrdersByUserId = catchAsync(async (req, res, next) => {
+  const { userId } = req.params;
+
+  // Build query with user filter
+  const queryObj = { user: userId, ...req.query };
+  const excludedFields = ["page", "sort", "limit", "fields"];
+  excludedFields.forEach((el) => delete queryObj[el]);
+
+  // Advanced filtering
+  let queryStr = JSON.stringify(queryObj);
+  queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
+
+  let query = Order.find(JSON.parse(queryStr));
+
+  // Sorting
+  if (req.query.sort) {
+    const sortBy = req.query.sort.split(",").join(" ");
+    query = query.sort(sortBy);
+  } else {
+    query = query.sort("-createdAt");
+  }
+
+  // Field limiting
+  if (req.query.fields) {
+    const fields = req.query.fields.split(",").join(" ");
+    query = query.select(fields);
+  }
+
+  // Pagination
+  const page = req.query.page * 1 || 1;
+  const limit = req.query.limit * 1 || 100;
+  const skip = (page - 1) * limit;
+
+  query = query.skip(skip).limit(limit);
+
+  const orders = await query;
+
+  res.status(200).json({
+    status: "success",
+    results: orders.length,
+    data: {
+      orders,
+    },
+    message: `Found ${orders.length} orders for user ${userId}`,
+  });
+});
+
+// Get orders by restaurant ID
+exports.getOrdersByRestaurantId = catchAsync(async (req, res, next) => {
+  const { restaurantId } = req.params;
+
+  // Build query with restaurant filter
+  const queryObj = { restaurant: restaurantId, ...req.query };
+  const excludedFields = ["page", "sort", "limit", "fields"];
+  excludedFields.forEach((el) => delete queryObj[el]);
+
+  // Advanced filtering
+  let queryStr = JSON.stringify(queryObj);
+  queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
+
+  let query = Order.find(JSON.parse(queryStr));
+
+  // Sorting
+  if (req.query.sort) {
+    const sortBy = req.query.sort.split(",").join(" ");
+    query = query.sort(sortBy);
+  } else {
+    query = query.sort("-createdAt");
+  }
+
+  // Field limiting
+  if (req.query.fields) {
+    const fields = req.query.fields.split(",").join(" ");
+    query = query.select(fields);
+  }
+
+  // Pagination
+  const page = req.query.page * 1 || 1;
+  const limit = req.query.limit * 1 || 100;
+  const skip = (page - 1) * limit;
+
+  query = query.skip(skip).limit(limit);
+
+  const orders = await query;
+
+  res.status(200).json({
+    status: "success",
+    results: orders.length,
+    data: {
+      orders,
+    },
+    message: `Found ${orders.length} orders for restaurant ${restaurantId}`,
+  });
+});
+
+// Get orders by delivery person ID
+exports.getOrdersByDeliveryPersonId = catchAsync(async (req, res, next) => {
+  const { deliveryPersonId } = req.params;
+
+  // Build query with delivery person filter
+  const queryObj = { "deliveryPerson.id": deliveryPersonId, ...req.query };
+  const excludedFields = ["page", "sort", "limit", "fields"];
+  excludedFields.forEach((el) => delete queryObj[el]);
+
+  // Advanced filtering
+  let queryStr = JSON.stringify(queryObj);
+  queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
+
+  let query = Order.find(JSON.parse(queryStr));
+
+  // Sorting
+  if (req.query.sort) {
+    const sortBy = req.query.sort.split(",").join(" ");
+    query = query.sort(sortBy);
+  } else {
+    query = query.sort("-createdAt");
+  }
+
+  // Field limiting
+  if (req.query.fields) {
+    const fields = req.query.fields.split(",").join(" ");
+    query = query.select(fields);
+  }
+
+  // Pagination
+  const page = req.query.page * 1 || 1;
+  const limit = req.query.limit * 1 || 100;
+  const skip = (page - 1) * limit;
+
+  query = query.skip(skip).limit(limit);
+
+  const orders = await query;
+
+  res.status(200).json({
+    status: "success",
+    results: orders.length,
+    data: {
+      orders,
+    },
+    message: `Found ${orders.length} orders for delivery person ${deliveryPersonId}`,
+  });
+});
