@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useCart } from "../contexts/CartContext";
 import {
@@ -21,7 +21,46 @@ const Header = () => {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState("Hà Nội");
+
+  // Danh sách địa chỉ có sẵn
+  const locations = [
+    "Hà Nội",
+    "TP. Hồ Chí Minh",
+    "Đà Nẵng",
+    "Hải Phòng",
+    "Cần Thơ",
+    "Nha Trang",
+    "Huế",
+    "Vũng Tàu",
+  ];
+
+  const handleLocationSelect = (location) => {
+    setSelectedLocation(location);
+    setIsLocationMenuOpen(false);
+  };
+
+  // Đóng dropdown khi click bên ngoài
+  const locationRef = useRef(null);
+  const userMenuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (locationRef.current && !locationRef.current.contains(event.target)) {
+        setIsLocationMenuOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const handleLogout = async () => {
     await logout();
@@ -94,12 +133,6 @@ const Header = () => {
             >
               Sản phẩm
             </Link>
-            <Link
-              to="/homepage-old"
-              className="px-4 py-2 text-gray-700 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all duration-200 font-medium"
-            >
-              Homepage Cũ
-            </Link>
             {user && (
               <>
                 <Link
@@ -123,10 +156,55 @@ const Header = () => {
           <div className="hidden md:flex items-center space-x-3">
             {user ? (
               <>
-                {/* Location */}
-                <div className="flex items-center space-x-2 text-gray-600 hover:text-orange-600 transition-colors cursor-pointer">
-                  <MapPin className="w-4 h-4" />
-                  <span className="text-sm font-medium">Hà Nội</span>
+                {/* Location Dropdown */}
+                <div className="relative" ref={locationRef}>
+                  <button
+                    onClick={() => setIsLocationMenuOpen(!isLocationMenuOpen)}
+                    className="flex items-center space-x-2 text-gray-600 hover:text-orange-600 transition-colors cursor-pointer p-2 rounded-lg hover:bg-orange-50"
+                  >
+                    <MapPin className="w-4 h-4" />
+                    <span className="text-sm font-medium">
+                      {selectedLocation}
+                    </span>
+                    <svg
+                      className={`w-4 h-4 transition-transform duration-200 ${
+                        isLocationMenuOpen ? "rotate-180" : ""
+                      }`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 9l-7 7-7-7"
+                      />
+                    </svg>
+                  </button>
+
+                  {isLocationMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
+                      <div className="px-4 py-2 border-b border-gray-100">
+                        <p className="text-sm font-semibold text-gray-900">
+                          Chọn địa chỉ
+                        </p>
+                      </div>
+                      {locations.map((location) => (
+                        <button
+                          key={location}
+                          onClick={() => handleLocationSelect(location)}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-orange-50 transition-colors ${
+                            selectedLocation === location
+                              ? "text-orange-600 bg-orange-50 font-medium"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          {location}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Notifications */}
@@ -148,7 +226,7 @@ const Header = () => {
                 </Link>
 
                 {/* User Menu */}
-                <div className="relative">
+                <div className="relative" ref={userMenuRef}>
                   <button
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                     className="flex items-center space-x-2 p-2 text-gray-700 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all duration-200"
@@ -280,13 +358,6 @@ const Header = () => {
                 className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:text-orange-600 hover:bg-white rounded-lg transition-all duration-200 font-medium"
               >
                 <span>Sản phẩm</span>
-              </Link>
-              <Link
-                to="/homepage-old"
-                onClick={() => setIsMenuOpen(false)}
-                className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:text-orange-600 hover:bg-white rounded-lg transition-all duration-200 font-medium"
-              >
-                <span>Homepage Cũ</span>
               </Link>
               {user ? (
                 <>

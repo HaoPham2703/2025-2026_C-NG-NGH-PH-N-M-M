@@ -8,7 +8,7 @@ export default defineConfig({
     port: 3475,
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:3002",
+        target: "http://127.0.0.1:5001", // API Gateway port (changed to avoid conflict)
         changeOrigin: true,
         secure: false,
       },

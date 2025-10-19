@@ -1,0 +1,136 @@
+/* Breadcrumb Navigation Styles */
+
+/* Breadcrumb Container */
+.breadcrumb-nav {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* Breadcrumb Items */
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  color: #6b7280;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.breadcrumb-item:hover {
+  background: rgba(249, 115, 22, 0.1);
+  color: #f97316;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Breadcrumb Separator */
+.breadcrumb-separator {
+  color: #d1d5db;
+  margin: 0 0.5rem;
+  flex-shrink: 0;
+}
+
+/* Current Page */
+.breadcrumb-current {
+  color: #1f2937;
+  font-weight: 600;
+  background: rgba(249, 115, 22, 0.1);
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(249, 115, 22, 0.2);
+  font-size: 0.875rem;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .breadcrumb-nav {
+    padding: 0.75rem 0;
+  }
+
+  .breadcrumb-item {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.8125rem;
+  }
+
+  .breadcrumb-current {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.8125rem;
+    max-width: 200px;
+  }
+
+  .breadcrumb-separator {
+    margin: 0 0.375rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .breadcrumb-nav {
+    padding: 0.5rem 0;
+  }
+
+  .breadcrumb-item {
+    padding: 0.25rem 0.375rem;
+    font-size: 0.75rem;
+  }
+
+  .breadcrumb-current {
+    padding: 0.25rem 0.375rem;
+    font-size: 0.75rem;
+    max-width: 150px;
+  }
+
+  .breadcrumb-separator {
+    margin: 0 0.25rem;
+  }
+}
+
+/* Focus States for Accessibility */
+.breadcrumb-item:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.5);
+  border-radius: 0.5rem;
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .breadcrumb-nav {
+    background: #ffffff;
+    border-bottom: 2px solid #000000;
+  }
+
+  .breadcrumb-item {
+    color: #000000;
+    border: 1px solid transparent;
+  }
+
+  .breadcrumb-item:hover {
+    background: #f0f0f0;
+    border-color: #000000;
+  }
+
+  .breadcrumb-current {
+    background: #f0f0f0;
+    border: 2px solid #000000;
+    color: #000000;
+  }
+
+  .breadcrumb-separator {
+    color: #000000;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .breadcrumb-item {
+    transition: none;
+  }
+
+  .breadcrumb-item:hover {
+    transform: none;
+  }
+}
