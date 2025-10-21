@@ -13,8 +13,10 @@ import OrderDetailPage from "./pages/OrderDetailPage";
 import ProfilePage from "./pages/ProfilePage";
 import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
-import AdminPage from "./pages/AdminPage";
 import NotFoundPage from "./pages/NotFoundPage";
+
+// Admin pages
+import { DashboardPage, AdminLoginPage, AdminSignupPage } from "./pages-admin";
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -30,11 +32,25 @@ function AppContent() {
   return (
     <div className="App">
       <Routes>
-        {/* Public routes */}
+        {/* Public routes - NO Layout */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
 
-        {/* Protected routes */}
+        {/* Admin routes - NO Layout (has its own sidebar/header) */}
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route path="/admin/signup" element={<AdminSignupPage />} />
+        <Route
+          path="/admin"
+          element={
+            user?.role === "admin" ? (
+              <DashboardPage />
+            ) : (
+              <Navigate to="/admin/login" replace />
+            )
+          }
+        />
+
+        {/* User routes - WITH Layout (header + footer) */}
         <Route path="/" element={<Layout />}>
           <Route index element={<HomePageNew />} />
           <Route path="homepage-old" element={<HomePage />} />
@@ -42,7 +58,7 @@ function AppContent() {
           <Route path="products/:id" element={<ProductDetailPage />} />
           <Route path="cart" element={<CartPage />} />
 
-          {/* User routes */}
+          {/* User protected routes */}
           <Route
             path="orders"
             element={user ? <OrdersPage /> : <Navigate to="/login" />}
@@ -58,14 +74,6 @@ function AppContent() {
           <Route
             path="checkout"
             element={user ? <CheckoutPage /> : <Navigate to="/login" />}
-          />
-
-          {/* Admin routes */}
-          <Route
-            path="admin"
-            element={
-              user?.role === "admin" ? <AdminPage /> : <Navigate to="/" />
-            }
           />
         </Route>
 
