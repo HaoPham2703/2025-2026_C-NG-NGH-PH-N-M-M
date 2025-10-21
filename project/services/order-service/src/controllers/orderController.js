@@ -88,8 +88,21 @@ exports.getOrder = catchAsync(async (req, res, next) => {
 exports.getAllOrders = catchAsync(async (req, res, next) => {
   // Build query
   const queryObj = { ...req.query };
-  const excludedFields = ["page", "sort", "limit", "fields"];
+  const excludedFields = [
+    "page",
+    "sort",
+    "limit",
+    "fields",
+    "queryKey",
+    "signal",
+  ];
   excludedFields.forEach((el) => delete queryObj[el]);
+
+  // Filter orders by current user (unless admin)
+  const userId = req.user._id || req.user.id;
+  if (req.user.role !== "admin") {
+    queryObj.user = userId;
+  }
 
   // Advanced filtering
   let queryStr = JSON.stringify(queryObj);

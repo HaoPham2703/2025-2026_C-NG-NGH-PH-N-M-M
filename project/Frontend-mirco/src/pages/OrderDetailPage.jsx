@@ -1,32 +1,42 @@
-import { useParams } from 'react-router-dom';
-import { useQuery } from 'react-query';
-import { Link } from 'react-router-dom';
-import { orderApi } from '../api/orderApi';
-import { Package, Clock, CheckCircle, XCircle, Truck, MapPin, Phone, User } from 'lucide-react';
-import Breadcrumb from '../components/Breadcrumb';
+import { useParams } from "react-router-dom";
+import { useQuery } from "react-query";
+import { Link } from "react-router-dom";
+import { orderApi } from "../api/orderApi";
+import {
+  Package,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Truck,
+  MapPin,
+  Phone,
+  User,
+  CreditCard,
+} from "lucide-react";
+import Breadcrumb from "../components/Breadcrumb";
 
 const OrderDetailPage = () => {
   const { id } = useParams();
 
-  const { data: order, isLoading, error } = useQuery(
-    ['order', id],
-    () => orderApi.getOrder(id),
-    {
-      refetchOnWindowFocus: false,
-    }
-  );
+  const {
+    data: order,
+    isLoading,
+    error,
+  } = useQuery(["order", id], () => orderApi.getOrder(id), {
+    refetchOnWindowFocus: false,
+  });
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'Processed':
+      case "Processed":
         return <Clock className="w-5 h-5 text-blue-500" />;
-      case 'Waiting Goods':
+      case "Waiting Goods":
         return <Package className="w-5 h-5 text-yellow-500" />;
-      case 'Delivery':
+      case "Delivery":
         return <Truck className="w-5 h-5 text-purple-500" />;
-      case 'Success':
+      case "Success":
         return <CheckCircle className="w-5 h-5 text-green-500" />;
-      case 'Cancelled':
+      case "Cancelled":
         return <XCircle className="w-5 h-5 text-red-500" />;
       default:
         return <Clock className="w-5 h-5 text-gray-500" />;
@@ -35,16 +45,16 @@ const OrderDetailPage = () => {
 
   const getStatusText = (status) => {
     switch (status) {
-      case 'Processed':
-        return 'Đã xử lý';
-      case 'Waiting Goods':
-        return 'Chờ hàng';
-      case 'Delivery':
-        return 'Đang giao';
-      case 'Success':
-        return 'Thành công';
-      case 'Cancelled':
-        return 'Đã hủy';
+      case "Processed":
+        return "Đã xử lý";
+      case "Waiting Goods":
+        return "Chờ hàng";
+      case "Delivery":
+        return "Đang giao";
+      case "Success":
+        return "Thành công";
+      case "Cancelled":
+        return "Đã hủy";
       default:
         return status;
     }
@@ -52,18 +62,18 @@ const OrderDetailPage = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'Processed':
-        return 'bg-blue-100 text-blue-800';
-      case 'Waiting Goods':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'Delivery':
-        return 'bg-purple-100 text-purple-800';
-      case 'Success':
-        return 'bg-green-100 text-green-800';
-      case 'Cancelled':
-        return 'bg-red-100 text-red-800';
+      case "Processed":
+        return "bg-blue-100 text-blue-800";
+      case "Waiting Goods":
+        return "bg-yellow-100 text-yellow-800";
+      case "Delivery":
+        return "bg-purple-100 text-purple-800";
+      case "Success":
+        return "bg-green-100 text-green-800";
+      case "Cancelled":
+        return "bg-red-100 text-red-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -79,7 +89,9 @@ const OrderDetailPage = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Đơn hàng không tồn tại</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Đơn hàng không tồn tại
+          </h2>
           <p className="text-gray-600">Vui lòng thử lại sau</p>
         </div>
       </div>
@@ -91,110 +103,192 @@ const OrderDetailPage = () => {
   const breadcrumbItems = [
     { label: "Trang Chủ", path: "/" },
     { label: "Đơn Hàng", path: "/orders" },
-    { label: `Đơn hàng #${orderData._id.slice(-8).toUpperCase()}`, path: `/orders/${id}` },
+    {
+      label: `Đơn hàng #${orderData._id.slice(-8).toUpperCase()}`,
+      path: `/orders/${id}`,
+    },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <Breadcrumb items={breadcrumbItems} />
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">
-            Chi tiết đơn hàng #{orderData._id.slice(-8).toUpperCase()}
-          </h1>
-          <p className="text-gray-600">
-            Đặt hàng lúc {new Date(orderData.createdAt).toLocaleString('vi-VN')}
-          </p>
+          <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <h1 className="text-3xl font-bold text-gray-900">
+                    Đơn hàng #{orderData._id.slice(-8).toUpperCase()}
+                  </h1>
+                  <div className="flex items-center gap-2">
+                    {getStatusIcon(orderData.status)}
+                    <span
+                      className={`px-3 py-1.5 rounded-full text-sm font-semibold ${getStatusColor(
+                        orderData.status
+                      )} shadow-sm`}
+                    >
+                      {getStatusText(orderData.status)}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Clock className="w-4 h-4" />
+                  <span>
+                    Đặt hàng lúc{" "}
+                    {new Date(orderData.createdAt).toLocaleString("vi-VN")}
+                  </span>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-gray-600 mb-1">Tổng tiền</p>
+                <p className="text-3xl font-bold text-primary-600">
+                  {new Intl.NumberFormat("vi-VN", {
+                    style: "currency",
+                    currency: "VND",
+                  }).format(orderData.totalPrice)}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Order Info */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Status */}
-            <div className="card">
-              <h2 className="text-xl font-semibold mb-4">Trạng thái đơn hàng</h2>
-              <div className="flex items-center space-x-4">
-                {getStatusIcon(orderData.status)}
-                <div>
-                  <div className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(orderData.status)}`}>
-                    {getStatusText(orderData.status)}
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Cập nhật lần cuối: {new Date(orderData.updatedAt || orderData.createdAt).toLocaleString('vi-VN')}
-                  </p>
-                </div>
-              </div>
-            </div>
-
             {/* Products */}
-            <div className="card">
-              <h2 className="text-xl font-semibold mb-4">Sản phẩm đã đặt</h2>
-              <div className="space-y-4">
-                {orderData.cart?.map((item, index) => (
-                  <div key={index} className="flex items-center space-x-4 py-4 border-b border-gray-200 last:border-b-0">
-                    <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden">
-                      {item.product?.images?.[0] ? (
-                        <img
-                          src={item.product.images[0]}
-                          alt={item.product.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-gray-400 text-xs">No Image</span>
-                      )}
-                    </div>
-                    
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">{item.product?.title}</h3>
-                      <p className="text-sm text-gray-600">
-                        Số lượng: {item.quantity}
-                      </p>
-                    </div>
-                    
-                    <div className="text-right">
-                      <div className="font-medium text-primary-600">
-                        {new Intl.NumberFormat('vi-VN', {
-                          style: 'currency',
-                          currency: 'VND',
-                        }).format((item.product?.promotion || item.product?.price || 0) * item.quantity)}
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+              <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Package className="w-5 h-5 text-primary-600" />
+                  Sản phẩm đã đặt
+                  <span className="ml-2 px-2 py-0.5 bg-primary-100 text-primary-700 text-sm font-semibold rounded-full">
+                    {orderData.cart?.length || 0} món
+                  </span>
+                </h2>
+              </div>
+              <div className="p-6">
+                <div className="space-y-4">
+                  {orderData.cart?.map((item, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors duration-200 border border-gray-200"
+                    >
+                      <div className="w-20 h-20 bg-white rounded-lg flex items-center justify-center overflow-hidden shadow-sm flex-shrink-0 border border-gray-200">
+                        {item.product?.images?.[0] ? (
+                          <img
+                            src={item.product.images[0]}
+                            alt={item.product.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="text-center">
+                            <Package className="w-8 h-8 text-gray-300 mx-auto mb-1" />
+                            <span className="text-xs text-gray-400">
+                              No Image
+                            </span>
+                          </div>
+                        )}
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {new Intl.NumberFormat('vi-VN', {
-                          style: 'currency',
-                          currency: 'VND',
-                        }).format(item.product?.promotion || item.product?.price || 0)} / sản phẩm
+
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 mb-1 truncate">
+                          {item.product?.title}
+                        </h3>
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <span className="flex items-center gap-1">
+                            <span className="font-medium">SL:</span>
+                            <span className="px-2 py-0.5 bg-white rounded-md font-semibold border border-gray-300">
+                              {item.quantity}
+                            </span>
+                          </span>
+                          <span className="text-gray-400">×</span>
+                          <span>
+                            {new Intl.NumberFormat("vi-VN", {
+                              style: "currency",
+                              currency: "VND",
+                            }).format(
+                              item.product?.promotion ||
+                                item.product?.price ||
+                                0
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-lg font-bold text-primary-600">
+                          {new Intl.NumberFormat("vi-VN", {
+                            style: "currency",
+                            currency: "VND",
+                          }).format(
+                            (item.product?.promotion ||
+                              item.product?.price ||
+                              0) * item.quantity
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
 
             {/* Delivery Info */}
-            <div className="card">
-              <h2 className="text-xl font-semibold mb-4">Thông tin giao hàng</h2>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <User className="w-5 h-5 text-gray-400" />
-                  <div>
-                    <p className="font-medium">{orderData.receiver}</p>
-                    <p className="text-sm text-gray-600">Người nhận</p>
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
+              <div className="bg-gradient-to-r from-gray-50 to-white px-6 py-4 border-b border-gray-100">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                  <Truck className="w-5 h-5 text-primary-600" />
+                  Thông tin giao hàng
+                </h2>
+              </div>
+              <div className="p-6">
+                <div className="space-y-4">
+                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-white rounded-lg shadow-sm">
+                        <User className="w-5 h-5 text-primary-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-500 mb-1">Người nhận</p>
+                        <p className="font-semibold text-gray-900">
+                          {orderData.receiver}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="flex items-center space-x-3">
-                  <Phone className="w-5 h-5 text-gray-400" />
-                  <div>
-                    <p className="font-medium">{orderData.phone}</p>
-                    <p className="text-sm text-gray-600">Số điện thoại</p>
+
+                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-white rounded-lg shadow-sm">
+                        <Phone className="w-5 h-5 text-primary-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-500 mb-1">
+                          Số điện thoại
+                        </p>
+                        <p className="font-semibold text-gray-900">
+                          {orderData.phone}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
-                  <div>
-                    <p className="font-medium">{orderData.address}</p>
-                    <p className="text-sm text-gray-600">Địa chỉ giao hàng</p>
+
+                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-white rounded-lg shadow-sm">
+                        <MapPin className="w-5 h-5 text-primary-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-500 mb-1">
+                          Địa chỉ giao hàng
+                        </p>
+                        <p className="font-semibold text-gray-900 leading-relaxed">
+                          {orderData.address}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -203,73 +297,107 @@ const OrderDetailPage = () => {
 
           {/* Order Summary */}
           <div>
-            <div className="card sticky top-8">
-              <h2 className="text-xl font-semibold mb-4">Tóm tắt đơn hàng</h2>
-              
-              <div className="space-y-3 mb-6">
-                <div className="flex justify-between">
-                  <span>Tạm tính:</span>
-                  <span>
-                    {new Intl.NumberFormat('vi-VN', {
-                      style: 'currency',
-                      currency: 'VND',
-                    }).format(orderData.totalPrice)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Phí vận chuyển:</span>
-                  <span className="text-green-600">Miễn phí</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Giảm giá:</span>
-                  <span className="text-red-600">-0đ</span>
-                </div>
-                <div className="border-t pt-3">
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Tổng cộng:</span>
-                    <span className="text-primary-600">
-                      {new Intl.NumberFormat('vi-VN', {
-                        style: 'currency',
-                        currency: 'VND',
+            <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden sticky top-8">
+              <div className="bg-gradient-to-r from-primary-50 to-primary-100 px-6 py-4 border-b border-primary-200">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Thông tin đơn hàng
+                </h2>
+              </div>
+
+              <div className="p-6">
+                <div className="space-y-3 mb-6">
+                  <div className="flex justify-between text-gray-700">
+                    <span>Tạm tính:</span>
+                    <span className="font-semibold">
+                      {new Intl.NumberFormat("vi-VN", {
+                        style: "currency",
+                        currency: "VND",
                       }).format(orderData.totalPrice)}
                     </span>
                   </div>
+                  <div className="flex justify-between text-gray-700">
+                    <span>Phí vận chuyển:</span>
+                    <span className="text-green-600 font-semibold">
+                      Miễn phí
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-gray-700">
+                    <span>Giảm giá:</span>
+                    <span className="text-red-600 font-semibold">-0đ</span>
+                  </div>
+                  <div className="border-t-2 border-gray-200 pt-3 mt-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-bold text-gray-900">
+                        Tổng cộng:
+                      </span>
+                      <span className="text-2xl font-bold text-primary-600">
+                        {new Intl.NumberFormat("vi-VN", {
+                          style: "currency",
+                          currency: "VND",
+                        }).format(orderData.totalPrice)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              <div className="space-y-3">
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-sm font-medium text-gray-900 mb-1">Phương thức thanh toán</p>
-                  <p className="text-sm text-gray-600">
-                    {orderData.payments === 'cash' ? 'Thanh toán khi nhận hàng' : 
-                     orderData.payments === 'vnpay' ? 'VNPay' :
-                     orderData.payments === 'momo' ? 'MoMo' : orderData.payments}
-                  </p>
+                <div className="space-y-3">
+                  <div className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border border-gray-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CreditCard className="w-4 h-4 text-primary-600" />
+                      <p className="text-xs font-semibold text-gray-600 uppercase">
+                        Thanh toán
+                      </p>
+                    </div>
+                    <p className="font-semibold text-gray-900">
+                      {orderData.payments === "tiền mặt"
+                        ? "Thanh toán khi nhận hàng (COD)"
+                        : orderData.payments === "vnpay"
+                        ? "VNPay"
+                        : orderData.payments === "momo"
+                        ? "MoMo"
+                        : orderData.payments}
+                    </p>
+                  </div>
+
+                  {orderData.status === "Processed" && (
+                    <button className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors duration-200 shadow-md flex items-center justify-center gap-2">
+                      <XCircle className="w-5 h-5" />
+                      Hủy đơn hàng
+                    </button>
+                  )}
+
+                  {orderData.status === "Success" && (
+                    <button className="w-full py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors duration-200 shadow-md flex items-center justify-center gap-2">
+                      <Package className="w-5 h-5" />
+                      Đặt lại
+                    </button>
+                  )}
+
+                  <Link
+                    to="/orders"
+                    className="block w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors duration-200 text-center"
+                  >
+                    Quay lại đơn hàng
+                  </Link>
                 </div>
 
-                {orderData.status === 'Processed' && (
-                  <button className="w-full btn-primary">
-                    Hủy đơn hàng
-                  </button>
-                )}
-                
-                {orderData.status === 'Success' && (
-                  <button className="w-full btn-primary">
-                    Đặt lại
-                  </button>
-                )}
-
-                <button className="w-full btn-secondary">
-                  Liên hệ hỗ trợ
-                </button>
-              </div>
-
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                <h3 className="font-medium text-blue-900 mb-2">Thông tin hỗ trợ</h3>
-                <div className="text-sm text-blue-800 space-y-1">
-                  <p>Hotline: 1900 1234</p>
-                  <p>Email: support@foodfast.com</p>
-                  <p>Thời gian: 24/7</p>
+                <div className="mt-6 p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-200">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Phone className="w-5 h-5 text-blue-600" />
+                    <h3 className="font-semibold text-blue-900">
+                      Hỗ trợ khách hàng
+                    </h3>
+                  </div>
+                  <div className="text-sm text-blue-800 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4" />
+                      <span className="font-medium">1900 1234</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      <span>Hoạt động 24/7</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
