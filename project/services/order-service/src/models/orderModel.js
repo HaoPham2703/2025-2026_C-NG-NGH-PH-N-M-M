@@ -34,8 +34,8 @@ const orderSchema = new mongoose.Schema(
       type: String,
       required: [true, "Phải có phương thức thanh toán"],
       enum: {
-        values: ["tiền mặt", "paypal", "vnpay", "số dư"],
-        message: "Phương thức thanh toán là tiền mặt hoặc ngân hàng",
+        values: ["tiền mặt", "paypal", "vnpay", "momo", "số dư"],
+        message: "Phương thức thanh toán là tiền mặt, vnpay, momo hoặc số dư",
       },
     },
     status: {

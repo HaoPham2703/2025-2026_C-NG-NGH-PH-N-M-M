@@ -6,6 +6,7 @@ export { default as AdminSignupPage } from "./AdminSignupPage";
 // Sub-pages (for dashboard routing)
 export { default as DashboardContent } from "./DashboardContent";
 export { default as OrdersManagementPage } from "./OrdersManagementPage";
+export { default as OrderDetailAdminPage } from "./OrderDetailAdminPage";
 export { default as ProductsManagementPage } from "./ProductsManagementPage";
 export { default as CustomersManagementPage } from "./CustomersManagementPage";
 export { default as PaymentsManagementPage } from "./PaymentsManagementPage";

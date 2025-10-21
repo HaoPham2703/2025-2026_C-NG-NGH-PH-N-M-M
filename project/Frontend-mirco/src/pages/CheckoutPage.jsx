@@ -47,7 +47,7 @@ const CheckoutPage = () => {
       const paymentMapping = {
         cash: "tiền mặt",
         vnpay: "vnpay",
-        momo: "tiền mặt", // Fallback to cash for now
+        momo: "momo",
       };
 
       const orderData = {
@@ -78,20 +78,13 @@ const CheckoutPage = () => {
 
         // Handle different payment methods
         if (selectedPayment === "vnpay") {
-          // Redirect to VNPay payment URL
-          const paymentData = {
-            orderId: order._id,
-            amount: getTotalPrice(),
-            orderDescription: `Thanh toán đơn hàng #${order._id}`,
-          };
-
-          const paymentResponse = await paymentApi.createVNPayUrl(paymentData);
-          if (paymentResponse.success) {
-            window.location.href = paymentResponse.paymentUrl;
-          }
+          // Redirect to VNPay Mock Page
+          const paymentUrl = `/payment/vnpay?orderId=${order._id}&amount=${getTotalPrice() * 100}&orderDescription=${encodeURIComponent(`Thanh toán đơn hàng #${order._id}`)}`;
+          navigate(paymentUrl);
         } else if (selectedPayment === "momo") {
-          // Handle MoMo payment (if implemented)
-          toast.info("Thanh toán MoMo đang được phát triển");
+          // Redirect to MoMo Mock Page
+          const paymentUrl = `/payment/momo?orderId=${order._id}&amount=${getTotalPrice()}&orderDescription=${encodeURIComponent(`Thanh toán đơn hàng #${order._id}`)}`;
+          navigate(paymentUrl);
         } else {
           // COD - redirect to order success page
           navigate(`/orders/${order._id}`);

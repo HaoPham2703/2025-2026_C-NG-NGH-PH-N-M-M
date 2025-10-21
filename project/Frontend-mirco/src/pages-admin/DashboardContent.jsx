@@ -21,6 +21,9 @@ const DashboardContent = () => {
   const { data: topProducts } = useQuery("topProducts", () =>
     orderApi.getTopProducts({})
   );
+  const { data: recentOrders } = useQuery("dashboardRecentOrders", () =>
+    orderApi.getOrders()
+  );
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -172,28 +175,66 @@ const DashboardContent = () => {
             </h3>
           </div>
           <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
-            {orderStats?.map((stat, index) => (
+            {recentOrders?.data?.orders?.slice(0, 5).map((order) => (
               <div
-                key={index}
-                className="p-4 hover:bg-gray-50 transition-colors"
+                key={order._id}
+                className="block p-4 hover:bg-gray-50 transition-colors cursor-default"
               >
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900">
-                      Trạng thái: {stat._id}
+                      Đơn #{order._id.slice(-8).toUpperCase()}
                     </p>
                     <p className="text-sm text-gray-500">
-                      {stat.count} đơn hàng
+                      {order.cart
+                        ?.map((item) => item.product?.title)
+                        .join(", ")
+                        .slice(0, 50)}
+                      {order.cart?.map((item) => item.product?.title).join(", ")
+                        .length > 50 && "..."}
                     </p>
                   </div>
                   <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800`}
+                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      order.status === "Success"
+                        ? "bg-green-100 text-green-800"
+                        : order.status === "Delivery"
+                        ? "bg-purple-100 text-purple-800"
+                        : order.status === "Processed"
+                        ? "bg-blue-100 text-blue-800"
+                        : order.status === "Cancelled"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-yellow-100 text-yellow-800"
+                    }`}
                   >
-                    {stat._id}
+                    {order.status === "Processed"
+                      ? "Đã xử lý"
+                      : order.status === "Waiting Goods"
+                      ? "Chờ hàng"
+                      : order.status === "Delivery"
+                      ? "Đang giao"
+                      : order.status === "Success"
+                      ? "Thành công"
+                      : order.status === "Cancelled"
+                      ? "Đã hủy"
+                      : order.status}
                   </span>
                 </div>
-                <div className="mt-2 flex justify-between text-xs text-gray-500">
-                  <div>Tổng số: {stat.count} đơn</div>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <div className="flex items-center gap-4">
+                    <span>Khách: {order.receiver}</span>
+                    <span>•</span>
+                    <span>{order.cart?.length || 0} món</span>
+                  </div>
+                  <div className="font-semibold text-primary-600">
+                    {new Intl.NumberFormat("vi-VN", {
+                      style: "currency",
+                      currency: "VND",
+                    }).format(order.totalPrice)}
+                  </div>
+                </div>
+                <div className="mt-1 text-xs text-gray-400">
+                  {new Date(order.createdAt).toLocaleString("vi-VN")}
                 </div>
               </div>
             ))}

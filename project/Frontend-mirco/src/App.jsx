@@ -14,6 +14,8 @@ import ProfilePage from "./pages/ProfilePage";
 import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import NotFoundPage from "./pages/NotFoundPage";
+import VNPayMockPage from "./pages/VNPayMockPage";
+import MoMoMockPage from "./pages/MoMoMockPage";
 
 // Admin pages
 import { DashboardPage, AdminLoginPage, AdminSignupPage } from "./pages-admin";
@@ -35,6 +37,10 @@ function AppContent() {
         {/* Public routes - NO Layout */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+
+        {/* Payment Mock Pages - NO Layout */}
+        <Route path="/payment/vnpay" element={<VNPayMockPage />} />
+        <Route path="/payment/momo" element={<MoMoMockPage />} />
 
         {/* Admin routes - NO Layout (has its own sidebar/header) */}
         <Route path="/admin/login" element={<AdminLoginPage />} />

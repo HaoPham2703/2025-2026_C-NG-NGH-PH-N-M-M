@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "react-query";
-import { Link } from "react-router-dom";
 import { orderApi } from "../api/orderApi";
 import {
   Package,
@@ -11,10 +10,12 @@ import {
   Search,
   Eye,
 } from "lucide-react";
+import OrderDetailAdminPage from "./OrderDetailAdminPage";
 
 const OrdersManagementPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
 
   const { data: orders, isLoading } = useQuery("adminAllOrders", () =>
     orderApi.getOrders()
@@ -60,6 +61,16 @@ const OrdersManagementPage = () => {
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
+    );
+  }
+
+  // If order is selected, show detail page
+  if (selectedOrderId) {
+    return (
+      <OrderDetailAdminPage
+        id={selectedOrderId}
+        onBack={() => setSelectedOrderId(null)}
+      />
     );
   }
 
@@ -186,13 +197,13 @@ const OrdersManagementPage = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <Link
-                      to={`/orders/${order._id}`}
-                      className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-900"
+                    <button
+                      onClick={() => setSelectedOrderId(order._id)}
+                      className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-900 transition-colors"
                     >
                       <Eye size={16} />
                       Xem
-                    </Link>
+                    </button>
                   </td>
                 </tr>
               ))}
