@@ -1,17 +1,21 @@
-import { useState } from "react";
-import { useQuery } from "react-query";
+import { useState, useMemo } from "react";
+import { useQuery, useMutation, useQueryClient } from "react-query";
 import { productApi } from "../api/productApi";
 import { Package, Search, Plus, Edit, Trash2, Eye } from "lucide-react";
 import ProductModal from "./components/ProductModal";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
+import Pagination from "./components/Pagination";
 import toast from "react-hot-toast";
 
 const ProductsManagementPage = () => {
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [modalMode, setModalMode] = useState(null); // 'view', 'edit', 'create'
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   const { data: products, isLoading } = useQuery("allProducts", () =>
     productApi.getProducts()
@@ -37,12 +41,26 @@ const ProductsManagementPage = () => {
     setShowDeleteModal(true);
   };
 
+  // Delete mutation
+  const deleteMutation = useMutation(
+    (productId) => productApi.deleteProduct(productId),
+    {
+      onSuccess: () => {
+        toast.success("Xóa sản phẩm thành công!");
+        queryClient.invalidateQueries("allProducts");
+        setShowDeleteModal(false);
+        setProductToDelete(null);
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message || "Xóa sản phẩm thất bại!");
+      },
+    }
+  );
+
   const handleDeleteConfirm = () => {
-    toast.error("Tính năng xóa sản phẩm đang được phát triển");
-    setShowDeleteModal(false);
-    setProductToDelete(null);
-    // TODO: Implement delete API call
-    // await productApi.deleteProduct(productToDelete._id);
+    if (productToDelete) {
+      deleteMutation.mutate(productToDelete._id);
+    }
   };
 
   const closeModal = () => {
@@ -53,6 +71,19 @@ const ProductsManagementPage = () => {
   const filteredProducts = products?.data?.products?.filter((product) =>
     product.title?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Pagination
+  const totalPages = Math.ceil((filteredProducts?.length || 0) / itemsPerPage);
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredProducts?.slice(start, end);
+  }, [filteredProducts, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when filter changes
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   if (isLoading) {
     return (
@@ -98,7 +129,7 @@ const ProductsManagementPage = () => {
 
       {/* Products Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredProducts?.map((product) => (
+        {paginatedProducts?.map((product) => (
           <div
             key={product._id}
             className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden border border-gray-100 hover:border-primary-200 group"
@@ -203,6 +234,17 @@ const ProductsManagementPage = () => {
         ))}
       </div>
 
+      {/* Pagination */}
+      {filteredProducts && filteredProducts.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          totalItems={filteredProducts.length}
+          itemsPerPage={itemsPerPage}
+        />
+      )}
+
       {/* Empty State */}
       {filteredProducts?.length === 0 && (
         <div className="bg-white rounded-lg shadow-sm p-12 text-center">
@@ -220,6 +262,7 @@ const ProductsManagementPage = () => {
 
       {/* Modals */}
       <ProductModal
+        key={`${modalMode}-${selectedProduct?._id || "new"}`}
         isOpen={modalMode !== null}
         onClose={closeModal}
         product={selectedProduct}
@@ -232,6 +275,7 @@ const ProductsManagementPage = () => {
         onConfirm={handleDeleteConfirm}
         itemName={productToDelete?.title}
         itemType="sản phẩm"
+        isLoading={deleteMutation.isLoading}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "react-query";
 import { orderApi } from "../api/orderApi";
 import {
@@ -11,11 +11,14 @@ import {
   Eye,
 } from "lucide-react";
 import OrderDetailAdminPage from "./OrderDetailAdminPage";
+import Pagination from "./components/Pagination";
 
 const OrdersManagementPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   const { data: orders, isLoading } = useQuery("adminAllOrders", () =>
     orderApi.getOrders()
@@ -33,6 +36,19 @@ const OrdersManagementPage = () => {
 
     return matchesSearch && matchesStatus;
   });
+
+  // Pagination
+  const totalPages = Math.ceil((filteredOrders?.length || 0) / itemsPerPage);
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    return filteredOrders?.slice(start, end);
+  }, [filteredOrders, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when filter changes
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter]);
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -144,7 +160,7 @@ const OrdersManagementPage = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredOrders?.map((order) => (
+              {paginatedOrders?.map((order) => (
                 <tr
                   key={order._id}
                   className="hover:bg-gray-50 transition-colors"
@@ -209,6 +225,14 @@ const OrdersManagementPage = () => {
               ))}
             </tbody>
           </table>
+
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalItems={filteredOrders?.length || 0}
+            itemsPerPage={itemsPerPage}
+          />
         </div>
 
         {/* Empty State */}
