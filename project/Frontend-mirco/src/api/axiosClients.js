@@ -67,10 +67,13 @@ const createErrorInterceptor = (serviceName) => (error) => {
   return Promise.reject(error);
 };
 
-// User Service Client (port 4001)
+// API Gateway URL - All requests go through the gateway
+const API_GATEWAY_URL = "http://localhost:5001";
+
+// User Service Client - via API Gateway (port 5001)
 export const userClient = axios.create({
   ...baseConfig,
-  baseURL: "http://localhost:4001",
+  baseURL: API_GATEWAY_URL,
 });
 
 userClient.interceptors.request.use(createRequestInterceptor("User"));
@@ -79,10 +82,10 @@ userClient.interceptors.response.use(
   createErrorInterceptor("User")
 );
 
-// Product Service Client (port 4002)
+// Product Service Client - via API Gateway (port 5001)
 export const productClient = axios.create({
   ...baseConfig,
-  baseURL: "http://localhost:4002/api/v1",
+  baseURL: `${API_GATEWAY_URL}/api/v1`,
 });
 
 productClient.interceptors.request.use(createRequestInterceptor("Product"));
@@ -91,10 +94,10 @@ productClient.interceptors.response.use(
   createErrorInterceptor("Product")
 );
 
-// Order Service Client (port 4003)
+// Order Service Client - via API Gateway (port 5001)
 export const orderClient = axios.create({
   ...baseConfig,
-  baseURL: "http://localhost:4003/api/v1",
+  baseURL: `${API_GATEWAY_URL}/api/v1`,
 });
 
 orderClient.interceptors.request.use(createRequestInterceptor("Order"));
@@ -103,10 +106,10 @@ orderClient.interceptors.response.use(
   createErrorInterceptor("Order")
 );
 
-// Payment Service Client (port 4004)
+// Payment Service Client - via API Gateway (port 5001)
 export const paymentClient = axios.create({
   ...baseConfig,
-  baseURL: "http://localhost:4004/api/v1",
+  baseURL: `${API_GATEWAY_URL}/api/v1`,
 });
 
 paymentClient.interceptors.request.use(createRequestInterceptor("Payment"));

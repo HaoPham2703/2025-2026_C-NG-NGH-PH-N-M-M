@@ -5,7 +5,7 @@ const { serviceRoutes } = require("../config/services");
 const createServiceProxy = (target, pathRewrite = {}) => {
   return createProxyMiddleware({
     target,
-    changeOrigin: false, // Disabled auto-origin change
+    changeOrigin: true, // Enable origin change for proper proxying
     pathRewrite,
     timeout: 30000, // Fixed timeout
     proxyTimeout: 30000,
@@ -26,6 +26,21 @@ const createServiceProxy = (target, pathRewrite = {}) => {
       proxyReq.setHeader("x-correlation-id", correlationId);
       proxyReq.setHeader("x-forwarded-for", req.ip);
       proxyReq.setHeader("x-user-agent", req.get("User-Agent"));
+
+      // Forward user information if available (Base64 encoded to avoid header issues)
+      if (req.user) {
+        const userJson = JSON.stringify(req.user);
+        const userBase64 = Buffer.from(userJson).toString("base64");
+        proxyReq.setHeader("x-user", userBase64);
+      }
+
+      // Fix body forwarding - re-stream the parsed body
+      if (req.body && Object.keys(req.body).length > 0) {
+        const bodyData = JSON.stringify(req.body);
+        proxyReq.setHeader("Content-Type", "application/json");
+        proxyReq.setHeader("Content-Length", Buffer.byteLength(bodyData));
+        proxyReq.write(bodyData);
+      }
 
       console.log(
         `[${correlationId}] FIXED Proxying ${req.method} ${req.url} to ${target}`

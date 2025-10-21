@@ -1,11 +1,11 @@
 const axios = require('axios');
 
-const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL || 'http://localhost:3002';
+const PRODUCT_SERVICE_URL = process.env.PRODUCT_SERVICE_URL || 'http://localhost:4002';
 
 // Check inventory for multiple products
 const checkInventory = async (cartItems) => {
   try {
-    const productIds = cartItems.map(item => item.product._id || item.product.id);
+    console.log('Checking inventory for cart items:', cartItems);
     
     const response = await axios.post(`${PRODUCT_SERVICE_URL}/api/v1/products/check-inventory`, {
       products: cartItems.map(item => ({
@@ -14,9 +14,11 @@ const checkInventory = async (cartItems) => {
       }))
     });
 
+    console.log('Inventory check response:', response.data);
     return response.data;
   } catch (error) {
     console.error('Error checking inventory:', error.message);
+    console.error('Error details:', error.response?.data);
     return { success: false, message: 'Error checking inventory' };
   }
 };

@@ -61,14 +61,15 @@ const orderSchema = new mongoose.Schema(
 
 orderSchema.index({ "$**": "text" });
 
-orderSchema.pre(/^find/, function (next) {
-  this.populate({
-    path: "user",
-    select: "name email",
-  });
-
-  next();
-});
+// Note: In microservices architecture, we don't populate user from User Service
+// User data should be fetched separately via API if needed
+// orderSchema.pre(/^find/, function (next) {
+//   this.populate({
+//     path: "user",
+//     select: "name email",
+//   });
+//   next();
+// });
 
 const Order = mongoose.model("Order", orderSchema);
 

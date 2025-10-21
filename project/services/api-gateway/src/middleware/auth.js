@@ -16,7 +16,7 @@ const verifyToken = async (req, res, next) => {
 
     // Verify token with user service
     try {
-      const response = await axios.get(`${services.user}/api/v1/auth/verify`, {
+      const response = await axios.get(`${services.user}/verify`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -52,14 +52,11 @@ const optionalAuth = async (req, res, next) => {
 
     if (token) {
       try {
-        const response = await axios.get(
-          `${services.user}/api/v1/auth/verify`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const response = await axios.get(`${services.user}/verify`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
         if (response.data.status === "success") {
           req.user = response.data.data.user;

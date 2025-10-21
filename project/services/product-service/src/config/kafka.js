@@ -1,20 +1,25 @@
-const { Kafka } = require('kafkajs');
+const { Kafka } = require("kafkajs");
 
 const kafka = new Kafka({
-  clientId: 'order-service',
-  brokers: [process.env.KAFKA_URL || '127.0.0.1:9092']
+  clientId: "product-service",
+  brokers: [process.env.KAFKA_URL || "127.0.0.1:9092"],
+  logLevel: 0, // Disable Kafka logging
+  logCreator: () => () => {}, // Empty log function
 });
 
 const producer = kafka.producer();
-const consumer = kafka.consumer({ groupId: 'order-service-group' });
+const consumer = kafka.consumer({ groupId: "product-service-group" });
 
 const connectKafka = async () => {
   try {
     await producer.connect();
     await consumer.connect();
-    console.log('✅ Kafka connected successfully');
+    console.log("✅ Kafka connected successfully");
   } catch (error) {
-    console.warn('⚠️ Kafka connection failed (continuing without Kafka):', error.message);
+    console.warn(
+      "⚠️ Kafka connection failed (continuing without Kafka):",
+      error.message
+    );
     // Don't throw error, continue without Kafka
   }
 };
@@ -23,9 +28,9 @@ const disconnectKafka = async () => {
   try {
     await producer.disconnect();
     await consumer.disconnect();
-    console.log('✅ Kafka disconnected successfully');
+    console.log("✅ Kafka disconnected successfully");
   } catch (error) {
-    console.error('❌ Kafka disconnection error:', error);
+    console.error("❌ Kafka disconnection error:", error);
   }
 };
 
@@ -33,14 +38,16 @@ const sendEvent = async (topic, message) => {
   try {
     await producer.send({
       topic,
-      messages: [{
-        key: message.id || Date.now().toString(),
-        value: JSON.stringify(message)
-      }]
+      messages: [
+        {
+          key: message.id || Date.now().toString(),
+          value: JSON.stringify(message),
+        },
+      ],
     });
     console.log(`📤 Event sent to ${topic}:`, message);
   } catch (error) {
-    console.error('❌ Error sending event:', error);
+    console.error("❌ Error sending event:", error);
   }
 };
 
@@ -54,13 +61,13 @@ const subscribeToTopic = async (topic, callback) => {
           console.log(`📥 Event received from ${topic}:`, data);
           await callback(data);
         } catch (error) {
-          console.error('❌ Error processing message:', error);
+          console.error("❌ Error processing message:", error);
         }
-      }
+      },
     });
     console.log(`✅ Subscribed to topic: ${topic}`);
   } catch (error) {
-    console.error('❌ Error subscribing to topic:', error);
+    console.error("❌ Error subscribing to topic:", error);
   }
 };
 
@@ -68,5 +75,5 @@ module.exports = {
   connectKafka,
   disconnectKafka,
   sendEvent,
-  subscribeToTopic
+  subscribeToTopic,
 };

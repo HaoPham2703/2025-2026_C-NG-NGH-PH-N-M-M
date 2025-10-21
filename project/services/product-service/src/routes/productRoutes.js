@@ -46,4 +46,13 @@ router
   .get(productController.getAllBrands)
   .post(productController.createBrand);
 
+// Inventory routes
+router
+  .route("/check-inventory")
+  .post(productController.checkInventory);
+
+router
+  .route("/update-inventory")
+  .post(productController.updateInventory);
+
 module.exports = router;

@@ -1,4 +1,5 @@
 const Order = require("../models/orderModel");
+const AppError = require("../utils/appError");
 const {
   checkInventory,
   updateInventory,
@@ -18,14 +19,6 @@ const catchAsync = (fn) => {
   };
 };
 
-// Helper function for creating errors
-const AppError = (message, statusCode) => {
-  const error = new Error(message);
-  error.statusCode = statusCode;
-  error.status = `${statusCode}`.startsWith("4") ? "fail" : "error";
-  return error;
-};
-
 exports.checkStatusOrder = catchAsync(async (req, res, next) => {
   if (
     req.user.role == "user" &&
@@ -41,7 +34,10 @@ exports.checkStatusOrder = catchAsync(async (req, res, next) => {
 });
 
 exports.setUser = (req, res, next) => {
-  if (!req.body.user) req.body.user = req.user.id;
+  if (!req.body.user) {
+    // Handle both _id and id fields from API Gateway user object
+    req.body.user = req.user._id || req.user.id;
+  }
   next();
 };
 
@@ -192,7 +188,12 @@ exports.isOwner = catchAsync(async (req, res, next) => {
   }
 
   // Check if user is owner or admin
-  if (order.user.toString() !== req.user.id && req.user.role !== "admin") {
+  // Handle both _id and id fields from API Gateway user object
+  const userId = req.user._id || req.user.id;
+  if (
+    order.user.toString() !== userId.toString() &&
+    req.user.role !== "admin"
+  ) {
     return next(new AppError("Bạn không có quyền truy cập đơn hàng này", 403));
   }
 

@@ -30,8 +30,29 @@ Start-Sleep -Seconds 3
 Write-Host "📋 Starting Order Service..." -ForegroundColor Green
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd 'services\order-service'; npm run dev"
 
+Start-Sleep -Seconds 3
+
+# Start Payment Service
+Write-Host "💳 Starting Payment Service..." -ForegroundColor Green
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd 'services\payment-service'; npm run dev"
+
+Start-Sleep -Seconds 3
+
+# Start Frontend
+Write-Host "🌐 Starting Frontend..." -ForegroundColor Green
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd 'Frontend-mirco'; npm run dev"
+
+Start-Sleep -Seconds 2
+
+Write-Host ""
 Write-Host "✅ All services started! Check individual windows for logs." -ForegroundColor Cyan
-Write-Host "🌐 API Gateway: http://localhost:5000" -ForegroundColor Blue
-Write-Host "👤 User Service: http://localhost:4001" -ForegroundColor Blue
-Write-Host "📦 Product Service: http://localhost:4002" -ForegroundColor Blue
-Write-Host "📋 Order Service: http://localhost:4003" -ForegroundColor Blue
+Write-Host ""
+Write-Host "Backend Services:" -ForegroundColor Yellow
+Write-Host "  🌐 API Gateway: http://localhost:4000" -ForegroundColor Blue
+Write-Host "  👤 User Service: http://localhost:4001" -ForegroundColor Blue
+Write-Host "  📦 Product Service: http://localhost:4002" -ForegroundColor Blue
+Write-Host "  📋 Order Service: http://localhost:4003" -ForegroundColor Blue
+Write-Host "  💳 Payment Service: http://localhost:4004" -ForegroundColor Blue
+Write-Host ""
+Write-Host "Frontend:" -ForegroundColor Yellow
+Write-Host "  🎨 Frontend: http://localhost:5173" -ForegroundColor Blue

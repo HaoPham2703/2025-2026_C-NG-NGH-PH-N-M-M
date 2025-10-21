@@ -1,18 +1,11 @@
 const User = require("../models/userModel");
+const AppError = require("../utils/appError");
 
 // Helper function for async error handling
 const catchAsync = (fn) => {
   return (req, res, next) => {
     fn(req, res, next).catch(next);
   };
-};
-
-// Helper function for creating errors
-const AppError = (message, statusCode) => {
-  const error = new Error(message);
-  error.statusCode = statusCode;
-  error.status = `${statusCode}`.startsWith("4") ? "fail" : "error";
-  return error;
 };
 
 const filterObj = (obj, ...allowedFields) => {

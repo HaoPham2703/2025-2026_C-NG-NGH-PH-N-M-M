@@ -2,21 +2,19 @@ const crypto = require("crypto");
 const { promisify } = require("util");
 const jwt = require("jsonwebtoken");
 const User = require("../models/userModel");
-const { createSendToken, changeState, sendVerifyToken, verifyToken } = require("../services/authService");
+const AppError = require("../utils/appError");
+const {
+  createSendToken,
+  changeState,
+  sendVerifyToken,
+  verifyToken,
+} = require("../services/authService");
 
 // Helper function for async error handling
 const catchAsync = (fn) => {
   return (req, res, next) => {
     fn(req, res, next).catch(next);
   };
-};
-
-// Helper function for creating errors
-const AppError = (message, statusCode) => {
-  const error = new Error(message);
-  error.statusCode = statusCode;
-  error.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
-  return error;
 };
 
 exports.changeStateUser = catchAsync(async (req, res, next) => {
@@ -103,9 +101,9 @@ exports.signupAdmin = catchAsync(async (req, res, next) => {
         name: newUser.name,
         email: newUser.email,
         role: newUser.role,
-        active: newUser.active
-      }
-    }
+        active: newUser.active,
+      },
+    },
   });
 });
 
@@ -381,28 +379,28 @@ exports.userLoginWith = catchAsync(async (req, res, next) => {
 
 // New endpoint for token verification (used by API Gateway)
 exports.verify = catchAsync(async (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
-  
+  const token = req.headers.authorization?.split(" ")[1];
+
   if (!token) {
     return res.status(401).json({
-      status: 'error',
-      message: 'No token provided'
+      status: "error",
+      message: "No token provided",
     });
   }
 
   const result = await verifyToken(token);
-  
+
   if (result.success) {
     res.json({
-      status: 'success',
+      status: "success",
       data: {
-        user: result.user
-      }
+        user: result.user,
+      },
     });
   } else {
     res.status(401).json({
-      status: 'error',
-      message: result.message
+      status: "error",
+      message: result.message,
     });
   }
 });

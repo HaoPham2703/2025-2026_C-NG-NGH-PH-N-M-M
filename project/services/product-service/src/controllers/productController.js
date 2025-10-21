@@ -303,3 +303,114 @@ exports.createBrand = catchAsync(async (req, res, next) => {
     },
   });
 });
+
+// Inventory operations
+exports.checkInventory = catchAsync(async (req, res, next) => {
+  const { products } = req.body;
+
+  if (!products || !Array.isArray(products)) {
+    return next(new AppError("Products array is required", 400));
+  }
+
+  const results = [];
+  let allAvailable = true;
+
+  for (const item of products) {
+    const product = await Product.findById(item.id);
+
+    if (!product) {
+      results.push({
+        id: item.id,
+        success: false,
+        message: "Product not found",
+      });
+      allAvailable = false;
+      continue;
+    }
+
+    if (product.inventory < item.quantity) {
+      results.push({
+        id: item.id,
+        success: false,
+        message: `Insufficient inventory. Available: ${product.inventory}, Requested: ${item.quantity}`,
+        available: product.inventory,
+        requested: item.quantity,
+      });
+      allAvailable = false;
+    } else {
+      results.push({
+        id: item.id,
+        success: true,
+        available: product.inventory,
+        requested: item.quantity,
+      });
+    }
+  }
+
+  res.status(200).json({
+    success: allAvailable,
+    message: allAvailable
+      ? "All products have sufficient inventory"
+      : "Some products have insufficient inventory",
+    results,
+  });
+});
+
+exports.updateInventory = catchAsync(async (req, res, next) => {
+  const { products, operation = "decrease" } = req.body;
+
+  if (!products || !Array.isArray(products)) {
+    return next(new AppError("Products array is required", 400));
+  }
+
+  const results = [];
+  let allUpdated = true;
+
+  for (const item of products) {
+    const product = await Product.findById(item.id);
+
+    if (!product) {
+      results.push({
+        id: item.id,
+        success: false,
+        message: "Product not found",
+      });
+      allUpdated = false;
+      continue;
+    }
+
+    if (operation === "decrease") {
+      if (product.inventory < item.quantity) {
+        results.push({
+          id: item.id,
+          success: false,
+          message: "Insufficient inventory",
+          available: product.inventory,
+          requested: item.quantity,
+        });
+        allUpdated = false;
+        continue;
+      }
+      product.inventory -= item.quantity;
+    } else if (operation === "increase") {
+      product.inventory += item.quantity;
+    }
+
+    await product.save();
+
+    results.push({
+      id: item.id,
+      success: true,
+      newInventory: product.inventory,
+      operation,
+    });
+  }
+
+  res.status(200).json({
+    success: allUpdated,
+    message: allUpdated
+      ? "Inventory updated successfully"
+      : "Some inventory updates failed",
+    results,
+  });
+});
