@@ -4,6 +4,7 @@ const services = {
   product: process.env.PRODUCT_SERVICE_URL || "http://localhost:4002",
   order: process.env.ORDER_SERVICE_URL || "http://localhost:4003",
   payment: process.env.PAYMENT_SERVICE_URL || "http://localhost:4004",
+  restaurant: process.env.RESTAURANT_SERVICE_URL || "http://localhost:4006",
 };
 
 // Service health check endpoints
@@ -12,6 +13,7 @@ const healthEndpoints = {
   product: `${services.product}/health`,
   order: `${services.order}/health`,
   payment: `${services.payment}/health`,
+  restaurant: `${services.restaurant}/health`,
 };
 
 // Service routing configuration
@@ -24,6 +26,7 @@ const serviceRoutes = {
   "/api/v1/orders": services.order,
   "/api/v1/payments": services.payment,
   "/api/v1/transactions": services.payment,
+  "/api/restaurant": services.restaurant,
 };
 
 module.exports = {

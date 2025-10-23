@@ -20,6 +20,19 @@ import MoMoMockPage from "./pages/MoMoMockPage";
 // Admin pages
 import { DashboardPage, AdminLoginPage, AdminSignupPage } from "./pages-admin";
 
+// Restaurant pages
+import {
+  RestaurantLoginPage,
+  RestaurantSignupPage,
+  RestaurantDashboard,
+  DashboardContent,
+  ProductsManagementPage,
+  OrdersManagementPage,
+  OrderDetailPage as RestaurantOrderDetailPage,
+  AnalyticsPage,
+  SettingsPage,
+} from "./pages-restaurant-client";
+
 function AppContent() {
   const { user, loading } = useAuth();
 
@@ -55,6 +68,25 @@ function AppContent() {
             )
           }
         />
+
+        {/* Restaurant routes - NO Layout (has its own sidebar/header) */}
+        <Route
+          path="/restaurant"
+          element={<Navigate to="/restaurant/login" replace />}
+        />
+        <Route path="/restaurant/login" element={<RestaurantLoginPage />} />
+        <Route path="/restaurant/signup" element={<RestaurantSignupPage />} />
+        <Route path="/restaurant/dashboard" element={<RestaurantDashboard />}>
+          <Route index element={<DashboardContent />} />
+          <Route path="products" element={<ProductsManagementPage />} />
+          <Route path="orders" element={<OrdersManagementPage />} />
+          <Route
+            path="orders/:orderId"
+            element={<RestaurantOrderDetailPage />}
+          />
+          <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+        </Route>
 
         {/* User routes - WITH Layout (header + footer) */}
         <Route path="/" element={<Layout />}>
