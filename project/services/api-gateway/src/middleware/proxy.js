@@ -71,6 +71,11 @@ const proxies = {
 
   // Payment service proxy - FIXED to payment service
   paymentProxy: createServiceProxy(serviceRoutes["/api/v1/payments"]),
+
+  // Restaurant service proxy - FIXED to restaurant service with path rewrite
+  restaurantProxy: createServiceProxy(serviceRoutes["/api/restaurant"], {
+    "^/api/restaurant": "/api/v1/restaurant", // Rewrite /api/restaurant/signup to /api/v1/restaurant/signup
+  }),
 };
 
 // Health check proxy - FIXED to user service port

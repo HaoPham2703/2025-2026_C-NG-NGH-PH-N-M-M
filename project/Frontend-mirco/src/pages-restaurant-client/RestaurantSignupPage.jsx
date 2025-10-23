@@ -13,6 +13,16 @@ import {
   Building,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import axios from "axios";
+
+// Restaurant API client
+const restaurantClient = axios.create({
+  baseURL: "/api",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  withCredentials: true,
+});
 
 const RestaurantSignupPage = () => {
   const navigate = useNavigate();
@@ -37,16 +47,11 @@ const RestaurantSignupPage = () => {
   });
   const [errors, setErrors] = useState({});
 
-  // TODO: Replace with actual restaurant signup API
+  // Restaurant signup API call
   const signupMutation = useMutation(
     async (data) => {
-      const response = await fetch("http://localhost:3001/api/restaurant/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error("Đăng ký thất bại");
-      return response.json();
+      const response = await restaurantClient.post("/restaurant/signup", data);
+      return response;
     },
     {
       onSuccess: () => {
@@ -61,7 +66,8 @@ const RestaurantSignupPage = () => {
 
   const validateStep1 = () => {
     const newErrors = {};
-    if (!formData.restaurantName) newErrors.restaurantName = "Vui lòng nhập tên nhà hàng";
+    if (!formData.restaurantName)
+      newErrors.restaurantName = "Vui lòng nhập tên nhà hàng";
     if (!formData.email) {
       newErrors.email = "Vui lòng nhập email";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
@@ -89,7 +95,8 @@ const RestaurantSignupPage = () => {
 
   const validateStep3 = () => {
     const newErrors = {};
-    if (!formData.ownerName) newErrors.ownerName = "Vui lòng nhập tên chủ nhà hàng";
+    if (!formData.ownerName)
+      newErrors.ownerName = "Vui lòng nhập tên chủ nhà hàng";
     if (!formData.password) {
       newErrors.password = "Vui lòng nhập mật khẩu";
     } else if (formData.password.length < 6) {
@@ -215,7 +222,9 @@ const RestaurantSignupPage = () => {
                       value={formData.restaurantName}
                       onChange={handleChange}
                       className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-500 ${
-                        errors.restaurantName ? "border-red-500" : "border-gray-300"
+                        errors.restaurantName
+                          ? "border-red-500"
+                          : "border-gray-300"
                       }`}
                       placeholder="Nhà hàng của bạn"
                     />
@@ -497,7 +506,9 @@ const RestaurantSignupPage = () => {
                       value={formData.confirmPassword}
                       onChange={handleChange}
                       className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-500 ${
-                        errors.confirmPassword ? "border-red-500" : "border-gray-300"
+                        errors.confirmPassword
+                          ? "border-red-500"
+                          : "border-gray-300"
                       }`}
                       placeholder="••••••••"
                     />
@@ -583,4 +594,3 @@ const RestaurantSignupPage = () => {
 };
 
 export default RestaurantSignupPage;
-

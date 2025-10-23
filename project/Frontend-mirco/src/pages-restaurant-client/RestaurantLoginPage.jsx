@@ -3,6 +3,16 @@ import { Link, useNavigate } from "react-router-dom";
 import { useMutation } from "react-query";
 import { ChefHat, Mail, Lock, AlertCircle, Store } from "lucide-react";
 import toast from "react-hot-toast";
+import axios from "axios";
+
+// Restaurant API client
+const restaurantClient = axios.create({
+  baseURL: "/api",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  withCredentials: true,
+});
 
 const RestaurantLoginPage = () => {
   const navigate = useNavigate();
@@ -13,22 +23,22 @@ const RestaurantLoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
 
-  // TODO: Replace with actual restaurant API call
+  // Restaurant login API call
   const loginMutation = useMutation(
     async (credentials) => {
-      // Placeholder for restaurant login API
-      const response = await fetch("http://localhost:3001/api/restaurant/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(credentials),
-      });
-      if (!response.ok) throw new Error("Đăng nhập thất bại");
-      return response.json();
+      const response = await restaurantClient.post(
+        "/restaurant/login",
+        credentials
+      );
+      return response;
     },
     {
       onSuccess: (data) => {
         localStorage.setItem("restaurant_token", data.token);
-        localStorage.setItem("restaurant_data", JSON.stringify(data.restaurant));
+        localStorage.setItem(
+          "restaurant_data",
+          JSON.stringify(data.restaurant)
+        );
         toast.success("Đăng nhập thành công!");
         navigate("/restaurant/dashboard");
       },
@@ -226,4 +236,3 @@ const RestaurantLoginPage = () => {
 };
 
 export default RestaurantLoginPage;
-

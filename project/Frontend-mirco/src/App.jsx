@@ -32,6 +32,8 @@ import {
   AnalyticsPage,
   SettingsPage,
 } from "./pages-restaurant-client";
+import RestaurantDashboardTest from "./pages-restaurant-client/RestaurantDashboardTest";
+import RestaurantLoginTest from "./pages-restaurant-client/RestaurantLoginTest";
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -76,7 +78,21 @@ function AppContent() {
         />
         <Route path="/restaurant/login" element={<RestaurantLoginPage />} />
         <Route path="/restaurant/signup" element={<RestaurantSignupPage />} />
-        <Route path="/restaurant/dashboard" element={<RestaurantDashboard />}>
+        <Route path="/restaurant/test" element={<RestaurantDashboardTest />} />
+        <Route
+          path="/restaurant/login-test"
+          element={<RestaurantLoginTest />}
+        />
+        <Route
+          path="/restaurant/dashboard"
+          element={
+            localStorage.getItem("restaurant_token") ? (
+              <RestaurantDashboard />
+            ) : (
+              <Navigate to="/restaurant/login" replace />
+            )
+          }
+        >
           <Route index element={<DashboardContent />} />
           <Route path="products" element={<ProductsManagementPage />} />
           <Route path="orders" element={<OrdersManagementPage />} />

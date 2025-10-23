@@ -118,5 +118,17 @@ paymentClient.interceptors.response.use(
   createErrorInterceptor("Payment")
 );
 
+// Restaurant Service Client - via API Gateway (port 5001)
+export const restaurantClient = axios.create({
+  ...baseConfig,
+  baseURL: `${API_GATEWAY_URL}/api`,
+});
+
+restaurantClient.interceptors.request.use(createRequestInterceptor("Restaurant"));
+restaurantClient.interceptors.response.use(
+  createResponseInterceptor("Restaurant"),
+  createErrorInterceptor("Restaurant")
+);
+
 // Default client (for backward compatibility)
 export default userClient;

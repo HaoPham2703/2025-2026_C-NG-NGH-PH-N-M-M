@@ -38,6 +38,7 @@ Start-Service -ServiceName "User Service" -ServicePath "$ProjectRoot\services\us
 Start-Service -ServiceName "Product Service" -ServicePath "$ProjectRoot\services\product-service" -Port "4002"
 Start-Service -ServiceName "Order Service" -ServicePath "$ProjectRoot\services\order-service" -Port "4003"
 Start-Service -ServiceName "Payment Service" -ServicePath "$ProjectRoot\services\payment-service" -Port "4004"
+Start-Service -ServiceName "Restaurant Service" -ServicePath "$ProjectRoot\services\restaurant-service" -Port "4006"
 
 Write-Host ""
 Write-Host "Waiting for services to initialize..." -ForegroundColor Yellow
@@ -66,6 +67,7 @@ Write-Host "  - User Service:     http://localhost:4001" -ForegroundColor Yellow
 Write-Host "  - Product Service:  http://localhost:4002" -ForegroundColor Yellow
 Write-Host "  - Order Service:    http://localhost:4003" -ForegroundColor Yellow
 Write-Host "  - Payment Service:  http://localhost:4004" -ForegroundColor Yellow
+Write-Host "  - Restaurant Service: http://localhost:4006" -ForegroundColor Yellow
 Write-Host "  - Frontend:         http://localhost:3475" -ForegroundColor Magenta
 Write-Host ""
 Write-Host "Press any key to close this window (services will keep running)..." -ForegroundColor Gray
