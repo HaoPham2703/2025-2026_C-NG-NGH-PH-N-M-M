@@ -28,7 +28,7 @@ const seedProducts = async () => {
     // Read products data
     const productsPath = path.join(
       __dirname,
-      "../../Data/fastfood.products.json"
+      "../../../Data/fastfood.products.json"
     );
     const productsData = JSON.parse(fs.readFileSync(productsPath, "utf8"));
 
