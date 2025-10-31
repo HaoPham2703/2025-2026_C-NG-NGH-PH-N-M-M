@@ -124,7 +124,19 @@ export const restaurantClient = axios.create({
   baseURL: `${API_GATEWAY_URL}/api`,
 });
 
-restaurantClient.interceptors.request.use(createRequestInterceptor("Restaurant"));
+// Restaurant client uses a different token stored at 'restaurant_token'
+restaurantClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem("restaurant_token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  console.log(`🚀 Restaurant API Request:`, {
+    method: config.method?.toUpperCase(),
+    url: config.url,
+    headers: config.headers,
+  });
+  return config;
+});
 restaurantClient.interceptors.response.use(
   createResponseInterceptor("Restaurant"),
   createErrorInterceptor("Restaurant")

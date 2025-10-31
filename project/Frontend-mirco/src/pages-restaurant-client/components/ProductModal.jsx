@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "react-query";
+import { restaurantClient } from "../../api/axiosClients";
 import { X, Upload, Package, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -24,7 +25,7 @@ const ProductModal = ({ product, onClose, onSuccess }) => {
         description: product.description || "",
         price: product.price || "",
         promotion: product.promotion || "",
-        category: product.category?.name || "",
+        category: product.category?.name || product.category || "",
         stock: product.stock || "",
         images: product.images || [],
         status: product.status || "active",
@@ -35,25 +36,12 @@ const ProductModal = ({ product, onClose, onSuccess }) => {
     }
   }, [product]);
 
-  // TODO: Replace with actual API call
   const saveProductMutation = useMutation(
     async (data) => {
-      const url = product
-        ? `http://localhost:3002/api/products/${product._id}`
-        : "http://localhost:3002/api/products";
-      const method = product ? "PUT" : "POST";
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("restaurant_token")}`,
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) throw new Error("Lưu thất bại");
-      return response.json();
+      if (product) {
+        return restaurantClient.put(`/restaurant/menu/${product._id}`, data);
+      }
+      return restaurantClient.post(`/restaurant/menu`, data);
     },
     {
       onSuccess: () => {
@@ -99,6 +87,8 @@ const ProductModal = ({ product, onClose, onSuccess }) => {
         price: Number(formData.price),
         promotion: formData.promotion ? Number(formData.promotion) : null,
         stock: Number(formData.stock),
+        // Ensure category is string value (backend expects category string)
+        category: String(formData.category),
       });
     }
   };
@@ -371,5 +361,3 @@ const ProductModal = ({ product, onClose, onSuccess }) => {
 };
 
 export default ProductModal;
-
-

@@ -5,7 +5,9 @@ const connectDB = async () => {
     // Set mongoose options to suppress deprecation warnings
     mongoose.set("strictQuery", false);
 
-    const conn = await mongoose.connect(process.env.DB_URL, {
+    const dbUrl =
+      process.env.DB_URL || "mongodb://localhost:27017/fastfood_users";
+    const conn = await mongoose.connect(dbUrl, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });
