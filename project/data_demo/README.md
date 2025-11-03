@@ -60,6 +60,24 @@ node data_demo/link-restaurants.js
 
 **Kết quả:** Link trường `restaurant` (ObjectId) trong products với restaurants trong database
 
+### 4. Sync Products → MenuItems (QUAN TRỌNG!)
+
+**⚠️ Bước này BẮT BUỘC để sản phẩm hiển thị trong Restaurant Dashboard**
+
+```bash
+cd services/product-service
+node sync-products-to-menuitems.js
+```
+
+Hoặc từ project root:
+
+```bash
+cd services/product-service
+npm run sync-menuitems
+```
+
+**Kết quả:** Tạo MenuItems trong Restaurant Service từ Products. Restaurant Dashboard chỉ hiển thị từ MenuItems, không phải Products.
+
 ## Thứ tự chạy
 
 1. **Chạy seed restaurants trước:**
@@ -74,9 +92,16 @@ node data_demo/link-restaurants.js
    node data_demo/seed-products-data.js
    ```
 
-3. **Cuối cùng link products với restaurants:**
+3. **Link products với restaurants:**
+
    ```bash
    node data_demo/link-restaurants.js
+   ```
+
+4. **QUAN TRỌNG: Sync products sang MenuItems (bắt buộc để hiển thị trong Dashboard):**
+   ```bash
+   cd services/product-service
+   node sync-products-to-menuitems.js
    ```
 
 ## Lưu ý

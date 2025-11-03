@@ -182,3 +182,4 @@ PATCH /api/v1/drones/:id/status
 # Update drone location
 PATCH /api/v1/drones/:id/location
 ```
+

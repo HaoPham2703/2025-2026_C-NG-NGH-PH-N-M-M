@@ -34,11 +34,32 @@ const RestaurantLoginPage = () => {
     },
     {
       onSuccess: (data) => {
-        localStorage.setItem("restaurant_token", data.token);
-        localStorage.setItem(
-          "restaurant_data",
-          JSON.stringify(data.restaurant)
-        );
+        console.log("Login response:", data);
+        
+        // Handle different response structures
+        const token = data.token || data.data?.token || data.data?.data?.token;
+        const restaurant = data.restaurant || data.data?.restaurant || data.data?.data?.restaurant;
+        
+        if (!token) {
+          console.error("No token in response:", data);
+          toast.error("Không nhận được token từ server");
+          return;
+        }
+        
+        // Verify token format (JWT should have 3 parts separated by dots)
+        if (!token.includes(".") || token.split(".").length !== 3) {
+          console.error("Invalid token format:", token);
+          toast.error("Token không hợp lệ");
+          return;
+        }
+        
+        localStorage.setItem("restaurant_token", token);
+        if (restaurant) {
+          localStorage.setItem(
+            "restaurant_data",
+            JSON.stringify(restaurant)
+          );
+        }
         toast.success("Đăng nhập thành công!");
         navigate("/restaurant/dashboard");
       },

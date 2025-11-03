@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react";
-import { useMutation } from "react-query";
-import { restaurantClient } from "../../api/axiosClients";
 import { X, Upload, Package, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
 
-const ProductModal = ({ product, onClose, onSuccess }) => {
+const ProductModal = ({ product, onClose, onCreate, onUpdate }) => {
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -36,26 +34,6 @@ const ProductModal = ({ product, onClose, onSuccess }) => {
     }
   }, [product]);
 
-  const saveProductMutation = useMutation(
-    async (data) => {
-      if (product) {
-        return restaurantClient.put(`/restaurant/menu/${product._id}`, data);
-      }
-      return restaurantClient.post(`/restaurant/menu`, data);
-    },
-    {
-      onSuccess: () => {
-        toast.success(
-          product ? "Cập nhật món ăn thành công!" : "Thêm món ăn thành công!"
-        );
-        onSuccess();
-      },
-      onError: () => {
-        toast.error("Lưu thất bại!");
-      },
-    }
-  );
-
   const validateForm = () => {
     const newErrors = {};
 
@@ -63,15 +41,18 @@ const ProductModal = ({ product, onClose, onSuccess }) => {
       newErrors.title = "Vui lòng nhập tên món ăn";
     }
 
-    if (!formData.price || formData.price <= 0) {
+    if (!formData.price || Number(formData.price) <= 0) {
       newErrors.price = "Vui lòng nhập giá hợp lệ";
     }
 
-    if (!formData.category) {
-      newErrors.category = "Vui lòng chọn danh mục";
+    if (
+      formData.promotion &&
+      Number(formData.promotion) >= Number(formData.price)
+    ) {
+      newErrors.promotion = "Giá khuyến mãi phải nhỏ hơn giá gốc";
     }
 
-    if (!formData.stock || formData.stock < 0) {
+    if (!formData.stock || Number(formData.stock) < 0) {
       newErrors.stock = "Vui lòng nhập số lượng hợp lệ";
     }
 
@@ -79,17 +60,34 @@ const ProductModal = ({ product, onClose, onSuccess }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (validateForm()) {
-      saveProductMutation.mutate({
-        ...formData,
+    if (!validateForm()) {
+      return;
+    }
+
+    try {
+      const data = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
         price: Number(formData.price),
         promotion: formData.promotion ? Number(formData.promotion) : null,
-        stock: Number(formData.stock),
-        // Ensure category is string value (backend expects category string)
-        category: String(formData.category),
-      });
+        category: formData.category || "Khác",
+        stock: Number(formData.stock) || 0,
+        images: formData.images || [],
+        status: formData.status || "active",
+      };
+
+      if (product) {
+        // Update
+        await onUpdate(product._id, data);
+      } else {
+        // Create
+        await onCreate(data);
+      }
+    } catch (error) {
+      console.error("Error saving product:", error);
+      toast.error("Lưu thất bại!");
     }
   };
 

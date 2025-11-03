@@ -4,6 +4,7 @@
   "description": "Product Service for FoodFast microservices",
   "main": "src/app.js",
   "scripts": {
+    "sync-menuitems": "node sync-products-to-menuitems.js",
     "start": "node src/app.js",
     "dev": "nodemon src/app.js",
     "test": "jest",

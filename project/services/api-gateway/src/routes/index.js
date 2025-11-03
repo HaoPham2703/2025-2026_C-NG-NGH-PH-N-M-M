@@ -2,6 +2,7 @@ const express = require("express");
 const { proxies } = require("../middleware/proxy");
 const {
   verifyToken,
+  verifyRestaurantToken,
   optionalAuth,
   requireAdmin,
 } = require("../middleware/auth");
@@ -47,7 +48,7 @@ router.use("/api/v1/transactions", verifyToken, proxies.paymentProxy);
 // Restaurant routes - public auth routes and protected routes
 router.use("/api/restaurant/signup", proxies.restaurantProxy);
 router.use("/api/restaurant/login", proxies.restaurantProxy);
-router.use("/api/restaurant", verifyToken, proxies.restaurantProxy);
+router.use("/api/restaurant", verifyRestaurantToken, proxies.restaurantProxy);
 
 // Drone routes (require authentication) - FIXED to drone service
 router.use("/api/v1/drones", verifyToken, proxies.droneProxy);

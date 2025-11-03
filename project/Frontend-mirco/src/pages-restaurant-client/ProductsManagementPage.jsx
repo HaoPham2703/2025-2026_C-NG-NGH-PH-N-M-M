@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
-import { restaurantClient } from "../api/axiosClients";
+import { productApi } from "../api/productApi";
 import {
   Plus,
   Search,
@@ -29,33 +29,115 @@ const ProductsManagementPage = () => {
   const [productToDelete, setProductToDelete] = useState(null);
   const queryClient = useQueryClient();
 
-  // Fetch products scoped to current restaurant
-  const { data: products, isLoading, error: productsError } = useQuery(
+  // Get restaurant ID from localStorage
+  const restaurantData = JSON.parse(
+    localStorage.getItem("restaurant_data") || "{}"
+  );
+  const restaurantId = restaurantData._id || restaurantData.id;
+
+  // Fetch products scoped to current restaurant from Product Service
+  const {
+    data: products,
+    isLoading,
+    error: productsError,
+  } = useQuery(
     "restaurantProducts",
     async () => {
       try {
-        const res = await restaurantClient.get("/restaurant/menu");
-        // restaurantClient returns response.data, which has shape:
-        // { status, results, data: { menuItems, pagination } }
-        return res?.data?.menuItems || [];
+        if (!restaurantId) {
+          throw new Error("Restaurant ID not found");
+        }
+        // Call Product Service directly with restaurant filter
+        const res = await productApi.getProducts({ restaurant: restaurantId });
+        // productApi returns response.data, which has shape:
+        // { status, results, data: { products } }
+        const productsList = res?.data?.products || [];
+
+        // Map Products format to MenuItems format for compatibility
+        return productsList.map((product) => ({
+          _id: product._id,
+          title: product.title,
+          description: product.description,
+          price: product.price,
+          promotion: product.promotion,
+          category: product.category?.name || product.category || "Khác",
+          images: product.images || [],
+          stock: product.inventory || 0, // Map inventory to stock
+          status: "active", // Products are always active
+          sold: product.sold || 0,
+          rating: product.ratingsAverage || 0,
+          reviewCount: product.ratingsQuantity || 0,
+        }));
       } catch (error) {
         console.error("Error fetching restaurant products:", error);
-        // If 401, the error interceptor will handle redirect
-        // For other errors, show message but don't crash
         throw error;
       }
     },
     {
       retry: 1,
       refetchOnWindowFocus: false,
-      // Only run if restaurant_token exists
-      enabled: !!localStorage.getItem("restaurant_token"),
+      enabled: !!restaurantId && !!localStorage.getItem("restaurant_token"),
     }
   );
 
+  // Create product mutation
+  const createProductMutation = useMutation(
+    async (productData) => {
+      // Add restaurant ID to product data
+      const data = {
+        ...productData,
+        restaurant: restaurantId,
+        inventory: productData.stock || 0, // Map stock to inventory
+      };
+      // Remove stock field if exists (use inventory instead)
+      delete data.stock;
+      return productApi.createProduct(data);
+    },
+    {
+      onSuccess: () => {
+        toast.success("Đã thêm món ăn!");
+        queryClient.invalidateQueries("restaurantProducts");
+        setShowProductModal(false);
+        setSelectedProduct(null);
+      },
+      onError: (error) => {
+        toast.error(error?.response?.data?.message || "Thêm món ăn thất bại!");
+      },
+    }
+  );
+
+  // Update product mutation
+  const updateProductMutation = useMutation(
+    async ({ productId, productData }) => {
+      // Add restaurant ID to product data
+      const data = {
+        ...productData,
+        restaurant: restaurantId,
+        inventory: productData.stock || 0, // Map stock to inventory
+      };
+      // Remove stock field if exists (use inventory instead)
+      delete data.stock;
+      return productApi.updateProduct(productId, data);
+    },
+    {
+      onSuccess: () => {
+        toast.success("Đã cập nhật món ăn!");
+        queryClient.invalidateQueries("restaurantProducts");
+        setShowProductModal(false);
+        setSelectedProduct(null);
+      },
+      onError: (error) => {
+        toast.error(
+          error?.response?.data?.message || "Cập nhật món ăn thất bại!"
+        );
+      },
+    }
+  );
+
+  // Delete product mutation
   const deleteProductMutation = useMutation(
     async (productId) => {
-      return restaurantClient.delete(`/restaurant/menu/${productId}`);
+      return productApi.deleteProduct(productId);
     },
     {
       onSuccess: () => {
@@ -64,8 +146,8 @@ const ProductsManagementPage = () => {
         setShowDeleteModal(false);
         setProductToDelete(null);
       },
-      onError: () => {
-        toast.error("Xóa thất bại!");
+      onError: (error) => {
+        toast.error(error?.response?.data?.message || "Xóa thất bại!");
       },
     }
   );
@@ -441,12 +523,11 @@ const ProductsManagementPage = () => {
       {showProductModal && (
         <ProductModal
           product={selectedProduct}
+          onCreate={(data) => createProductMutation.mutate(data)}
+          onUpdate={(productId, data) =>
+            updateProductMutation.mutate({ productId, productData: data })
+          }
           onClose={() => {
-            setShowProductModal(false);
-            setSelectedProduct(null);
-          }}
-          onSuccess={() => {
-            queryClient.invalidateQueries("restaurantProducts");
             setShowProductModal(false);
             setSelectedProduct(null);
           }}
