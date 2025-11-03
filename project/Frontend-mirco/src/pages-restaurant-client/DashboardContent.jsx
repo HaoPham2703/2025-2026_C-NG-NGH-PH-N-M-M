@@ -12,49 +12,66 @@ import {
 
 const DashboardContent = () => {
   // TODO: Replace with actual API calls
-  const { data: stats, isLoading } = useQuery("restaurantStats", async () => {
-    // Placeholder data
-    return {
-      totalRevenue: 45000000,
-      totalOrders: 234,
-      pendingOrders: 12,
-      completedOrders: 210,
-      totalProducts: 48,
-      activeProducts: 42,
-      revenueGrowth: 15.3,
-      ordersGrowth: 8.5,
-    };
-  });
+  const { data: stats, isLoading, error: statsError } = useQuery(
+    "restaurantStats",
+    async () => {
+      // Placeholder data
+      return {
+        totalRevenue: 45000000,
+        totalOrders: 234,
+        pendingOrders: 12,
+        completedOrders: 210,
+        totalProducts: 48,
+        activeProducts: 42,
+        revenueGrowth: 15.3,
+        ordersGrowth: 8.5,
+      };
+    },
+    {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    }
+  );
 
-  const { data: recentOrders } = useQuery("recentOrders", async () => {
-    // Placeholder data
-    return [
-      {
-        id: "ORD-001",
-        customerName: "Nguyễn Văn A",
-        items: 3,
-        total: 250000,
-        status: "pending",
-        time: "5 phút trước",
-      },
-      {
-        id: "ORD-002",
-        customerName: "Trần Thị B",
-        items: 2,
-        total: 180000,
-        status: "preparing",
-        time: "15 phút trước",
-      },
-      {
-        id: "ORD-003",
-        customerName: "Lê Văn C",
-        items: 4,
-        total: 320000,
-        status: "completed",
-        time: "30 phút trước",
-      },
-    ];
-  });
+  const {
+    data: recentOrders,
+    error: ordersError,
+  } = useQuery(
+    "recentOrders",
+    async () => {
+      // Placeholder data
+      return [
+        {
+          id: "ORD-001",
+          customerName: "Nguyễn Văn A",
+          items: 3,
+          total: 250000,
+          status: "pending",
+          time: "5 phút trước",
+        },
+        {
+          id: "ORD-002",
+          customerName: "Trần Thị B",
+          items: 2,
+          total: 180000,
+          status: "preparing",
+          time: "15 phút trước",
+        },
+        {
+          id: "ORD-003",
+          customerName: "Lê Văn C",
+          items: 4,
+          total: 320000,
+          status: "completed",
+          time: "30 phút trước",
+        },
+      ];
+    },
+    {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    }
+  );
 
   const statCards = [
     {
@@ -108,6 +125,20 @@ const DashboardContent = () => {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+      </div>
+    );
+  }
+
+  if (statsError || ordersError) {
+    console.error("Dashboard error:", statsError || ordersError);
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <p className="text-red-600 mb-2">Lỗi tải dữ liệu</p>
+          <p className="text-sm text-gray-600">
+            {statsError?.message || ordersError?.message || "Vui lòng thử lại"}
+          </p>
+        </div>
       </div>
     );
   }

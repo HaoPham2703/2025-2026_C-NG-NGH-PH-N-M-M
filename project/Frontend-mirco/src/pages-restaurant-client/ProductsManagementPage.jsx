@@ -30,13 +30,26 @@ const ProductsManagementPage = () => {
   const queryClient = useQueryClient();
 
   // Fetch products scoped to current restaurant
-  const { data: products, isLoading } = useQuery(
+  const { data: products, isLoading, error: productsError } = useQuery(
     "restaurantProducts",
     async () => {
-      const res = await restaurantClient.get("/restaurant/menu");
-      // restaurantClient returns response.data, which has shape:
-      // { status, results, data: { menuItems, pagination } }
-      return res?.data?.menuItems || [];
+      try {
+        const res = await restaurantClient.get("/restaurant/menu");
+        // restaurantClient returns response.data, which has shape:
+        // { status, results, data: { menuItems, pagination } }
+        return res?.data?.menuItems || [];
+      } catch (error) {
+        console.error("Error fetching restaurant products:", error);
+        // If 401, the error interceptor will handle redirect
+        // For other errors, show message but don't crash
+        throw error;
+      }
+    },
+    {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      // Only run if restaurant_token exists
+      enabled: !!localStorage.getItem("restaurant_token"),
     }
   );
 
@@ -126,10 +139,43 @@ const ProductsManagementPage = () => {
     return { label: "Tạm ngưng", color: "bg-gray-100 text-gray-800" };
   };
 
+  // Check if restaurant is authenticated
+  const restaurantToken = localStorage.getItem("restaurant_token");
+  if (!restaurantToken) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <p className="text-red-600 mb-2">Chưa đăng nhập</p>
+          <p className="text-sm text-gray-600">
+            Vui lòng đăng nhập để tiếp tục
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+      </div>
+    );
+  }
+
+  if (productsError) {
+    console.error("Products error:", productsError);
+    // Don't show error if it's a 401 (redirect will happen)
+    if (productsError?.response?.status === 401) {
+      return null; // Let the redirect happen
+    }
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <p className="text-red-600 mb-2">Lỗi tải dữ liệu</p>
+          <p className="text-sm text-gray-600">
+            {productsError?.response?.data?.message || "Vui lòng thử lại"}
+          </p>
+        </div>
       </div>
     );
   }

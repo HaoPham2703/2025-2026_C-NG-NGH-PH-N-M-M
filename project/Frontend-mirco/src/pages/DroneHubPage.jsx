@@ -1,0 +1,1039 @@
+import { useEffect, useState, useRef } from "react";
+import { useQuery, useMutation, useQueryClient } from "react-query";
+import { Link } from "react-router-dom";
+import { droneApi } from "../api/droneApi";
+import {
+  Navigation,
+  Battery,
+  MapPin,
+  Package,
+  Activity,
+  Plus,
+  RefreshCw,
+  ArrowLeft,
+  Loader,
+  Play,
+  Pause,
+  RotateCcw,
+} from "lucide-react";
+import Breadcrumb from "../components/Breadcrumb";
+import toast from "react-hot-toast";
+
+const DroneHubPage = () => {
+  const [map, setMap] = useState(null);
+  const mapRef = useRef(null);
+  const markersRef = useRef({});
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [selectedDrone, setSelectedDrone] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [previewMarker, setPreviewMarker] = useState(null);
+  const [clickToPlace, setClickToPlace] = useState(false);
+  const [newDrone, setNewDrone] = useState({
+    droneId: "",
+    name: "",
+    latitude: 10.7769,
+    longitude: 106.7009,
+    altitude: 50,
+    speed: 40,
+    batteryLevel: 100,
+  });
+
+  const queryClient = useQueryClient();
+
+  // Fetch all drones
+  const {
+    data: dronesData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery("drones", droneApi.getAllDrones, {
+    refetchInterval: 5000, // Auto refresh every 5 seconds
+    refetchOnWindowFocus: true,
+  });
+
+  // Handle different response structures
+  const drones =
+    dronesData?.data?.drones || dronesData?.data || dronesData || [];
+
+  // Initialize map
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadLeaflet = () => {
+      return new Promise((resolve, reject) => {
+        // Check if already loaded
+        if (window.L && document.querySelector('link[href*="leaflet"]')) {
+          resolve();
+          return;
+        }
+
+        // Load CSS
+        if (!document.querySelector('link[href*="leaflet"]')) {
+          const link = document.createElement("link");
+          link.rel = "stylesheet";
+          link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+          link.integrity =
+            "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
+          link.crossOrigin = "";
+          document.head.appendChild(link);
+        }
+
+        // Load JS
+        if (!window.L) {
+          const script = document.createElement("script");
+          script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+          script.integrity =
+            "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
+          script.crossOrigin = "";
+          script.onload = () => {
+            console.log("Leaflet loaded successfully");
+            resolve();
+          };
+          script.onerror = () => {
+            console.error("Failed to load Leaflet");
+            reject(new Error("Failed to load Leaflet"));
+          };
+          document.head.appendChild(script);
+        } else {
+          resolve();
+        }
+      });
+    };
+
+    const initMap = () => {
+      // Wait for DOM element to be ready
+      const mapContainer = document.getElementById("drone-hub-map");
+      if (!mapContainer) {
+        console.warn("Map container not found, retrying...");
+        setTimeout(initMap, 100);
+        return;
+      }
+
+      if (!window.L) {
+        console.warn("Leaflet not loaded yet, retrying...");
+        setTimeout(initMap, 100);
+        return;
+      }
+
+      if (mapRef.current) {
+        console.log("Map already initialized");
+        return;
+      }
+
+      try {
+        // Default location (Ho Chi Minh City)
+        const defaultLat = 10.7769;
+        const defaultLon = 106.7009;
+
+        console.log("Initializing map...");
+        const mapInstance = window.L.map("drone-hub-map", {
+          zoomControl: true,
+        }).setView([defaultLat, defaultLon], 12);
+
+        window.L.tileLayer(
+          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          {
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19,
+          }
+        ).addTo(mapInstance);
+
+        // Fix Leaflet default marker icon issue
+        delete window.L.Icon.Default.prototype._getIconUrl;
+        window.L.Icon.Default.mergeOptions({
+          iconRetinaUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+          iconUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+          shadowUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+        });
+
+        if (isMounted) {
+          mapRef.current = mapInstance;
+          setMap(mapInstance);
+          console.log("Map initialized successfully");
+
+          // Add click handler for placing drone
+          mapInstance.on("click", (e) => {
+            if (clickToPlace) {
+              const { lat, lng } = e.latlng;
+              setNewDrone((prev) => ({
+                ...prev,
+                latitude: lat,
+                longitude: lng,
+              }));
+
+              // Remove existing preview marker
+              if (previewMarker) {
+                mapInstance.removeLayer(previewMarker);
+              }
+
+              // Add preview marker
+              const marker = window.L.marker([lat, lng], {
+                icon: window.L.divIcon({
+                  className: "preview-drone-marker",
+                  html: `<div style="background: #22c55e; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 20px; animation: pulse 2s infinite;">📍</div>`,
+                  iconSize: [32, 32],
+                  iconAnchor: [16, 16],
+                }),
+              }).addTo(mapInstance);
+
+              marker.bindPopup("Vị trí drone mới").openPopup();
+              setPreviewMarker(marker);
+
+              toast.success(
+                `Đã chọn vị trí: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
+              );
+            }
+          });
+        } else {
+          mapInstance.remove();
+        }
+      } catch (error) {
+        console.error("Error initializing map:", error);
+      }
+    };
+
+    // Start loading process
+    loadLeaflet()
+      .then(() => {
+        // Small delay to ensure DOM is ready
+        setTimeout(initMap, 100);
+      })
+      .catch((error) => {
+        console.error("Failed to load Leaflet:", error);
+        toast.error(
+          "Không thể tải bản đồ. Vui lòng kiểm tra kết nối internet."
+        );
+      });
+
+    return () => {
+      isMounted = false;
+      if (mapRef.current) {
+        try {
+          mapRef.current.remove();
+        } catch (error) {
+          console.error("Error removing map:", error);
+        }
+        mapRef.current = null;
+        setMap(null);
+      }
+    };
+  }, []);
+
+  // Update map markers when drones data changes
+  useEffect(() => {
+    if (!map) {
+      console.log("Map not ready yet");
+      return;
+    }
+
+    if (!drones.length) {
+      console.log("No drones to display");
+      return;
+    }
+
+    // Clear existing markers
+    Object.values(markersRef.current).forEach((marker) => {
+      map.removeLayer(marker);
+    });
+    markersRef.current = {};
+
+    // Add markers for each drone
+    drones.forEach((drone) => {
+      if (drone.currentLocation) {
+        const iconColor = getStatusColorForMap(drone.status);
+        const marker = window.L.marker(
+          [drone.currentLocation.latitude, drone.currentLocation.longitude],
+          {
+            icon: window.L.divIcon({
+              className: "drone-hub-marker",
+              html: `<div style="background: ${iconColor}; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 20px; cursor: pointer;">🚁</div>`,
+              iconSize: [32, 32],
+              iconAnchor: [16, 16],
+            }),
+          }
+        ).addTo(map);
+
+        const popupContent = `
+          <div style="min-width: 200px;">
+            <b>${drone.name}</b><br/>
+            <small>${drone.droneId}</small><br/>
+            <span style="color: ${iconColor}; font-weight: bold;">${getStatusText(
+          drone.status
+        )}</span><br/>
+            <small>Pin: ${drone.batteryLevel}% | ${drone.speed} km/h</small>
+            ${
+              drone.orderId
+                ? `<br/><small>Order: ${drone.orderId.slice(-8)}</small>`
+                : ""
+            }
+          </div>
+        `;
+        marker.bindPopup(popupContent);
+
+        marker.on("click", () => {
+          setSelectedDrone(drone);
+        });
+
+        markersRef.current[drone._id] = marker;
+      }
+    });
+
+    // Fit map to show all drones
+    if (drones.length > 0) {
+      const bounds = drones
+        .filter((d) => d.currentLocation)
+        .map((d) => [d.currentLocation.latitude, d.currentLocation.longitude]);
+      if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
+    }
+  }, [map, drones]);
+
+  const getStatusText = (status) => {
+    const statusMap = {
+      available: "Sẵn sàng",
+      assigned: "Đã gán",
+      flying: "Đang bay",
+      delivering: "Đang giao hàng",
+      returning: "Đang quay về",
+      maintenance: "Bảo trì",
+    };
+    return statusMap[status] || status;
+  };
+
+  const getStatusColor = (status) => {
+    const colorMap = {
+      available: "bg-green-100 text-green-800",
+      assigned: "bg-blue-100 text-blue-800",
+      flying: "bg-purple-100 text-purple-800",
+      delivering: "bg-yellow-100 text-yellow-800",
+      returning: "bg-gray-100 text-gray-800",
+      maintenance: "bg-red-100 text-red-800",
+    };
+    return colorMap[status] || "bg-gray-100 text-gray-800";
+  };
+
+  const getStatusColorForMap = (status) => {
+    const colorMap = {
+      available: "#10b981", // green
+      assigned: "#3b82f6", // blue
+      flying: "#8b5cf6", // purple
+      delivering: "#eab308", // yellow
+      returning: "#6b7280", // gray
+      maintenance: "#ef4444", // red
+    };
+    return colorMap[status] || "#6b7280";
+  };
+
+  const getBatteryColor = (level) => {
+    if (level > 50) return "bg-green-500";
+    if (level > 20) return "bg-yellow-500";
+    return "bg-red-500";
+  };
+
+  const filteredDrones = drones.filter((drone) => {
+    if (selectedStatus === "all") return true;
+    return drone.status === selectedStatus;
+  });
+
+  const statusCounts = {
+    all: drones.length,
+    available: drones.filter((d) => d.status === "available").length,
+    assigned: drones.filter((d) => d.status === "assigned").length,
+    flying: drones.filter((d) => d.status === "flying").length,
+    delivering: drones.filter((d) => d.status === "delivering").length,
+    returning: drones.filter((d) => d.status === "returning").length,
+    maintenance: drones.filter((d) => d.status === "maintenance").length,
+  };
+
+  const updateStatusMutation = useMutation(
+    ({ droneId, status }) => droneApi.updateDroneStatus(droneId, status),
+    {
+      onSuccess: () => {
+        toast.success("Cập nhật trạng thái thành công!");
+        queryClient.invalidateQueries("drones");
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message || "Cập nhật thất bại");
+      },
+    }
+  );
+
+  const handleUpdateStatus = (droneId, newStatus) => {
+    updateStatusMutation.mutate({ droneId, status: newStatus });
+  };
+
+  // Create drone mutation
+  const createDroneMutation = useMutation(
+    (droneData) => droneApi.createDrone(droneData),
+    {
+      onSuccess: (response) => {
+        toast.success("Tạo drone thành công!");
+
+        // Remove preview marker
+        if (previewMarker && map) {
+          map.removeLayer(previewMarker);
+          setPreviewMarker(null);
+        }
+        setClickToPlace(false);
+
+        // Reset form
+        setNewDrone({
+          droneId: "",
+          name: "",
+          latitude: 10.7769,
+          longitude: 106.7009,
+          altitude: 50,
+          speed: 40,
+          batteryLevel: 100,
+        });
+
+        setShowCreateModal(false);
+
+        // Refetch drones list immediately and invalidate cache
+        setTimeout(() => {
+          refetch();
+          queryClient.invalidateQueries("drones");
+        }, 500);
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message || "Tạo drone thất bại");
+      },
+    }
+  );
+
+  const handleCreateDrone = (e) => {
+    e.preventDefault();
+    if (!newDrone.droneId || !newDrone.name) {
+      toast.error("Vui lòng điền đầy đủ thông tin");
+      return;
+    }
+
+    createDroneMutation.mutate({
+      droneId: newDrone.droneId,
+      name: newDrone.name,
+      currentLocation: {
+        latitude: parseFloat(newDrone.latitude),
+        longitude: parseFloat(newDrone.longitude),
+        altitude: parseFloat(newDrone.altitude),
+      },
+      speed: parseFloat(newDrone.speed) || 40,
+      batteryLevel: parseFloat(newDrone.batteryLevel) || 100,
+    });
+  };
+
+  const generateDroneId = () => {
+    const count = drones.length + 1;
+    const newId = `DRONE_${String(count).padStart(3, "0")}`;
+    setNewDrone({ ...newDrone, droneId: newId });
+  };
+
+  const handleOpenCreateModal = () => {
+    setShowCreateModal(true);
+    setClickToPlace(true);
+    toast.info("Click trên bản đồ để chọn vị trí drone", { duration: 3000 });
+  };
+
+  const handleCloseCreateModal = () => {
+    setShowCreateModal(false);
+    setClickToPlace(false);
+    if (previewMarker && map) {
+      map.removeLayer(previewMarker);
+      setPreviewMarker(null);
+    }
+  };
+
+  const breadcrumbItems = [
+    { label: "Trang Chủ", path: "/" },
+    { label: "Drone Hub", path: "/drone-hub" },
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
+          <p className="text-gray-600">Đang tải dữ liệu drones...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Lỗi tải dữ liệu
+          </h2>
+          <p className="text-gray-600 mb-6">{error.message}</p>
+          <button
+            onClick={() => refetch()}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Breadcrumb items={breadcrumbItems} />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              🚁 Drone Hub - Điều Khiển
+            </h1>
+            <p className="text-gray-600">
+              Quản lý và theo dõi tất cả drones của hệ thống
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => refetch()}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+            <button
+              onClick={handleOpenCreateModal}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Tạo Drone Mới
+            </button>
+            <Link
+              to="/orders"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Đơn Hàng
+            </Link>
+          </div>
+        </div>
+
+        {/* Statistics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+          {Object.entries(statusCounts).map(([status, count]) => (
+            <div
+              key={status}
+              onClick={() => setSelectedStatus(status)}
+              className={`bg-white rounded-lg p-4 shadow-sm border-2 cursor-pointer transition-all ${
+                selectedStatus === status
+                  ? "border-primary-600 shadow-md"
+                  : "border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              <div className="text-2xl font-bold text-gray-900">{count}</div>
+              <div className="text-xs text-gray-600 mt-1">
+                {status === "all" ? "Tất cả" : getStatusText(status)}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Map */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
+              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-primary-600" />
+                  Bản Đồ Drones ({drones.length} drones)
+                </h2>
+              </div>
+              <div
+                id="drone-hub-map"
+                className="w-full h-[600px] bg-gray-100"
+                style={{ zIndex: 0 }}
+              >
+                {!map && (
+                  <div className="w-full h-full flex items-center justify-center text-gray-500">
+                    <div className="text-center">
+                      <Loader className="w-8 h-8 animate-spin mx-auto mb-2" />
+                      <p>Đang tải bản đồ...</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Drone List */}
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl shadow-md border border-gray-200">
+              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+                <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <Navigation className="w-5 h-5 text-primary-600" />
+                  Danh Sách Drones ({filteredDrones.length})
+                </h2>
+              </div>
+              <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
+                {filteredDrones.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    Không có drone nào
+                  </div>
+                ) : (
+                  filteredDrones.map((drone) => (
+                    <div
+                      key={drone._id}
+                      onClick={() => {
+                        setSelectedDrone(drone);
+                        if (drone.currentLocation && map) {
+                          map.setView(
+                            [
+                              drone.currentLocation.latitude,
+                              drone.currentLocation.longitude,
+                            ],
+                            15
+                          );
+                        }
+                      }}
+                      className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        selectedDrone?._id === drone._id
+                          ? "border-primary-600 bg-primary-50"
+                          : "border-gray-200 hover:border-gray-300 bg-white"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <div className="font-semibold text-gray-900">
+                            {drone.name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {drone.droneId}
+                          </div>
+                        </div>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(
+                            drone.status
+                          )}`}
+                        >
+                          {getStatusText(drone.status)}
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 mt-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600 flex items-center gap-1">
+                            <Battery className="w-3 h-3" />
+                            Pin
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full ${getBatteryColor(
+                                  drone.batteryLevel
+                                )}`}
+                                style={{ width: `${drone.batteryLevel}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-medium text-gray-700">
+                              {drone.batteryLevel}%
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">Tốc độ</span>
+                          <span className="font-medium text-gray-900">
+                            {drone.speed} km/h
+                          </span>
+                        </div>
+
+                        {drone.currentLocation && (
+                          <div className="text-xs text-gray-500">
+                            📍 {drone.currentLocation.latitude.toFixed(4)},{" "}
+                            {drone.currentLocation.longitude.toFixed(4)}
+                          </div>
+                        )}
+
+                        {drone.orderId && (
+                          <Link
+                            to={`/drone-tracking/${drone.orderId}`}
+                            className="block mt-2 text-xs text-primary-600 hover:text-primary-700 font-medium"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            📦 Theo dõi đơn hàng →
+                          </Link>
+                        )}
+                      </div>
+
+                      {/* Quick Actions */}
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200">
+                        {drone.status === "available" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUpdateStatus(drone._id, "maintenance");
+                            }}
+                            className="flex-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
+                          >
+                            Bảo trì
+                          </button>
+                        )}
+                        {drone.status === "maintenance" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUpdateStatus(drone._id, "available");
+                            }}
+                            className="flex-1 px-2 py-1 text-xs bg-green-100 hover:bg-green-200 text-green-700 rounded transition-colors"
+                          >
+                            Hoạt động
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Selected Drone Details */}
+        {selectedDrone && (
+          <div className="mt-6 bg-white rounded-xl shadow-md border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900">
+                Chi Tiết: {selectedDrone.name}
+              </h3>
+              <button
+                onClick={() => setSelectedDrone(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <h4 className="font-semibold text-gray-700 mb-2">Thông Tin</h4>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <span className="text-gray-600">ID:</span>{" "}
+                    <span className="font-mono">{selectedDrone.droneId}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Trạng thái:</span>{" "}
+                    <span
+                      className={`px-2 py-1 rounded text-xs ${getStatusColor(
+                        selectedDrone.status
+                      )}`}
+                    >
+                      {getStatusText(selectedDrone.status)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Pin:</span>{" "}
+                    {selectedDrone.batteryLevel}%
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Tốc độ:</span>{" "}
+                    {selectedDrone.speed} km/h
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-700 mb-2">Vị Trí</h4>
+                {selectedDrone.currentLocation ? (
+                  <div className="space-y-2 text-sm">
+                    <div>
+                      <span className="text-gray-600">Lat:</span>{" "}
+                      {selectedDrone.currentLocation.latitude.toFixed(6)}
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Lng:</span>{" "}
+                      {selectedDrone.currentLocation.longitude.toFixed(6)}
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Độ cao:</span>{" "}
+                      {selectedDrone.currentLocation.altitude}m
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-gray-500 text-sm">Chưa có vị trí</div>
+                )}
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-700 mb-2">Đơn Hàng</h4>
+                {selectedDrone.orderId ? (
+                  <div className="space-y-2">
+                    <div className="text-sm">
+                      <span className="text-gray-600">Order ID:</span>{" "}
+                      <span className="font-mono text-xs">
+                        {selectedDrone.orderId}
+                      </span>
+                    </div>
+                    <Link
+                      to={`/drone-tracking/${selectedDrone.orderId}`}
+                      className="inline-block px-3 py-1 text-sm bg-primary-600 text-white rounded hover:bg-primary-700"
+                    >
+                      Theo dõi đơn hàng
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="text-gray-500 text-sm">
+                    Chưa có đơn hàng được gán
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create Drone Modal */}
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Tạo Drone Mới
+                  </h2>
+                  {clickToPlace && (
+                    <p className="text-sm text-green-600 mt-1">
+                      💡 Click trên bản đồ để chọn vị trí
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={handleCloseCreateModal}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateDrone} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Drone ID <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newDrone.droneId}
+                      onChange={(e) =>
+                        setNewDrone({ ...newDrone, droneId: e.target.value })
+                      }
+                      placeholder="DRONE_001"
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={generateDroneId}
+                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm whitespace-nowrap"
+                    >
+                      Tự động
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    ID duy nhất cho drone (ví dụ: DRONE_001)
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tên Drone <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newDrone.name}
+                    onChange={(e) =>
+                      setNewDrone({ ...newDrone, name: e.target.value })
+                    }
+                    placeholder="Drone Giao Hàng 1"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      Vĩ độ (Latitude)
+                      {clickToPlace && (
+                        <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                          Click trên map
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={newDrone.latitude}
+                      onChange={(e) =>
+                        setNewDrone({ ...newDrone, latitude: e.target.value })
+                      }
+                      placeholder="10.7769"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      readOnly={clickToPlace}
+                      style={
+                        clickToPlace
+                          ? {
+                              backgroundColor: "#f3f4f6",
+                              cursor: "not-allowed",
+                            }
+                          : {}
+                      }
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      {clickToPlace
+                        ? "Click trên bản đồ để tự động điền"
+                        : "Mặc định: TP.HCM"}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                      Kinh độ (Longitude)
+                      {clickToPlace && (
+                        <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
+                          Click trên map
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={newDrone.longitude}
+                      onChange={(e) =>
+                        setNewDrone({
+                          ...newDrone,
+                          longitude: e.target.value,
+                        })
+                      }
+                      placeholder="106.7009"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      readOnly={clickToPlace}
+                      style={
+                        clickToPlace
+                          ? {
+                              backgroundColor: "#f3f4f6",
+                              cursor: "not-allowed",
+                            }
+                          : {}
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Độ cao (m)
+                    </label>
+                    <input
+                      type="number"
+                      value={newDrone.altitude}
+                      onChange={(e) =>
+                        setNewDrone({ ...newDrone, altitude: e.target.value })
+                      }
+                      placeholder="50"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Tốc độ (km/h)
+                    </label>
+                    <input
+                      type="number"
+                      value={newDrone.speed}
+                      onChange={(e) =>
+                        setNewDrone({ ...newDrone, speed: e.target.value })
+                      }
+                      placeholder="40"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Pin (%)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={newDrone.batteryLevel}
+                      onChange={(e) =>
+                        setNewDrone({
+                          ...newDrone,
+                          batteryLevel: e.target.value,
+                        })
+                      }
+                      placeholder="100"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    type="submit"
+                    disabled={createDroneMutation.isLoading}
+                    className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {createDroneMutation.isLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader className="w-4 h-4 animate-spin" />
+                        Đang tạo...
+                      </span>
+                    ) : (
+                      "Tạo Drone"
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCloseCreateModal}
+                    className="px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClickToPlace(!clickToPlace);
+                      if (!clickToPlace) {
+                        toast.info("Click trên bản đồ để chọn vị trí", {
+                          duration: 2000,
+                        });
+                      } else {
+                        if (previewMarker && map) {
+                          map.removeLayer(previewMarker);
+                          setPreviewMarker(null);
+                        }
+                      }
+                    }}
+                    className={`px-6 py-3 font-medium rounded-lg transition-colors ${
+                      clickToPlace
+                        ? "bg-yellow-100 hover:bg-yellow-200 text-yellow-800"
+                        : "bg-blue-100 hover:bg-blue-200 text-blue-800"
+                    }`}
+                  >
+                    {clickToPlace ? "✕ Hủy chọn vị trí" : "📍 Chọn trên map"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default DroneHubPage;

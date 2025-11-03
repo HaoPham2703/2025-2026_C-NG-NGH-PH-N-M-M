@@ -391,6 +391,16 @@ const OrdersPage = () => {
                     >
                       Xem chi tiết
                     </Link>
+                    {(order.status === "Delivery" ||
+                      order.status === "Waiting Goods") && (
+                      <Link
+                        to={`/drone-tracking/${order._id}`}
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors duration-200 shadow-sm"
+                      >
+                        <Truck className="w-4 h-4 mr-1" />
+                        Theo dõi Drone
+                      </Link>
+                    )}
                     {order.status === "Processed" && (
                       <button className="inline-flex items-center px-4 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors duration-200">
                         Hủy đơn hàng

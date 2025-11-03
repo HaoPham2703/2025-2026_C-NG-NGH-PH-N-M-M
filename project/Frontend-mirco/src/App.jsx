@@ -10,6 +10,8 @@ import ProductsPage from "./pages/ProductsPage";
 import ProductDetailPage from "./pages/ProductDetailPage";
 import OrdersPage from "./pages/OrdersPage";
 import OrderDetailPage from "./pages/OrderDetailPage";
+import DroneTrackingPage from "./pages/DroneTrackingPage";
+import DroneHubPage from "./pages/DroneHubPage";
 import ProfilePage from "./pages/ProfilePage";
 import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
@@ -120,6 +122,24 @@ function AppContent() {
           <Route
             path="orders/:id"
             element={user ? <OrderDetailPage /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="drone-hub"
+            element={user ? <DroneHubPage /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="drone-tracking"
+            element={
+              user ? (
+                <Navigate to="/drone-hub" replace />
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          />
+          <Route
+            path="drone-tracking/:orderId"
+            element={user ? <DroneTrackingPage /> : <Navigate to="/login" />}
           />
           <Route
             path="profile"

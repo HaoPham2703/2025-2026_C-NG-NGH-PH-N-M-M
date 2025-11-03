@@ -99,9 +99,34 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
   excludedFields.forEach((el) => delete queryObj[el]);
 
   // Filter orders by current user (unless admin)
-  const userId = req.user._id || req.user.id;
-  if (req.user.role !== "admin") {
-    queryObj.user = userId;
+  if (req.user) {
+    const userId = req.user._id || req.user.id || req.user.userId;
+
+    // Log for debugging
+    console.log("[getAllOrders] User info:", {
+      hasUser: !!req.user,
+      userId: userId,
+      userRole: req.user.role,
+      userObject: req.user,
+    });
+
+    // Only show orders for current user unless they are admin
+    if (req.user.role !== "admin" && userId) {
+      queryObj.user = userId;
+      console.log("[getAllOrders] Filtering orders for user:", userId);
+    } else if (!userId) {
+      console.warn("[getAllOrders] User ID not found in req.user");
+    }
+  } else {
+    console.warn("[getAllOrders] req.user is not defined");
+    // If no user, return empty results
+    return res.status(200).json({
+      status: "success",
+      results: 0,
+      data: {
+        orders: [],
+      },
+    });
   }
 
   // Advanced filtering

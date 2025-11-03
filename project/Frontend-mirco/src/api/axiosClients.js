@@ -48,10 +48,19 @@ const createErrorInterceptor = (serviceName) => (error) => {
 
   // Handle different error statuses
   if (response?.status === 401) {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    toast.error("Session expired. Please login again.");
-    window.location.href = "/login";
+    // Only redirect to user login if this is NOT a restaurant client
+    if (serviceName !== "Restaurant") {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      toast.error("Session expired. Please login again.");
+      window.location.href = "/login";
+    } else {
+      // For restaurant: redirect to restaurant login
+      localStorage.removeItem("restaurant_token");
+      localStorage.removeItem("restaurant_data");
+      toast.error("Session expired. Please login again.");
+      window.location.href = "/restaurant/login";
+    }
   } else if (response?.status === 403) {
     toast.error("Access denied. You do not have permission.");
   } else if (response?.status === 404) {

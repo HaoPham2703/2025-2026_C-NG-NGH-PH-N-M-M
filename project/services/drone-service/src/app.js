@@ -6,12 +6,36 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const compression = require("compression");
 const rateLimit = require("express-rate-limit");
+const { createServer } = require("http");
+const { Server } = require("socket.io");
 
 const connectDB = require("./config/database");
-const orderRoutes = require("./routes/orderRoutes");
+const droneRoutes = require("./routes/droneRoutes");
+const DroneSimulation = require("./services/droneSimulation");
+const Drone = require("./models/droneModel");
 
 const app = express();
-const PORT = process.env.PORT || 4003;
+const server = createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: [
+      "http://localhost:4000",
+      "http://localhost:4005",
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "http://127.0.0.1:4000",
+      "http://127.0.0.1:4005",
+      "http://127.0.0.1:5173",
+      "http://127.0.0.1:5174",
+    ],
+    credentials: true,
+  },
+});
+
+const PORT = process.env.PORT || 4007;
+
+// Initialize drone simulation
+const droneSimulation = new DroneSimulation(io);
 
 // Trust proxy for rate limiting and X-Forwarded-For headers from API Gateway
 app.set("trust proxy", 1);
@@ -60,17 +84,9 @@ app.use((req, res, next) => {
       // Decode Base64 first, then parse JSON
       const userJson = Buffer.from(userHeader, "base64").toString("utf-8");
       req.user = JSON.parse(userJson);
-      console.log("[Order Service] User extracted from header:", {
-        userId: req.user._id || req.user.id || req.user.userId,
-        role: req.user.role,
-        email: req.user.email,
-      });
     } catch (error) {
-      console.error("[Order Service] Error parsing user header:", error);
-      console.error("[Order Service] User header value:", userHeader);
+      console.error("Error parsing user header:", error);
     }
-  } else {
-    console.warn("[Order Service] No x-user header found in request");
   }
   next();
 });
@@ -99,15 +115,42 @@ app.use((req, res, next) => {
 app.get("/health", (req, res) => {
   res.json({
     status: "success",
-    message: "Order Service is running",
+    message: "Drone Service is running",
     timestamp: new Date().toISOString(),
-    service: "order-service",
+    service: "drone-service",
     port: PORT,
   });
 });
 
 // Routes
-app.use("/api/v1/orders", orderRoutes);
+app.use("/api/v1/drones", droneRoutes);
+
+// Socket.IO connection handling
+io.on("connection", (socket) => {
+  console.log(`Client connected: ${socket.id}`);
+
+  // Join order-specific room for tracking
+  socket.on("join:order", (orderId) => {
+    socket.join(`order:${orderId}`);
+    console.log(`Socket ${socket.id} joined order:${orderId}`);
+  });
+
+  // Leave order room
+  socket.on("leave:order", (orderId) => {
+    socket.leave(`order:${orderId}`);
+    console.log(`Socket ${socket.id} left order:${orderId}`);
+  });
+
+  // Subscribe to specific drone updates
+  socket.on("subscribe:drone", (droneId) => {
+    socket.join(`drone:${droneId}`);
+    console.log(`Socket ${socket.id} subscribed to drone:${droneId}`);
+  });
+
+  socket.on("disconnect", () => {
+    console.log(`Client disconnected: ${socket.id}`);
+  });
+});
 
 // Global error handler
 app.use((err, req, res, next) => {
@@ -131,18 +174,38 @@ app.use("*", (req, res) => {
   });
 });
 
-// No graceful shutdown needed - simple service like User/Product Service
+// Watch for drone status changes and start/stop simulations
+// This will automatically handle starting simulation when drone is assigned
+setInterval(async () => {
+  try {
+    const activeDrones = await Drone.find({
+      status: { $in: ["flying", "delivering", "returning"] },
+    });
+
+    for (const drone of activeDrones) {
+      // Check if simulation is not running for this drone
+      if (!droneSimulation.simulations.has(drone.droneId)) {
+        droneSimulation.startSimulation(drone.droneId);
+      }
+    }
+  } catch (error) {
+    console.error("Error checking drone simulations:", error);
+  }
+}, 5000); // Check every 5 seconds
+
+// Initialize simulations for existing active drones
+droneSimulation.initializeSimulations();
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Order Service running on port ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`🚁 Drone Service running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(
     `🔗 Database: ${
-      process.env.DB_URL || "mongodb://localhost:27017/fastfood_orders"
+      process.env.DB_URL || "mongodb://localhost:27017/fastfood_drones"
     }`
   );
-  // No Kafka logging - simple service like User/Product Service
+  console.log(`🔌 WebSocket server ready for real-time tracking`);
 });
 
-module.exports = app;
+module.exports = { app, io, droneSimulation };

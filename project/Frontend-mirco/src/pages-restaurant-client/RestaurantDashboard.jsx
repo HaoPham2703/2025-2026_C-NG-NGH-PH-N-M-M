@@ -19,9 +19,15 @@ const RestaurantDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [restaurantData] = useState(
-    JSON.parse(localStorage.getItem("restaurant_data") || "{}")
-  );
+  const [restaurantData, setRestaurantData] = useState(() => {
+    try {
+      const data = localStorage.getItem("restaurant_data");
+      return data ? JSON.parse(data) : {};
+    } catch (error) {
+      console.error("Error parsing restaurant_data:", error);
+      return {};
+    }
+  });
 
   const handleLogout = () => {
     localStorage.removeItem("restaurant_token");
@@ -62,6 +68,13 @@ const RestaurantDashboard = () => {
       active: location.pathname.includes("/settings"),
     },
   ];
+
+  // Check if token exists
+  const token = localStorage.getItem("restaurant_token");
+  if (!token) {
+    navigate("/restaurant/login", { replace: true });
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

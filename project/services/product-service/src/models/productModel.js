@@ -76,6 +76,15 @@ const productSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
     },
+    restaurant: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Restaurant",
+      index: true,
+    },
+    restaurantId: {
+      type: String,
+      // Can be ObjectId string or restaurant identifier
+    },
     review: [Array],
   },
   {

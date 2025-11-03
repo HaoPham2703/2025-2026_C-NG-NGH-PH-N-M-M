@@ -20,6 +20,7 @@ router.get("/health", (req, res) => {
       order: process.env.ORDER_SERVICE_URL || "http://localhost:4003",
       payment: process.env.PAYMENT_SERVICE_URL || "http://localhost:4004",
       restaurant: process.env.RESTAURANT_SERVICE_URL || "http://localhost:4006",
+      drone: process.env.DRONE_SERVICE_URL || "http://localhost:4007",
     },
   });
 });
@@ -47,6 +48,9 @@ router.use("/api/v1/transactions", verifyToken, proxies.paymentProxy);
 router.use("/api/restaurant/signup", proxies.restaurantProxy);
 router.use("/api/restaurant/login", proxies.restaurantProxy);
 router.use("/api/restaurant", verifyToken, proxies.restaurantProxy);
+
+// Drone routes (require authentication) - FIXED to drone service
+router.use("/api/v1/drones", verifyToken, proxies.droneProxy);
 
 // Admin routes (require admin role) - FIXED to respective services
 router.use("/api/v1/admin/users", verifyToken, requireAdmin, proxies.userProxy);
@@ -80,6 +84,7 @@ router.all("*", (req, res) => {
       "/api/v1/products/*",
       "/api/v1/orders/*",
       "/api/v1/payments/*",
+      "/api/v1/drones/*",
       "/api/restaurant/*",
       "/health",
     ],

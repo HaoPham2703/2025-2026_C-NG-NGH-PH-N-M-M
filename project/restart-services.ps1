@@ -38,6 +38,18 @@ Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd 'services\paym
 
 Start-Sleep -Seconds 3
 
+# Start Restaurant Service
+Write-Host "🍽️ Starting Restaurant Service..." -ForegroundColor Green
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd 'services\restaurant-service'; npm run dev"
+
+Start-Sleep -Seconds 3
+
+# Start Drone Service
+Write-Host "🚁 Starting Drone Service..." -ForegroundColor Green
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd 'services\drone-service'; npm run dev"
+
+Start-Sleep -Seconds 3
+
 # Start Frontend
 Write-Host "🌐 Starting Frontend..." -ForegroundColor Green
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd 'Frontend-mirco'; npm run dev"
