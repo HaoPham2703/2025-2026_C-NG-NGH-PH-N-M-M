@@ -176,16 +176,33 @@ app.use("*", (req, res) => {
 
 // Watch for drone status changes and start/stop simulations
 // This will automatically handle starting simulation when drone is assigned
+// Also handles charging for available drones with low battery
 setInterval(async () => {
   try {
+    // Include available drones with low battery (< 100%) so they can charge
     const activeDrones = await Drone.find({
-      status: { $in: ["flying", "delivering", "returning"] },
+      $or: [
+        { status: { $in: ["flying", "delivering", "returning"] } },
+        { status: "available", batteryLevel: { $lt: 100 } },
+      ],
     });
 
     for (const drone of activeDrones) {
       // Check if simulation is not running for this drone
       if (!droneSimulation.simulations.has(drone.droneId)) {
         droneSimulation.startSimulation(drone.droneId);
+      }
+    }
+    
+    // Stop simulation for available drones that are fully charged
+    const fullyChargedDrones = await Drone.find({
+      status: "available",
+      batteryLevel: 100,
+    });
+    
+    for (const drone of fullyChargedDrones) {
+      if (droneSimulation.simulations.has(drone.droneId)) {
+        droneSimulation.stopSimulation(drone.droneId);
       }
     }
   } catch (error) {

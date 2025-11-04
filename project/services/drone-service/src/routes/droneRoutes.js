@@ -9,11 +9,11 @@ router.get("/", droneController.getAllDrones);
 // Get available drones
 router.get("/available", droneController.getAvailableDrones);
 
-// Get drone by ID
-router.get("/:id", droneController.getDroneById);
-
-// Get drone by order ID
+// Get drone by order ID - MUST be before /:id to avoid route conflict
 router.get("/order/:orderId", droneController.getDroneByOrderId);
+
+// Get drone by ID - MUST be last to avoid matching /order/:orderId
+router.get("/:id", droneController.getDroneById);
 
 // Create new drone
 router.post("/", droneController.createDrone);

@@ -18,7 +18,6 @@ router.put(
   restaurantController.updateNotificationSettings
 );
 router.get("/stats", restaurantController.getStats);
+router.get("/orders", restaurantController.getOrders);
 
 module.exports = router;
-
-

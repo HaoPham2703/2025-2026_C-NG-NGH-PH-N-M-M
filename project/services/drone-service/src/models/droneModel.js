@@ -54,6 +54,20 @@ const droneSchema = new mongoose.Schema(
       longitude: Number,
       address: String,
     },
+    homeLocation: {
+      latitude: {
+        type: Number,
+        default: 10.7769, // Default depot location
+      },
+      longitude: {
+        type: Number,
+        default: 106.7009,
+      },
+      address: {
+        type: String,
+        default: "Depot Location",
+      },
+    },
     speed: {
       type: Number,
       default: 10, // km/h

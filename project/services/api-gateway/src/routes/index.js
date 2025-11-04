@@ -50,8 +50,8 @@ router.use("/api/restaurant/signup", proxies.restaurantProxy);
 router.use("/api/restaurant/login", proxies.restaurantProxy);
 router.use("/api/restaurant", verifyRestaurantToken, proxies.restaurantProxy);
 
-// Drone routes (require authentication) - FIXED to drone service
-router.use("/api/v1/drones", verifyToken, proxies.droneProxy);
+// Drone routes (optional authentication - allow public access for tracking)
+router.use("/api/v1/drones", optionalAuth, proxies.droneProxy);
 
 // Admin routes (require admin role) - FIXED to respective services
 router.use("/api/v1/admin/users", verifyToken, requireAdmin, proxies.userProxy);

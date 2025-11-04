@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { Link } from "react-router-dom";
 import { droneApi } from "../api/droneApi";
+import { orderApi } from "../api/orderApi";
 import {
   Navigation,
   Battery,
@@ -23,11 +24,51 @@ const DroneHubPage = () => {
   const [map, setMap] = useState(null);
   const mapRef = useRef(null);
   const markersRef = useRef({});
+  const destinationMarkersRef = useRef({});
+  const pathLinesRef = useRef({});
+  const initialBoundsSetRef = useRef(false); // Track if initial bounds have been set
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedDrone, setSelectedDrone] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [previewMarker, setPreviewMarker] = useState(null);
   const [clickToPlace, setClickToPlace] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [assignOrderId, setAssignOrderId] = useState("");
+  const [assignMode, setAssignMode] = useState("list"); // "list" or "manual"
+
+  // Fetch orders that need drone delivery (Delivery or Waiting Goods status)
+  const { data: pendingOrders, isLoading: ordersLoading } = useQuery(
+    "pendingOrdersForDrone",
+    () => orderApi.getOrders(),
+    {
+      enabled: showAssignModal, // Only fetch when modal is open
+      select: (data) => {
+        const orders = data?.data?.orders || [];
+        // Filter orders that need drone: Delivery, Waiting Goods, or Processed
+        const filtered = orders.filter(
+          (order) =>
+            (order.status === "Delivery" ||
+              order.status === "Waiting Goods" ||
+              order.status === "Processed") &&
+            order.status !== "Success" &&
+            order.status !== "Cancelled"
+        );
+
+        // Sort by createdAt descending (newest first) or by _id if createdAt is not available
+        return filtered.sort((a, b) => {
+          // Try createdAt first (newest first)
+          if (a.createdAt && b.createdAt) {
+            return new Date(b.createdAt) - new Date(a.createdAt);
+          }
+          // Fallback to _id (MongoDB ObjectId includes timestamp, newer IDs are larger)
+          if (a._id && b._id) {
+            return a._id > b._id ? -1 : 1;
+          }
+          return 0;
+        });
+      },
+    }
+  );
   const [newDrone, setNewDrone] = useState({
     droneId: "",
     name: "",
@@ -241,6 +282,22 @@ const DroneHubPage = () => {
     });
     markersRef.current = {};
 
+    // Clear existing destination markers
+    Object.values(destinationMarkersRef.current).forEach((marker) => {
+      if (marker && map.hasLayer(marker)) {
+        map.removeLayer(marker);
+      }
+    });
+    destinationMarkersRef.current = {};
+
+    // Clear existing path lines
+    Object.values(pathLinesRef.current).forEach((line) => {
+      if (line && map.hasLayer(line)) {
+        map.removeLayer(line);
+      }
+    });
+    pathLinesRef.current = {};
+
     // Add markers for each drone
     drones.forEach((drone) => {
       if (drone.currentLocation) {
@@ -264,7 +321,9 @@ const DroneHubPage = () => {
             <span style="color: ${iconColor}; font-weight: bold;">${getStatusText(
           drone.status
         )}</span><br/>
-            <small>Pin: ${drone.batteryLevel}% | ${drone.speed} km/h</small>
+            <small>Pin: ${parseFloat(drone.batteryLevel).toFixed(2)}% | ${
+          drone.speed
+        } km/h</small>
             ${
               drone.orderId
                 ? `<br/><small>Order: ${drone.orderId.slice(-8)}</small>`
@@ -279,16 +338,102 @@ const DroneHubPage = () => {
         });
 
         markersRef.current[drone._id] = marker;
+
+        // Add destination marker if drone has a destination
+        if (
+          drone.destination &&
+          drone.destination.latitude !== undefined &&
+          drone.destination.longitude !== undefined &&
+          !isNaN(drone.destination.latitude) &&
+          !isNaN(drone.destination.longitude)
+        ) {
+          try {
+            // Add destination marker
+            const destMarker = window.L.marker(
+              [drone.destination.latitude, drone.destination.longitude],
+              {
+                icon: window.L.divIcon({
+                  className: "destination-marker-hub",
+                  html: `<div style="background: #ef4444; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 12px;">📍</div>`,
+                  iconSize: [20, 20],
+                  iconAnchor: [10, 10],
+                }),
+              }
+            ).addTo(map);
+
+            destMarker.bindPopup(
+              `<b>📍 Điểm đến</b><br/>${
+                drone.destination.address || "Địa chỉ giao hàng"
+              }<br/><small>Drone: ${
+                drone.name
+              }</small><br/><small>${drone.destination.latitude.toFixed(
+                6
+              )}, ${drone.destination.longitude.toFixed(6)}</small>`
+            );
+
+            destinationMarkersRef.current[drone._id] = destMarker;
+
+            // Draw line from drone to destination
+            if (drone.currentLocation) {
+              const pathLine = window.L.polyline(
+                [
+                  [
+                    drone.currentLocation.latitude,
+                    drone.currentLocation.longitude,
+                  ],
+                  [drone.destination.latitude, drone.destination.longitude],
+                ],
+                {
+                  color: "#ef4444",
+                  weight: 2,
+                  opacity: 0.6,
+                  dashArray: "5, 10",
+                }
+              ).addTo(map);
+
+              pathLinesRef.current[drone._id] = pathLine;
+            }
+          } catch (error) {
+            console.error(
+              `[DroneHubPage] Error adding destination marker for drone ${drone._id}:`,
+              error
+            );
+          }
+        }
       }
     });
 
-    // Fit map to show all drones
+    // Fit map to show all drones and destinations (only on initial load or significant change)
+    // Don't reset zoom on every update (especially battery updates)
     if (drones.length > 0) {
-      const bounds = drones
+      const bounds = [];
+
+      // Add drone positions
+      drones
         .filter((d) => d.currentLocation)
-        .map((d) => [d.currentLocation.latitude, d.currentLocation.longitude]);
-      if (bounds.length > 0) {
+        .forEach((d) => {
+          bounds.push([
+            d.currentLocation.latitude,
+            d.currentLocation.longitude,
+          ]);
+        });
+
+      // Add destination positions
+      drones
+        .filter(
+          (d) =>
+            d.destination &&
+            d.destination.latitude !== undefined &&
+            d.destination.longitude !== undefined
+        )
+        .forEach((d) => {
+          bounds.push([d.destination.latitude, d.destination.longitude]);
+        });
+
+      // Only fitBounds on initial load, not on every update
+      if (bounds.length > 0 && !initialBoundsSetRef.current) {
         map.fitBounds(bounds, { padding: [50, 50] });
+        initialBoundsSetRef.current = true;
       }
     }
   }, [map, drones]);
@@ -430,6 +575,43 @@ const DroneHubPage = () => {
     const count = drones.length + 1;
     const newId = `DRONE_${String(count).padStart(3, "0")}`;
     setNewDrone({ ...newDrone, droneId: newId });
+  };
+
+  // Assign drone to order mutation
+  const assignDroneMutation = useMutation(
+    (data) => droneApi.assignDroneToOrder(data),
+    {
+      onSuccess: () => {
+        toast.success("Gán drone thành công!");
+        queryClient.invalidateQueries("drones");
+        setShowAssignModal(false);
+        setAssignOrderId("");
+        setAssignMode("list");
+      },
+      onError: (error) => {
+        toast.error(error?.response?.data?.message || "Gán drone thất bại!");
+      },
+    }
+  );
+
+  const handleAssignDrone = (e) => {
+    e.preventDefault();
+    if (!assignOrderId.trim()) {
+      toast.error(
+        assignMode === "list"
+          ? "Vui lòng chọn một đơn hàng"
+          : "Vui lòng nhập Order ID"
+      );
+      return;
+    }
+    if (!selectedDrone) {
+      toast.error("Vui lòng chọn drone");
+      return;
+    }
+    assignDroneMutation.mutate({
+      droneId: selectedDrone.droneId,
+      orderId: assignOrderId.trim(),
+    });
   };
 
   const handleOpenCreateModal = () => {
@@ -638,7 +820,7 @@ const DroneHubPage = () => {
                               />
                             </div>
                             <span className="text-xs font-medium text-gray-700">
-                              {drone.batteryLevel}%
+                              {parseFloat(drone.batteryLevel).toFixed(2)}%
                             </span>
                           </div>
                         </div>
@@ -671,15 +853,27 @@ const DroneHubPage = () => {
                       {/* Quick Actions */}
                       <div className="flex gap-2 mt-3 pt-3 border-t border-gray-200">
                         {drone.status === "available" && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUpdateStatus(drone._id, "maintenance");
-                            }}
-                            className="flex-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
-                          >
-                            Bảo trì
-                          </button>
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedDrone(drone);
+                                setShowAssignModal(true);
+                              }}
+                              className="flex-1 px-2 py-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded transition-colors font-medium"
+                            >
+                              🎯 Gán đơn
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUpdateStatus(drone._id, "maintenance");
+                              }}
+                              className="flex-1 px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition-colors"
+                            >
+                              Bảo trì
+                            </button>
+                          </>
                         )}
                         {drone.status === "maintenance" && (
                           <button
@@ -735,7 +929,7 @@ const DroneHubPage = () => {
                   </div>
                   <div>
                     <span className="text-gray-600">Pin:</span>{" "}
-                    {selectedDrone.batteryLevel}%
+                    {parseFloat(selectedDrone.batteryLevel).toFixed(2)}%
                   </div>
                   <div>
                     <span className="text-gray-600">Tốc độ:</span>{" "}
@@ -782,11 +976,219 @@ const DroneHubPage = () => {
                     </Link>
                   </div>
                 ) : (
-                  <div className="text-gray-500 text-sm">
-                    Chưa có đơn hàng được gán
+                  <div className="space-y-2">
+                    <div className="text-gray-500 text-sm mb-2">
+                      Chưa có đơn hàng được gán
+                    </div>
+                    {selectedDrone.status === "available" && (
+                      <button
+                        onClick={() => {
+                          setShowAssignModal(true);
+                        }}
+                        className="w-full px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                      >
+                        🎯 Gán cho đơn hàng
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Assign Drone Modal */}
+        {showAssignModal && selectedDrone && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">
+                  Gán Drone cho Đơn Hàng
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowAssignModal(false);
+                    setAssignOrderId("");
+                    setAssignMode("list");
+                  }}
+                  className="text-gray-400 hover:text-gray-600 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+              <form onSubmit={handleAssignDrone} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Drone được chọn
+                  </label>
+                  <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="font-semibold text-gray-900">
+                      {selectedDrone.name}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {selectedDrone.droneId}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mode Toggle */}
+                <div className="flex gap-2 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssignMode("list");
+                      setAssignOrderId("");
+                    }}
+                    className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      assignMode === "list"
+                        ? "bg-primary-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    📋 Chọn từ danh sách
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssignMode("manual");
+                      setAssignOrderId("");
+                    }}
+                    className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      assignMode === "manual"
+                        ? "bg-primary-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    ⌨️ Nhập thủ công
+                  </button>
+                </div>
+
+                {assignMode === "list" ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Chọn đơn hàng cần gán{" "}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    {ordersLoading ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <Loader className="w-6 h-6 animate-spin mx-auto mb-2" />
+                        <p className="text-sm">
+                          Đang tải danh sách đơn hàng...
+                        </p>
+                      </div>
+                    ) : !pendingOrders || pendingOrders.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500 border border-gray-200 rounded-lg">
+                        <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">
+                          Không có đơn hàng đang chờ giao
+                        </p>
+                        <p className="text-xs mt-1">
+                          Hoặc chuyển sang chế độ nhập thủ công
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="border border-gray-300 rounded-lg max-h-64 overflow-y-auto">
+                        {pendingOrders.map((order) => (
+                          <div
+                            key={order._id}
+                            onClick={() => setAssignOrderId(order._id)}
+                            className={`px-4 py-3 border-b border-gray-200 cursor-pointer hover:bg-primary-50 transition-colors ${
+                              assignOrderId === order._id
+                                ? "bg-primary-100 border-primary-300"
+                                : ""
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="font-semibold text-gray-900 text-sm">
+                                  {order.receiver || "Không có tên"}
+                                </div>
+                                <div className="text-xs text-gray-600 mt-1">
+                                  📞 {order.phone || "N/A"}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  📍 {order.address || "Không có địa chỉ"}
+                                </div>
+                                <div className="flex items-center gap-2 mt-2">
+                                  <span
+                                    className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                      order.status === "Delivery"
+                                        ? "bg-purple-100 text-purple-800"
+                                        : order.status === "Waiting Goods"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : "bg-blue-100 text-blue-800"
+                                    }`}
+                                  >
+                                    {order.status}
+                                  </span>
+                                  {order.total && (
+                                    <span className="text-xs text-gray-600">
+                                      💰{" "}
+                                      {new Intl.NumberFormat("vi-VN").format(
+                                        order.total
+                                      )}{" "}
+                                      đ
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="ml-4">
+                                <div className="text-xs font-mono text-gray-400">
+                                  {order._id.slice(-8)}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Order ID <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={assignOrderId}
+                      onChange={(e) => setAssignOrderId(e.target.value)}
+                      placeholder="690863a9c35779c8bdd0774c"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent font-mono text-sm"
+                      required
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Nhập ID của đơn hàng cần gán drone
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-4 border-t border-gray-200">
+                  <button
+                    type="submit"
+                    disabled={assignDroneMutation.isLoading}
+                    className="flex-1 px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {assignDroneMutation.isLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader className="w-4 h-4 animate-spin" />
+                        Đang gán...
+                      </span>
+                    ) : (
+                      "Gán Drone"
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAssignModal(false);
+                      setAssignOrderId("");
+                    }}
+                    className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors"
+                  >
+                    Hủy
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

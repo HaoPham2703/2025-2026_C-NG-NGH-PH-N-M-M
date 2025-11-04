@@ -4,7 +4,7 @@ class DroneSimulation {
   constructor(io) {
     this.io = io;
     this._simulations = new Map(); // Map<droneId, intervalId>
-    this.updateInterval = 2000; // Update every 2 seconds
+    this.updateInterval = 3000; // Update every 3 seconds (slower updates = slower battery drain)
   }
 
   // Getter for simulations map
@@ -39,7 +39,29 @@ class DroneSimulation {
       return;
     }
 
-    // Only simulate if drone is flying or delivering
+    // Handle battery charging for available drones at home
+    if (drone.status === "available" && drone.batteryLevel < 100) {
+      // Slow recharge: 2% per update (every 3 seconds) = 40% per minute = fast charge
+      // This simulates charging at depot
+      drone.batteryLevel = Math.min(100, drone.batteryLevel + 2);
+      await drone.save();
+
+      // Emit update for battery charging (only if changed significantly)
+      if (drone.batteryLevel >= 100 || drone.batteryLevel % 5 === 0) {
+        this.io.emit("drone:update", {
+          droneId: drone.droneId,
+          location: drone.currentLocation,
+          status: drone.status,
+          batteryLevel: drone.batteryLevel,
+          orderId: drone.orderId,
+        });
+      }
+
+      // Continue simulation loop for charging (don't stop)
+      return;
+    }
+
+    // Only simulate movement if drone is flying, delivering, or returning
     if (
       drone.status !== "flying" &&
       drone.status !== "delivering" &&
@@ -72,15 +94,18 @@ class DroneSimulation {
       destLon
     );
 
-    // If very close to destination (within 50m), mark as arrived
-    if (distance < 0.05) {
+    // If very close to destination (within 100m), mark as arrived
+    // Increased threshold for faster simulation
+    if (distance < 0.1) {
       await this.handleArrival(drone);
       return;
     }
 
     // Calculate movement per update (speed in km/h, updateInterval in ms)
+    // Multiply speed by 10x for faster simulation (since this is just a demo)
+    const speedMultiplier = 10; // Make drones move 10x faster
     const hoursElapsed = this.updateInterval / (1000 * 60 * 60);
-    const distancePerUpdate = drone.speed * hoursElapsed; // km
+    const distancePerUpdate = drone.speed * speedMultiplier * hoursElapsed; // km
 
     // Calculate bearing (direction)
     const bearing = this.calculateBearing(
@@ -115,8 +140,11 @@ class DroneSimulation {
       drone.flightHistory.shift();
     }
 
-    // Decrease battery slightly (0.1% per update when flying)
-    drone.batteryLevel = Math.max(0, drone.batteryLevel - 0.1);
+    // Decrease battery slightly (0.015% per update when flying)
+    // Update interval is 3 seconds, so this equals:
+    // 0.015% per 3 seconds = 0.005% per second = 0.3% per minute = 18% per hour
+    // A 20-minute delivery would consume ~6% battery (realistic for drone delivery)
+    drone.batteryLevel = Math.max(0, drone.batteryLevel - 0.015);
 
     await drone.save();
 
@@ -181,36 +209,62 @@ class DroneSimulation {
       drone.currentLocation.latitude = drone.destination.latitude;
       drone.currentLocation.longitude = drone.destination.longitude;
 
-      // Simulate delivery time (30 seconds)
+      // Simulate delivery time (5 seconds for faster demo)
       setTimeout(async () => {
         const updatedDrone = await Drone.findOne({ droneId: drone.droneId });
         if (updatedDrone && updatedDrone.status === "delivering") {
           updatedDrone.status = "returning";
-          // Set return destination (to a depot/restaurant location)
-          updatedDrone.destination = {
-            latitude: 10.7769, // Default depot location
+
+          // Set return destination to drone's home location (where it started)
+          const homeLocation = updatedDrone.homeLocation || {
+            latitude: 10.7769,
             longitude: 106.7009,
             address: "Depot Location",
           };
+
+          updatedDrone.destination = {
+            latitude: homeLocation.latitude,
+            longitude: homeLocation.longitude,
+            address: homeLocation.address || "Depot Location",
+          };
+
           await updatedDrone.save();
+
+          // Start simulation for returning trip
+          this.startSimulation(updatedDrone.droneId);
 
           this.io.emit("drone:status", {
             droneId: updatedDrone.droneId,
             status: "returning",
             orderId: updatedDrone.orderId,
           });
+
+          console.log(
+            `[DroneSimulation] Drone ${updatedDrone.droneId} starting return trip to home location (${homeLocation.latitude}, ${homeLocation.longitude})`
+          );
         }
-      }, 30000);
+      }, 5000); // Reduced to 5 seconds for faster demo
     } else if (drone.status === "returning") {
-      // Drone returned to depot
+      // Drone returned to home location (depot)
+      const homeLocation = drone.homeLocation || {
+        latitude: 10.7769,
+        longitude: 106.7009,
+      };
+
       drone.status = "available";
       drone.orderId = null;
       drone.destination = null;
       drone.assignedAt = null;
       drone.estimatedArrival = null;
-      // Reset to depot location
-      drone.currentLocation.latitude = 10.7769;
-      drone.currentLocation.longitude = 106.7009;
+
+      // Reset to home location (where drone started)
+      drone.currentLocation.latitude = homeLocation.latitude;
+      drone.currentLocation.longitude = homeLocation.longitude;
+
+      // Recharge battery when returning home (charge to 100%)
+      drone.batteryLevel = 100;
+
+      await drone.save();
 
       this.io.emit("drone:status", {
         droneId: drone.droneId,
@@ -219,6 +273,10 @@ class DroneSimulation {
       });
 
       this.stopSimulation(drone.droneId);
+
+      console.log(
+        `[DroneSimulation] Drone ${drone.droneId} returned home and is now available at (${homeLocation.latitude}, ${homeLocation.longitude})`
+      );
     }
 
     await drone.save();
@@ -244,10 +302,10 @@ class DroneSimulation {
     }
   }
 
-  // Initialize simulations for all active drones
+  // Initialize simulations for all active drones and available drones (for charging)
   async initializeSimulations() {
     const activeDrones = await Drone.find({
-      status: { $in: ["flying", "delivering", "returning"] },
+      status: { $in: ["flying", "delivering", "returning", "available"] },
     });
 
     for (const drone of activeDrones) {
@@ -256,13 +314,15 @@ class DroneSimulation {
   }
 
   // Start simulation for a specific drone (called when drone is assigned)
+  // Also start for available drones to enable battery charging
   async startDroneSimulation(droneId) {
     const drone = await Drone.findOne({ droneId });
     if (
       drone &&
       (drone.status === "flying" ||
         drone.status === "delivering" ||
-        drone.status === "returning")
+        drone.status === "returning" ||
+        (drone.status === "available" && drone.batteryLevel < 100))
     ) {
       this.startSimulation(droneId);
     }

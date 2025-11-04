@@ -76,13 +76,23 @@ exports.createDrone = async (req, res) => {
       });
     }
 
+    const defaultLocation = {
+      latitude: 10.7769,
+      longitude: 106.7009,
+      altitude: 50,
+    };
+    
+    const finalLocation = currentLocation || defaultLocation;
+
     const drone = await Drone.create({
       droneId,
       name,
-      currentLocation: currentLocation || {
-        latitude: 10.7769,
-        longitude: 106.7009,
-        altitude: 50,
+      currentLocation: finalLocation,
+      // Save starting location as home location for return trips
+      homeLocation: {
+        latitude: finalLocation.latitude,
+        longitude: finalLocation.longitude,
+        address: "Depot Location",
       },
     });
 
@@ -177,6 +187,15 @@ exports.assignDroneToOrder = async (req, res) => {
     const estimatedArrival = new Date(
       Date.now() + estimatedMinutes * 60 * 1000
     );
+
+    // If drone doesn't have a home location, set it to current location
+    if (!drone.homeLocation || !drone.homeLocation.latitude) {
+      drone.homeLocation = {
+        latitude: drone.currentLocation.latitude,
+        longitude: drone.currentLocation.longitude,
+        address: "Depot Location",
+      };
+    }
 
     // Update drone
     drone.orderId = orderId;

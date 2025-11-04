@@ -12,6 +12,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { orderApi } from "../api/orderApi";
+import { restaurantClient } from "../api/axiosClients";
 
 const OrdersManagementPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,67 +22,84 @@ const OrdersManagementPage = () => {
   const itemsPerPage = 10;
   const queryClient = useQueryClient();
 
-  // TODO: Replace with actual API call
-  const { data: orders, isLoading } = useQuery("restaurantOrders", async () => {
-    // Placeholder data
-    return [
-      {
-        _id: "ORD-001",
-        customerName: "Nguyễn Văn A",
-        customerPhone: "0912345678",
-        items: [
-          { productName: "Phở Bò", quantity: 2, price: 50000 },
-          { productName: "Bánh Mì", quantity: 1, price: 25000 },
-        ],
-        totalAmount: 125000,
-        status: "pending",
-        createdAt: new Date().toISOString(),
-        address: "123 Nguyễn Huệ, Q1, TP.HCM",
-      },
-      {
-        _id: "ORD-002",
-        customerName: "Trần Thị B",
-        customerPhone: "0987654321",
-        items: [
-          { productName: "Cơm Tấm", quantity: 1, price: 45000 },
-          { productName: "Trà Đá", quantity: 2, price: 5000 },
-        ],
-        totalAmount: 55000,
-        status: "preparing",
-        createdAt: new Date(Date.now() - 30 * 60000).toISOString(),
-        address: "456 Lê Lợi, Q1, TP.HCM",
-      },
-      {
-        _id: "ORD-003",
-        customerName: "Lê Văn C",
-        customerPhone: "0901234567",
-        items: [
-          { productName: "Phở Bò", quantity: 3, price: 50000 },
-        ],
-        totalAmount: 150000,
-        status: "ready",
-        createdAt: new Date(Date.now() - 60 * 60000).toISOString(),
-        address: "789 Võ Văn Tần, Q3, TP.HCM",
-      },
-    ];
-  });
+  // Get restaurant ID from localStorage
+  const restaurantData = JSON.parse(
+    localStorage.getItem("restaurant_data") || "{}"
+  );
+  const restaurantId = restaurantData._id || restaurantData.id;
+
+  // Fetch orders from Order Service API
+  const {
+    data: ordersResponse,
+    isLoading,
+    error,
+  } = useQuery(
+    "restaurantOrders",
+    async () => {
+      if (!restaurantId) {
+        throw new Error("Restaurant ID not found");
+      }
+      // Call Restaurant Service endpoint which proxies to Order Service
+      const response = await restaurantClient.get("/restaurant/orders");
+      // orderApi returns response.data, which has shape:
+      // { status, results, data: { orders } }
+      const ordersList = response?.data?.orders || [];
+
+      // Map Order Service format to UI format
+      return ordersList.map((order) => ({
+        _id: order._id,
+        customerName: order.receiver || "Không có tên",
+        customerPhone: order.phone || "N/A",
+        items: (order.cart || []).map((item) => ({
+          productName: item.product?.title || item.product?.name || "Sản phẩm",
+          quantity: item.quantity || 0,
+          price: item.product?.price || 0,
+        })),
+        totalAmount: order.totalPrice || 0,
+        status: mapOrderStatus(order.status),
+        createdAt: order.createdAt,
+        address: order.address || "N/A",
+      }));
+    },
+    {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      enabled: !!restaurantId && !!localStorage.getItem("restaurant_token"),
+    }
+  );
+
+  // Map Order Service status to UI status
+  const mapOrderStatus = (status) => {
+    const statusMap = {
+      Processed: "pending",
+      "Waiting Goods": "preparing",
+      Delivery: "delivering",
+      Success: "completed",
+      Cancelled: "cancelled",
+    };
+    return statusMap[status] || status?.toLowerCase() || "pending";
+  };
+
+  const orders = ordersResponse || [];
+
+  // Map UI status back to Order Service status
+  const mapStatusToOrderService = (uiStatus) => {
+    const statusMap = {
+      pending: "Processed",
+      preparing: "Waiting Goods",
+      ready: "Waiting Goods",
+      delivering: "Delivery",
+      completed: "Success",
+      cancelled: "Cancelled",
+    };
+    return statusMap[uiStatus] || "Processed";
+  };
 
   const updateOrderStatusMutation = useMutation(
     async ({ orderId, status }) => {
-      // TODO: Replace with actual API call
-      const response = await fetch(
-        `http://localhost:3003/api/orders/${orderId}/status`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("restaurant_token")}`,
-          },
-          body: JSON.stringify({ status }),
-        }
-      );
-      if (!response.ok) throw new Error("Cập nhật thất bại");
-      return response.json();
+      // Map UI status to Order Service status
+      const orderServiceStatus = mapStatusToOrderService(status);
+      return orderApi.updateOrder(orderId, { status: orderServiceStatus });
     },
     {
       onSuccess: () => {
@@ -99,7 +118,8 @@ const OrdersManagementPage = () => {
       order.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.customerPhone?.includes(searchTerm);
 
-    const matchesStatus = statusFilter === "all" || order.status === statusFilter;
+    const matchesStatus =
+      statusFilter === "all" || order.status === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
@@ -179,13 +199,28 @@ const OrdersManagementPage = () => {
     );
   }
 
+  if (error) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-red-200 p-12 text-center">
+        <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">
+          Lỗi tải dữ liệu
+        </h3>
+        <p className="text-gray-600">
+          {error.message || "Không thể tải danh sách đơn hàng"}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Quản lý đơn hàng</h2>
         <p className="text-sm text-gray-600 mt-1">
-          Hiển thị {filteredOrders?.length || 0} / {orders?.length || 0} đơn hàng
+          Hiển thị {filteredOrders?.length || 0} / {orders?.length || 0} đơn
+          hàng
         </p>
       </div>
 
@@ -256,11 +291,15 @@ const OrdersManagementPage = () => {
                       <p className="font-semibold text-gray-900">
                         {order.customerName}
                       </p>
-                      <p className="text-sm text-gray-600">{order.customerPhone}</p>
+                      <p className="text-sm text-gray-600">
+                        {order.customerPhone}
+                      </p>
                     </div>
 
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Địa chỉ giao hàng</p>
+                      <p className="text-sm text-gray-600 mb-1">
+                        Địa chỉ giao hàng
+                      </p>
                       <p className="text-sm text-gray-900">{order.address}</p>
                     </div>
                   </div>
@@ -372,7 +411,9 @@ const OrdersManagementPage = () => {
               Trang {currentPage} / {totalPages}
             </span>
             <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              onClick={() =>
+                setCurrentPage(Math.min(totalPages, currentPage + 1))
+              }
               disabled={currentPage === totalPages}
               className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -386,4 +427,3 @@ const OrdersManagementPage = () => {
 };
 
 export default OrdersManagementPage;
-
