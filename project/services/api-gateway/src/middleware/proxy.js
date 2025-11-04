@@ -76,6 +76,9 @@ const proxies = {
   restaurantProxy: createServiceProxy(serviceRoutes["/api/restaurant"], {
     "^/api/restaurant": "/api/v1/restaurant", // Rewrite /api/restaurant/signup to /api/v1/restaurant/signup
   }),
+
+  // Drone service proxy - FIXED to drone service
+  droneProxy: createServiceProxy(serviceRoutes["/api/v1/drones"]),
 };
 
 // Health check proxy - FIXED to user service port

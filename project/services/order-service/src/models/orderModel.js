@@ -51,6 +51,11 @@ const orderSchema = new mongoose.Schema(
       },
       default: "Processed",
     },
+    restaurant: {
+      type: mongoose.Schema.ObjectId,
+      ref: "Restaurant",
+      index: true,
+    },
     invoicePayment: Object,
   },
   {

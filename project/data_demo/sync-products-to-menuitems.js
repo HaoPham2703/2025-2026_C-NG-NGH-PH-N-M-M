@@ -1,0 +1,224 @@
+// Change to product-service directory to have access to node_modules
+const path = require("path");
+process.chdir(path.join(__dirname, "../services/product-service"));
+
+const mongoose = require("mongoose");
+require("dotenv").config();
+
+// Import models
+const Product = require("./src/models/productModel");
+const Restaurant = require("../restaurant-service/src/models/restaurantModel");
+const MenuItem = require("../restaurant-service/src/models/menuItemModel");
+
+// Connect to MongoDB
+const connectDB = async (dbUrl, dbName) => {
+  try {
+    mongoose.set("strictQuery", false);
+    await mongoose.connect(dbUrl, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log(`✅ Connected to ${dbName}`);
+  } catch (error) {
+    console.error(`❌ MongoDB connection error for ${dbName}:`, error);
+    throw error;
+  }
+};
+
+const syncProductsToMenuItems = async () => {
+  try {
+    console.log("\n🔄 Starting sync: Products -> MenuItems\n");
+
+    // Step 1: Connect to Product DB
+    const productDbUrl =
+      process.env.DB_URL || "mongodb://127.0.0.1:27017/fastfood_products";
+    await connectDB(productDbUrl, "Product DB");
+
+    // Get all products with restaurantId
+    console.log("1️⃣ Fetching products from Product service...");
+    const products = await Product.find({
+      restaurantId: { $exists: true, $ne: null },
+    }).populate("restaurant");
+
+    console.log(`   Found ${products.length} products with restaurantId`);
+
+    if (products.length === 0) {
+      console.log("\n⚠️ No products found! Please seed products first:");
+      console.log("   node data_demo/seed-products-data.js");
+      process.exit(0);
+    }
+
+    // Step 2: Connect to Restaurant DB
+    console.log("\n2️⃣ Connecting to Restaurant DB...");
+    const restaurantDbUrl =
+      process.env.DB_URL || "mongodb://127.0.0.1:27017/fastfood_restaurants";
+
+    await mongoose.disconnect();
+    await connectDB(restaurantDbUrl, "Restaurant DB");
+
+    // Get mapping of restaurantId (string) to Restaurant ObjectId
+    console.log("\n3️⃣ Creating restaurant mapping...");
+    const restaurants = await Restaurant.find({});
+    const restaurantMap = new Map();
+
+    restaurants.forEach((rest) => {
+      // Map email to restaurant ObjectId
+      restaurantMap.set(rest.email, rest._id);
+    });
+
+    console.log(`   Mapped ${restaurants.length} restaurants`);
+
+    // Group products by restaurantId
+    const productsByRestaurant = new Map();
+
+    products.forEach((product) => {
+      const restaurantId = product.restaurantId;
+      if (restaurantId && !productsByRestaurant.has(restaurantId)) {
+        productsByRestaurant.set(restaurantId, []);
+      }
+      if (restaurantId) {
+        productsByRestaurant.get(restaurantId).push(product);
+      }
+    });
+
+    console.log(
+      `\n4️⃣ Found ${productsByRestaurant.size} restaurants with products`
+    );
+
+    // Step 3: Sync each restaurant's products to MenuItems
+    let totalSynced = 0;
+    let totalSkipped = 0;
+
+    for (const [
+      restaurantIdString,
+      restaurantProducts,
+    ] of productsByRestaurant) {
+      // Find restaurant by email (email format: name@fastfood.com)
+      // Or try to find by restaurantId if it's an ObjectId
+      let restaurant = null;
+
+      // Try to find by email pattern
+      const emailPattern = restaurantIdString.replace("restaurant_", "");
+      const possibleEmails = [
+        `${emailPattern}@fastfood.com`,
+        `restaurant_${emailPattern}@fastfood.com`,
+      ];
+
+      // Try to find restaurant by email or by checking products' restaurantName
+      const product = restaurantProducts[0];
+      const restaurantName = product.restaurantName;
+
+      if (restaurantName) {
+        restaurant = await Restaurant.findOne({
+          restaurantName: restaurantName,
+        });
+      }
+
+      // If still not found, try by email
+      if (!restaurant) {
+        for (const email of possibleEmails) {
+          restaurant = await Restaurant.findOne({ email });
+          if (restaurant) break;
+        }
+      }
+
+      if (!restaurant) {
+        console.log(
+          `\n   ⚠️ Restaurant not found for ${restaurantIdString} (${restaurantName})`
+        );
+        console.log(
+          `      Skipping ${restaurantProducts.length} products for this restaurant`
+        );
+        totalSkipped += restaurantProducts.length;
+        continue;
+      }
+
+      console.log(
+        `\n   📦 Processing restaurant: ${restaurant.restaurantName} (${restaurant.email})`
+      );
+      console.log(`      Found ${restaurantProducts.length} products`);
+
+      // Check existing menu items
+      const existingMenuItems = await MenuItem.find({
+        restaurantId: restaurant._id,
+      });
+      const existingTitles = new Set(
+        existingMenuItems.map((item) => item.title.toLowerCase())
+      );
+
+      let synced = 0;
+      let skipped = 0;
+
+      for (const product of restaurantProducts) {
+        // Check if menu item already exists
+        if (existingTitles.has(product.title.toLowerCase())) {
+          skipped++;
+          continue;
+        }
+
+        // Map Product category to MenuItem category
+        let category = "Khác";
+        if (product.origin && product.origin.includes("Việt Nam")) {
+          category = "Món Việt";
+        } else if (
+          product.ingredients &&
+          product.ingredients.includes("burger")
+        ) {
+          category = "Món ăn nhanh";
+        }
+
+        // Create MenuItem from Product
+        const menuItem = await MenuItem.create({
+          restaurantId: restaurant._id,
+          title: product.title,
+          description: product.description || "",
+          price: product.price,
+          promotion: product.promotion || null,
+          category: category,
+          images: product.images || [],
+          stock: product.inventory || 0,
+          status: "active",
+          sold: 0,
+          rating: product.ratingsAverage || 0,
+          reviewCount: product.ratingsQuantity || 0,
+        });
+
+        synced++;
+        console.log(`      ✅ Created: ${product.title}`);
+      }
+
+      totalSynced += synced;
+      totalSkipped += skipped;
+      console.log(
+        `      Summary: ${synced} created, ${skipped} skipped (already exist)`
+      );
+    }
+
+    // Summary
+    console.log("\n📊 Sync Summary:");
+    console.log(`   ✅ Total synced: ${totalSynced} menu items`);
+    console.log(`   ⏭️  Total skipped: ${totalSkipped} (already exist)`);
+    console.log(
+      `   📦 Total restaurants processed: ${productsByRestaurant.size}`
+    );
+
+    if (totalSynced > 0) {
+      console.log("\n✅ Sync completed successfully!");
+      console.log(
+        "   Products are now available in Restaurant Dashboard -> Quản lý món ăn"
+      );
+    } else if (totalSkipped > 0) {
+      console.log("\n⚠️ All products already exist in MenuItems!");
+      console.log(
+        "   If you don't see products in the dashboard, check the restaurant login."
+      );
+    }
+
+    process.exit(0);
+  } catch (error) {
+    console.error("❌ Error:", error);
+    process.exit(1);
+  }
+};
+
+syncProductsToMenuItems();

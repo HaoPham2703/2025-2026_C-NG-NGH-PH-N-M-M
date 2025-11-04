@@ -11,6 +11,74 @@ const {
   sendOrderCompleted,
 } = require("../events/orderEvents");
 const moment = require("moment");
+const axios = require("axios");
+
+// Auto-assign available drone to order
+// Uses API Gateway for consistent routing and authentication
+const autoAssignDroneToOrder = async (orderId) => {
+  try {
+    const apiGatewayUrl =
+      process.env.API_GATEWAY_URL || "http://localhost:5001";
+
+    // 1. Get available drones via API Gateway
+    const availableDronesResponse = await axios.get(
+      `${apiGatewayUrl}/api/v1/drones/available`,
+      {
+        timeout: 3000,
+        // Optional: Add service-to-service authentication token if needed
+        // headers: {
+        //   'Authorization': `Bearer ${process.env.INTERNAL_SERVICE_TOKEN}`
+        // }
+      }
+    );
+
+    // Handle different response structures from API Gateway
+    const availableDrones =
+      availableDronesResponse.data?.data?.data ||
+      availableDronesResponse.data?.data ||
+      [];
+
+    if (availableDrones.length === 0) {
+      console.log(`[autoAssignDrone] No available drones for order ${orderId}`);
+      return null;
+    }
+
+    // 2. Select first available drone
+    const selectedDrone = availableDrones[0];
+
+    // 3. Assign drone to order via API Gateway
+    const assignResponse = await axios.post(
+      `${apiGatewayUrl}/api/v1/drones/assign`,
+      {
+        droneId: selectedDrone.droneId,
+        orderId: orderId,
+      },
+      {
+        timeout: 5000,
+        // Optional: Add service-to-service authentication token if needed
+        // headers: {
+        //   'Authorization': `Bearer ${process.env.INTERNAL_SERVICE_TOKEN}`
+        // }
+      }
+    );
+
+    console.log(
+      `[autoAssignDrone] Successfully assigned drone ${selectedDrone.droneId} to order ${orderId}`
+    );
+    return assignResponse.data;
+  } catch (error) {
+    console.error(
+      `[autoAssignDrone] Error assigning drone to order ${orderId}:`,
+      error.message
+    );
+    console.error(`[autoAssignDrone] Error details:`, {
+      status: error.response?.status,
+      data: error.response?.data,
+      url: error.config?.url,
+    });
+    throw error;
+  }
+};
 
 // Helper function for async error handling
 const catchAsync = (fn) => {
@@ -48,8 +116,20 @@ exports.createOrder = catchAsync(async (req, res, next) => {
     return next(new AppError(inventoryCheck.message, 400));
   }
 
-  // Create order
-  const newOrder = await Order.create(req.body);
+  // Extract restaurant ID from cart products (first product's restaurant)
+  // Cart structure: [{ product: { restaurant, restaurantId, ... }, quantity }]
+  let restaurantId = req.body.restaurant;
+  if (!restaurantId && req.body.cart && req.body.cart.length > 0) {
+    const firstProduct = req.body.cart[0].product;
+    restaurantId = firstProduct?.restaurant || firstProduct?.restaurantId;
+  }
+
+  // Create order with restaurant ID
+  const orderData = {
+    ...req.body,
+    restaurant: restaurantId,
+  };
+  const newOrder = await Order.create(orderData);
 
   // Update inventory
   const inventoryUpdate = await updateInventory(req.body.cart, "decrease");
@@ -61,6 +141,19 @@ exports.createOrder = catchAsync(async (req, res, next) => {
 
   // Send order created event
   await sendOrderCreated(newOrder);
+
+  // Auto-assign drone if order status is Delivery or Waiting Goods
+  if (newOrder.status === "Delivery" || newOrder.status === "Waiting Goods") {
+    try {
+      await autoAssignDroneToOrder(newOrder._id.toString());
+    } catch (error) {
+      console.error(
+        "Auto-assign drone failed on order creation:",
+        error.message
+      );
+      // Don't fail the order creation if drone assignment fails
+    }
+  }
 
   res.status(201).json({
     status: "success",
@@ -99,9 +192,34 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
   excludedFields.forEach((el) => delete queryObj[el]);
 
   // Filter orders by current user (unless admin)
-  const userId = req.user._id || req.user.id;
-  if (req.user.role !== "admin") {
-    queryObj.user = userId;
+  if (req.user) {
+    const userId = req.user._id || req.user.id || req.user.userId;
+
+    // Log for debugging
+    console.log("[getAllOrders] User info:", {
+      hasUser: !!req.user,
+      userId: userId,
+      userRole: req.user.role,
+      userObject: req.user,
+    });
+
+    // Only show orders for current user unless they are admin
+    if (req.user.role !== "admin" && userId) {
+      queryObj.user = userId;
+      console.log("[getAllOrders] Filtering orders for user:", userId);
+    } else if (!userId) {
+      console.warn("[getAllOrders] User ID not found in req.user");
+    }
+  } else {
+    console.warn("[getAllOrders] req.user is not defined");
+    // If no user, return empty results
+    return res.status(200).json({
+      status: "success",
+      results: 0,
+      data: {
+        orders: [],
+      },
+    });
   }
 
   // Advanced filtering
@@ -446,6 +564,19 @@ exports.updateOrderStatus = catchAsync(async (req, res, next) => {
 
   order.status = status;
   await order.save();
+
+  // Auto-assign drone when order status changes to Delivery or Waiting Goods
+  if (
+    (status === "Delivery" || status === "Waiting Goods") &&
+    oldStatus !== status
+  ) {
+    try {
+      await autoAssignDroneToOrder(order._id.toString());
+    } catch (error) {
+      console.error("Auto-assign drone failed:", error.message);
+      // Don't fail the order status update if drone assignment fails
+    }
+  }
 
   // Send appropriate events
   if (status === "Cancelled") {

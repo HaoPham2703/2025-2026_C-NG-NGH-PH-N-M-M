@@ -359,6 +359,17 @@ const OrderDetailPage = () => {
                     </p>
                   </div>
 
+                  {(orderData.status === "Delivery" ||
+                    orderData.status === "Waiting Goods") && (
+                    <Link
+                      to={`/drone-tracking/${orderData._id}`}
+                      className="block w-full py-3 px-4 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors duration-200 shadow-md flex items-center justify-center gap-2"
+                    >
+                      <Truck className="w-5 h-5" />
+                      Theo dõi Drone
+                    </Link>
+                  )}
+
                   {orderData.status === "Processed" && (
                     <button className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors duration-200 shadow-md flex items-center justify-center gap-2">
                       <XCircle className="w-5 h-5" />

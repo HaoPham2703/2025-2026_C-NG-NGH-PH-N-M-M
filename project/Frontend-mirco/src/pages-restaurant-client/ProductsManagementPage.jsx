@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
-import { restaurantClient } from "../api/axiosClients";
+import { productApi } from "../api/productApi";
 import {
   Plus,
   Search,
@@ -29,20 +29,115 @@ const ProductsManagementPage = () => {
   const [productToDelete, setProductToDelete] = useState(null);
   const queryClient = useQueryClient();
 
-  // Fetch products scoped to current restaurant
-  const { data: products, isLoading } = useQuery(
+  // Get restaurant ID from localStorage
+  const restaurantData = JSON.parse(
+    localStorage.getItem("restaurant_data") || "{}"
+  );
+  const restaurantId = restaurantData._id || restaurantData.id;
+
+  // Fetch products scoped to current restaurant from Product Service
+  const {
+    data: products,
+    isLoading,
+    error: productsError,
+  } = useQuery(
     "restaurantProducts",
     async () => {
-      const res = await restaurantClient.get("/restaurant/menu");
-      // restaurantClient returns response.data, which has shape:
-      // { status, results, data: { menuItems, pagination } }
-      return res?.data?.menuItems || [];
+      try {
+        if (!restaurantId) {
+          throw new Error("Restaurant ID not found");
+        }
+        // Call Product Service directly with restaurant filter
+        const res = await productApi.getProducts({ restaurant: restaurantId });
+        // productApi returns response.data, which has shape:
+        // { status, results, data: { products } }
+        const productsList = res?.data?.products || [];
+
+        // Map Products format to MenuItems format for compatibility
+        return productsList.map((product) => ({
+          _id: product._id,
+          title: product.title,
+          description: product.description,
+          price: product.price,
+          promotion: product.promotion,
+          category: product.category?.name || product.category || "Khác",
+          images: product.images || [],
+          stock: product.inventory || 0, // Map inventory to stock
+          status: "active", // Products are always active
+          sold: product.sold || 0,
+          rating: product.ratingsAverage || 0,
+          reviewCount: product.ratingsQuantity || 0,
+        }));
+      } catch (error) {
+        console.error("Error fetching restaurant products:", error);
+        throw error;
+      }
+    },
+    {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      enabled: !!restaurantId && !!localStorage.getItem("restaurant_token"),
     }
   );
 
+  // Create product mutation
+  const createProductMutation = useMutation(
+    async (productData) => {
+      // Add restaurant ID to product data
+      const data = {
+        ...productData,
+        restaurant: restaurantId,
+        inventory: productData.stock || 0, // Map stock to inventory
+      };
+      // Remove stock field if exists (use inventory instead)
+      delete data.stock;
+      return productApi.createProduct(data);
+    },
+    {
+      onSuccess: () => {
+        toast.success("Đã thêm món ăn!");
+        queryClient.invalidateQueries("restaurantProducts");
+        setShowProductModal(false);
+        setSelectedProduct(null);
+      },
+      onError: (error) => {
+        toast.error(error?.response?.data?.message || "Thêm món ăn thất bại!");
+      },
+    }
+  );
+
+  // Update product mutation
+  const updateProductMutation = useMutation(
+    async ({ productId, productData }) => {
+      // Add restaurant ID to product data
+      const data = {
+        ...productData,
+        restaurant: restaurantId,
+        inventory: productData.stock || 0, // Map stock to inventory
+      };
+      // Remove stock field if exists (use inventory instead)
+      delete data.stock;
+      return productApi.updateProduct(productId, data);
+    },
+    {
+      onSuccess: () => {
+        toast.success("Đã cập nhật món ăn!");
+        queryClient.invalidateQueries("restaurantProducts");
+        setShowProductModal(false);
+        setSelectedProduct(null);
+      },
+      onError: (error) => {
+        toast.error(
+          error?.response?.data?.message || "Cập nhật món ăn thất bại!"
+        );
+      },
+    }
+  );
+
+  // Delete product mutation
   const deleteProductMutation = useMutation(
     async (productId) => {
-      return restaurantClient.delete(`/restaurant/menu/${productId}`);
+      return productApi.deleteProduct(productId);
     },
     {
       onSuccess: () => {
@@ -51,8 +146,8 @@ const ProductsManagementPage = () => {
         setShowDeleteModal(false);
         setProductToDelete(null);
       },
-      onError: () => {
-        toast.error("Xóa thất bại!");
+      onError: (error) => {
+        toast.error(error?.response?.data?.message || "Xóa thất bại!");
       },
     }
   );
@@ -126,10 +221,43 @@ const ProductsManagementPage = () => {
     return { label: "Tạm ngưng", color: "bg-gray-100 text-gray-800" };
   };
 
+  // Check if restaurant is authenticated
+  const restaurantToken = localStorage.getItem("restaurant_token");
+  if (!restaurantToken) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <p className="text-red-600 mb-2">Chưa đăng nhập</p>
+          <p className="text-sm text-gray-600">
+            Vui lòng đăng nhập để tiếp tục
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+      </div>
+    );
+  }
+
+  if (productsError) {
+    console.error("Products error:", productsError);
+    // Don't show error if it's a 401 (redirect will happen)
+    if (productsError?.response?.status === 401) {
+      return null; // Let the redirect happen
+    }
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <p className="text-red-600 mb-2">Lỗi tải dữ liệu</p>
+          <p className="text-sm text-gray-600">
+            {productsError?.response?.data?.message || "Vui lòng thử lại"}
+          </p>
+        </div>
       </div>
     );
   }
@@ -395,12 +523,11 @@ const ProductsManagementPage = () => {
       {showProductModal && (
         <ProductModal
           product={selectedProduct}
+          onCreate={(data) => createProductMutation.mutate(data)}
+          onUpdate={(productId, data) =>
+            updateProductMutation.mutate({ productId, productData: data })
+          }
           onClose={() => {
-            setShowProductModal(false);
-            setSelectedProduct(null);
-          }}
-          onSuccess={() => {
-            queryClient.invalidateQueries("restaurantProducts");
             setShowProductModal(false);
             setSelectedProduct(null);
           }}

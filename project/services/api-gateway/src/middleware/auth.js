@@ -98,8 +98,44 @@ const requireAdmin = async (req, res, next) => {
   }
 };
 
+// Restaurant token verification middleware
+// For restaurant routes, we just check token exists and forward to restaurant service
+// Restaurant service's protect middleware will verify the token with its own JWT_SECRET
+const verifyRestaurantToken = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+
+    if (!token) {
+      return res.status(401).json({
+        status: "error",
+        message: "Access token is required",
+      });
+    }
+
+    // Just check token exists (basic format check)
+    // Don't verify JWT here - let restaurant service verify with its own JWT_SECRET
+    // This prevents "jwt malformed" errors due to different JWT_SECRETs
+    if (typeof token !== "string" || token.length < 10) {
+      return res.status(401).json({
+        status: "error",
+        message: "Invalid token format",
+      });
+    }
+
+    // Forward request to restaurant service
+    // Restaurant service's protect middleware will verify the token
+    next();
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: "Authentication error",
+    });
+  }
+};
+
 module.exports = {
   verifyToken,
+  verifyRestaurantToken,
   optionalAuth,
   requireAdmin,
 };

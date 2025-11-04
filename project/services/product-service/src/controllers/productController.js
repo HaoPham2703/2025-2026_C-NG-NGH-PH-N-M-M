@@ -130,6 +130,11 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
   const excludedFields = ["page", "sort", "limit", "fields", "search"];
   excludedFields.forEach((el) => delete queryObj[el]);
 
+  // Support filter by restaurant ObjectId (for Restaurant Dashboard)
+  if (req.query.restaurant) {
+    queryObj.restaurant = req.query.restaurant;
+  }
+
   // Advanced filtering
   let queryStr = JSON.stringify(queryObj);
   queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);

@@ -60,9 +60,17 @@ app.use((req, res, next) => {
       // Decode Base64 first, then parse JSON
       const userJson = Buffer.from(userHeader, "base64").toString("utf-8");
       req.user = JSON.parse(userJson);
+      console.log("[Order Service] User extracted from header:", {
+        userId: req.user._id || req.user.id || req.user.userId,
+        role: req.user.role,
+        email: req.user.email,
+      });
     } catch (error) {
-      console.error("Error parsing user header:", error);
+      console.error("[Order Service] Error parsing user header:", error);
+      console.error("[Order Service] User header value:", userHeader);
     }
+  } else {
+    console.warn("[Order Service] No x-user header found in request");
   }
   next();
 });

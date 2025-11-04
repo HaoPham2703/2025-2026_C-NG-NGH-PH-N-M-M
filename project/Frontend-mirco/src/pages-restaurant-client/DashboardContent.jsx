@@ -1,4 +1,5 @@
 import { useQuery } from "react-query";
+import { restaurantClient } from "../api/axiosClients";
 import {
   DollarSign,
   ShoppingBag,
@@ -11,50 +12,84 @@ import {
 } from "lucide-react";
 
 const DashboardContent = () => {
-  // TODO: Replace with actual API calls
-  const { data: stats, isLoading } = useQuery("restaurantStats", async () => {
-    // Placeholder data
-    return {
-      totalRevenue: 45000000,
-      totalOrders: 234,
-      pendingOrders: 12,
-      completedOrders: 210,
-      totalProducts: 48,
-      activeProducts: 42,
-      revenueGrowth: 15.3,
-      ordersGrowth: 8.5,
-    };
-  });
+  // Fetch real stats from Restaurant Service API
+  const {
+    data: statsData,
+    isLoading,
+    error: statsError,
+  } = useQuery(
+    "restaurantStats",
+    async () => {
+      const response = await restaurantClient.get("/restaurant/stats");
+      // restaurantClient returns response.data, which has shape:
+      // { status, data: { stats } }
+      return (
+        response?.data?.stats || {
+          totalRevenue: 0,
+          totalOrders: 0,
+          pendingOrders: 0,
+          completedOrders: 0,
+          totalProducts: 0,
+          activeProducts: 0,
+          revenueGrowth: 0,
+          ordersGrowth: 0,
+        }
+      );
+    },
+    {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      enabled: !!localStorage.getItem("restaurant_token"),
+    }
+  );
 
-  const { data: recentOrders } = useQuery("recentOrders", async () => {
-    // Placeholder data
-    return [
-      {
-        id: "ORD-001",
-        customerName: "Nguyễn Văn A",
-        items: 3,
-        total: 250000,
-        status: "pending",
-        time: "5 phút trước",
-      },
-      {
-        id: "ORD-002",
-        customerName: "Trần Thị B",
-        items: 2,
-        total: 180000,
-        status: "preparing",
-        time: "15 phút trước",
-      },
-      {
-        id: "ORD-003",
-        customerName: "Lê Văn C",
-        items: 4,
-        total: 320000,
-        status: "completed",
-        time: "30 phút trước",
-      },
-    ];
-  });
+  const stats = statsData || {
+    totalRevenue: 0,
+    totalOrders: 0,
+    pendingOrders: 0,
+    completedOrders: 0,
+    totalProducts: 0,
+    activeProducts: 0,
+    revenueGrowth: 0,
+    ordersGrowth: 0,
+  };
+
+  const { data: recentOrders, error: ordersError } = useQuery(
+    "recentOrders",
+    async () => {
+      // Placeholder data
+      return [
+        {
+          id: "ORD-001",
+          customerName: "Nguyễn Văn A",
+          items: 3,
+          total: 250000,
+          status: "pending",
+          time: "5 phút trước",
+        },
+        {
+          id: "ORD-002",
+          customerName: "Trần Thị B",
+          items: 2,
+          total: 180000,
+          status: "preparing",
+          time: "15 phút trước",
+        },
+        {
+          id: "ORD-003",
+          customerName: "Lê Văn C",
+          items: 4,
+          total: 320000,
+          status: "completed",
+          time: "30 phút trước",
+        },
+      ];
+    },
+    {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    }
+  );
 
   const statCards = [
     {
@@ -88,7 +123,7 @@ const DashboardContent = () => {
       icon: UtensilsCrossed,
       label: "Món ăn",
       value: `${stats?.activeProducts || 0}/${stats?.totalProducts || 0}`,
-      change: "Đang hoạt động",
+      change: "Đang bán",
       changeType: "neutral",
       color: "bg-purple-100 text-purple-600",
     },
@@ -96,7 +131,10 @@ const DashboardContent = () => {
 
   const getStatusBadge = (status) => {
     const badges = {
-      pending: { label: "Chờ xác nhận", color: "bg-yellow-100 text-yellow-800" },
+      pending: {
+        label: "Chờ xác nhận",
+        color: "bg-yellow-100 text-yellow-800",
+      },
       preparing: { label: "Đang chuẩn bị", color: "bg-blue-100 text-blue-800" },
       completed: { label: "Hoàn thành", color: "bg-green-100 text-green-800" },
       cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
@@ -108,6 +146,20 @@ const DashboardContent = () => {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
+      </div>
+    );
+  }
+
+  if (statsError || ordersError) {
+    console.error("Dashboard error:", statsError || ordersError);
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center">
+          <p className="text-red-600 mb-2">Lỗi tải dữ liệu</p>
+          <p className="text-sm text-gray-600">
+            {statsError?.message || ordersError?.message || "Vui lòng thử lại"}
+          </p>
+        </div>
       </div>
     );
   }
@@ -230,12 +282,8 @@ const DashboardContent = () => {
               <UtensilsCrossed className="h-8 w-8 text-orange-600" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900 mb-1">
-                Thêm món mới
-              </h3>
-              <p className="text-sm text-gray-600">
-                Cập nhật thực đơn của bạn
-              </p>
+              <h3 className="font-semibold text-gray-900 mb-1">Thêm món mới</h3>
+              <p className="text-sm text-gray-600">Cập nhật thực đơn của bạn</p>
             </div>
           </div>
         </a>
@@ -249,9 +297,7 @@ const DashboardContent = () => {
               <Package className="h-8 w-8 text-blue-600" />
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900 mb-1">
-                Xem đơn hàng
-              </h3>
+              <h3 className="font-semibold text-gray-900 mb-1">Xem đơn hàng</h3>
               <p className="text-sm text-gray-600">Quản lý đơn hàng của bạn</p>
             </div>
           </div>
@@ -277,4 +323,3 @@ const DashboardContent = () => {
 };
 
 export default DashboardContent;
-

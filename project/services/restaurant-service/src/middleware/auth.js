@@ -20,7 +20,28 @@ exports.protect = catchAsync(async (req, res, next) => {
   }
 
   // 2) Verify token
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
+  let decoded;
+  try {
+    // Basic token format check
+    if (!token || typeof token !== "string" || token.split(".").length !== 3) {
+      return next(
+        new AppError("Invalid token format. Please log in again.", 401)
+      );
+    }
+
+    decoded = jwt.verify(token, process.env.JWT_SECRET);
+  } catch (error) {
+    console.error("[Restaurant Auth] JWT verification error:", error.message);
+    if (error.name === "JsonWebTokenError") {
+      return next(new AppError("Invalid token. Please log in again.", 401));
+    }
+    if (error.name === "TokenExpiredError") {
+      return next(
+        new AppError("Your token has expired. Please log in again.", 401)
+      );
+    }
+    return next(new AppError("Token verification failed.", 401));
+  }
 
   // 3) Check if restaurant still exists
   const restaurant = await Restaurant.findById(decoded.id);
@@ -42,5 +63,3 @@ exports.protect = catchAsync(async (req, res, next) => {
   req.restaurant = restaurant;
   next();
 });
-
-
