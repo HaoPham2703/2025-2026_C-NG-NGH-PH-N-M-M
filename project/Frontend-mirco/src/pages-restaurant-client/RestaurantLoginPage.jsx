@@ -33,14 +33,15 @@ const RestaurantLoginPage = () => {
       return response;
     },
     {
-      onSuccess: (data) => {
-        localStorage.setItem("restaurant_token", data.token);
-        localStorage.setItem(
-          "restaurant_data",
-          JSON.stringify(data.restaurant)
-        );
+      onSuccess: (response) => {
+        const { token, data: { restaurant } } = response.data;
+        if (!token || !restaurant) {
+          throw new Error('Invalid response from server');
+        }
+        localStorage.setItem("restaurant_token", token);
+        localStorage.setItem("restaurant_data", JSON.stringify(restaurant));
         toast.success("Đăng nhập thành công!");
-        navigate("/restaurant/dashboard");
+        navigate("/restaurant/dashboard", { replace: true });
       },
       onError: (error) => {
         toast.error(error.message || "Đăng nhập thất bại!");

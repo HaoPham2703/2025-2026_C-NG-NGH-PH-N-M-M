@@ -76,7 +76,16 @@ function AppContent() {
           path="/restaurant"
           element={<Navigate to="/restaurant/login" replace />}
         />
-        <Route path="/restaurant/login" element={<RestaurantLoginPage />} />
+        <Route 
+          path="/restaurant/login" 
+          element={
+            !localStorage.getItem("restaurant_token") ? (
+              <RestaurantLoginPage />
+            ) : (
+              <Navigate to="/restaurant/dashboard" replace />
+            )
+          } 
+        />
         <Route path="/restaurant/signup" element={<RestaurantSignupPage />} />
         <Route path="/restaurant/test" element={<RestaurantDashboardTest />} />
         <Route
