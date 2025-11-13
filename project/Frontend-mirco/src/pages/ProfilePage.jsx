@@ -541,10 +541,10 @@ const ProfilePage = () => {
                     const isEditingThis = editingAddressId === index;
 
                     return (
-                      <div
-                        key={index}
+                    <div
+                      key={index}
                         className={`p-5 border-2 rounded-xl transition-all duration-300 ${
-                          addr.setDefault
+                        addr.setDefault
                             ? "border-primary-500 bg-gradient-to-br from-primary-50 to-white shadow-md"
                             : "border-gray-200 bg-white hover:border-primary-300 hover:shadow-md"
                         }`}
@@ -649,8 +649,8 @@ const ProfilePage = () => {
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
                               <div className="flex items-center space-x-3 mb-3">
                                 <div className="p-2 bg-primary-100 rounded-lg">
                                   <MapPin className="w-5 h-5 text-primary-600" />
@@ -659,13 +659,13 @@ const ProfilePage = () => {
                                   <span className="font-bold text-gray-900 text-lg">
                                     {addr.name}
                                   </span>
-                                  {addr.setDefault && (
+                            {addr.setDefault && (
                                     <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-600 text-white">
                                       <Star className="w-3 h-3 mr-1" />
-                                      Mặc định
-                                    </span>
-                                  )}
-                                </div>
+                                Mặc định
+                              </span>
+                            )}
+                          </div>
                               </div>
                               <div className="ml-12 space-y-3">
                                 {/* Số điện thoại */}
@@ -684,12 +684,12 @@ const ProfilePage = () => {
                                     </span>
                                     <span className="text-sm text-gray-600">
                                       {addr.ward}, {addr.district},{" "}
-                                      {addr.province}
+                            {addr.province}
                                     </span>
                                   </div>
                                 </div>
                               </div>
-                            </div>
+                        </div>
                             <div className="flex flex-col space-y-2 ml-4">
                               {!addr.setDefault && (
                                 <button
@@ -700,24 +700,24 @@ const ProfilePage = () => {
                                   Đặt mặc định
                                 </button>
                               )}
-                              <div className="flex space-x-2">
+                        <div className="flex space-x-2">
                                 <button
                                   onClick={() => handleEditAddress(addr, index)}
                                   className="flex items-center px-3 py-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors duration-200"
                                 >
                                   <Edit className="w-4 h-4 mr-1" />
-                                  Sửa
-                                </button>
+                            Sửa
+                          </button>
                                 <button
                                   onClick={() => handleDeleteAddress(index)}
                                   className="flex items-center px-3 py-1.5 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-200"
                                 >
                                   <Trash2 className="w-4 h-4 mr-1" />
-                                  Xóa
-                                </button>
-                              </div>
-                            </div>
-                          </div>
+                            Xóa
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                         )}
                       </div>
                     );
