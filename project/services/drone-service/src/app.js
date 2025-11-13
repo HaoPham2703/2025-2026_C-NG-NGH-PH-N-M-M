@@ -193,13 +193,13 @@ setInterval(async () => {
         droneSimulation.startSimulation(drone.droneId);
       }
     }
-    
+
     // Stop simulation for available drones that are fully charged
     const fullyChargedDrones = await Drone.find({
       status: "available",
       batteryLevel: 100,
     });
-    
+
     for (const drone of fullyChargedDrones) {
       if (droneSimulation.simulations.has(drone.droneId)) {
         droneSimulation.stopSimulation(drone.droneId);
@@ -219,7 +219,7 @@ server.listen(PORT, () => {
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(
     `🔗 Database: ${
-      process.env.DB_URL || "mongodb://localhost:27017/fastfood_drones"
+      process.env.DB_URL || "mongodb://127.0.0.1:27017/fastfood_drones"
     }`
   );
   console.log(`🔌 WebSocket server ready for real-time tracking`);

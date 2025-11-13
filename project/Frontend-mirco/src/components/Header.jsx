@@ -13,6 +13,8 @@ import {
   Bell,
   Heart,
   MapPin,
+  Star,
+  Plus,
 } from "lucide-react";
 
 const Header = () => {
@@ -23,23 +25,52 @@ const Header = () => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedLocation, setSelectedLocation] = useState("Hà Nội");
+  const [selectedAddress, setSelectedAddress] = useState(null);
 
-  // Danh sách địa chỉ có sẵn
-  const locations = [
-    "Hà Nội",
-    "TP. Hồ Chí Minh",
-    "Đà Nẵng",
-    "Hải Phòng",
-    "Cần Thơ",
-    "Nha Trang",
-    "Huế",
-    "Vũng Tàu",
-  ];
+  // Lấy địa chỉ đã chọn từ localStorage hoặc dùng địa chỉ mặc định
+  useEffect(() => {
+    if (user?.address && user.address.length > 0) {
+      const savedAddressIndex = localStorage.getItem("selectedAddressIndex");
+      if (savedAddressIndex !== null) {
+        const index = parseInt(savedAddressIndex);
+        if (index >= 0 && index < user.address.length) {
+          setSelectedAddress(user.address[index]);
+          return;
+        }
+      }
+      // Nếu không có địa chỉ đã lưu, dùng địa chỉ mặc định
+      const defaultIndex = user.address.findIndex((addr) => addr.setDefault);
+      if (defaultIndex !== -1) {
+        setSelectedAddress(user.address[defaultIndex]);
+        localStorage.setItem("selectedAddressIndex", defaultIndex.toString());
+      } else {
+        setSelectedAddress(user.address[0]);
+        localStorage.setItem("selectedAddressIndex", "0");
+      }
+    } else {
+      setSelectedAddress(null);
+      localStorage.removeItem("selectedAddressIndex");
+    }
+  }, [user]);
 
-  const handleLocationSelect = (location) => {
-    setSelectedLocation(location);
+  const handleLocationSelect = (address) => {
+    setSelectedAddress(address);
+    // Lưu index của địa chỉ đã chọn
+    const index = user.address.findIndex(
+      (addr) =>
+        (addr._id && address._id && addr._id === address._id) ||
+        (addr.id && address.id && addr.id === address.id) ||
+        addr === address
+    );
+    if (index !== -1) {
+      localStorage.setItem("selectedAddressIndex", index.toString());
+    }
     setIsLocationMenuOpen(false);
+  };
+
+  const getAddressDisplay = (address) => {
+    if (!address) return "Chọn địa chỉ";
+    return `${address.district}, ${address.province}`;
   };
 
   // Đóng dropdown khi click bên ngoài
@@ -157,55 +188,126 @@ const Header = () => {
             {user ? (
               <>
                 {/* Location Dropdown */}
-                <div className="relative" ref={locationRef}>
-                  <button
-                    onClick={() => setIsLocationMenuOpen(!isLocationMenuOpen)}
-                    className="flex items-center space-x-2 text-gray-600 hover:text-orange-600 transition-colors cursor-pointer p-2 rounded-lg hover:bg-orange-50"
-                  >
-                    <MapPin className="w-4 h-4" />
-                    <span className="text-sm font-medium">
-                      {selectedLocation}
-                    </span>
-                    <svg
-                      className={`w-4 h-4 transition-transform duration-200 ${
-                        isLocationMenuOpen ? "rotate-180" : ""
-                      }`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                {user && (
+                  <div className="relative" ref={locationRef}>
+                    <button
+                      onClick={() => setIsLocationMenuOpen(!isLocationMenuOpen)}
+                      className="flex items-center space-x-2 text-gray-600 hover:text-orange-600 transition-colors cursor-pointer p-2 rounded-lg hover:bg-orange-50"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M19 9l-7 7-7-7"
-                      />
-                    </svg>
-                  </button>
+                      <MapPin className="w-4 h-4" />
+                      <span className="text-sm font-medium max-w-[150px] truncate">
+                        {getAddressDisplay(selectedAddress)}
+                      </span>
+                      <svg
+                        className={`w-4 h-4 transition-transform duration-200 flex-shrink-0 ${
+                          isLocationMenuOpen ? "rotate-180" : ""
+                        }`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
+                      </svg>
+                    </button>
 
-                  {isLocationMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50">
-                      <div className="px-4 py-2 border-b border-gray-100">
-                        <p className="text-sm font-semibold text-gray-900">
-                          Chọn địa chỉ
-                        </p>
+                    {isLocationMenuOpen && (
+                      <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 max-h-96 overflow-y-auto">
+                        <div className="px-4 py-2 border-b border-gray-100 sticky top-0 bg-white">
+                          <p className="text-sm font-semibold text-gray-900">
+                            Chọn địa chỉ giao hàng
+                          </p>
+                        </div>
+                        {user.address && user.address.length > 0 ? (
+                          <>
+                            {user.address.map((address, index) => {
+                              // So sánh địa chỉ bằng cách so sánh object reference hoặc các field chính
+                              const isSelected =
+                                selectedAddress &&
+                                (selectedAddress === address ||
+                                  (selectedAddress._id &&
+                                    address._id &&
+                                    selectedAddress._id === address._id) ||
+                                  (selectedAddress.id &&
+                                    address.id &&
+                                    selectedAddress.id === address.id) ||
+                                  (selectedAddress.detail === address.detail &&
+                                    selectedAddress.phone === address.phone &&
+                                    selectedAddress.province ===
+                                      address.province));
+                              return (
+                                <button
+                                  key={index}
+                                  onClick={() => handleLocationSelect(address)}
+                                  className={`w-full text-left px-4 py-3 hover:bg-orange-50 transition-colors border-b border-gray-50 last:border-b-0 ${
+                                    isSelected
+                                      ? "bg-orange-50 border-l-4 border-l-orange-500"
+                                      : ""
+                                  }`}
+                                >
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center space-x-2 mb-1">
+                                        <span className="text-sm font-semibold text-gray-900">
+                                          {address.name}
+                                        </span>
+                                        {address.setDefault && (
+                                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                                            <Star className="w-3 h-3 mr-1" />
+                                            Mặc định
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-gray-600 mb-1">
+                                        {address.phone}
+                                      </p>
+                                      <p className="text-xs text-gray-500 line-clamp-2">
+                                        {address.detail}, {address.ward},{" "}
+                                        {address.district}, {address.province}
+                                      </p>
+                                    </div>
+                                    {isSelected && (
+                                      <div className="ml-2 flex-shrink-0">
+                                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                            <Link
+                              to="/profile"
+                              onClick={() => setIsLocationMenuOpen(false)}
+                              className="flex items-center space-x-2 px-4 py-3 text-sm text-orange-600 hover:bg-orange-50 transition-colors border-t border-gray-100"
+                            >
+                              <Plus className="w-4 h-4" />
+                              <span>Thêm địa chỉ mới</span>
+                            </Link>
+                          </>
+                        ) : (
+                          <div className="px-4 py-6 text-center">
+                            <MapPin className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                            <p className="text-sm text-gray-500 mb-3">
+                              Chưa có địa chỉ nào
+                            </p>
+                            <Link
+                              to="/profile"
+                              onClick={() => setIsLocationMenuOpen(false)}
+                              className="inline-flex items-center space-x-2 px-4 py-2 text-sm text-white bg-orange-500 rounded-lg hover:bg-orange-600 transition-colors"
+                            >
+                              <Plus className="w-4 h-4" />
+                              <span>Thêm địa chỉ</span>
+                            </Link>
+                          </div>
+                        )}
                       </div>
-                      {locations.map((location) => (
-                        <button
-                          key={location}
-                          onClick={() => handleLocationSelect(location)}
-                          className={`w-full text-left px-4 py-2 text-sm hover:bg-orange-50 transition-colors ${
-                            selectedLocation === location
-                              ? "text-orange-600 bg-orange-50 font-medium"
-                              : "text-gray-700"
-                          }`}
-                        >
-                          {location}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Notifications */}
                 <button className="relative p-2 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all duration-200">

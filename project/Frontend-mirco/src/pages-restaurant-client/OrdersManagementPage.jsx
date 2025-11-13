@@ -45,7 +45,7 @@ const OrdersManagementPage = () => {
       // { status, results, data: { orders } }
       const ordersList = response?.data?.orders || [];
 
-      // Map Order Service format to UI format
+      // Use Order Service format directly (no mapping)
       return ordersList.map((order) => ({
         _id: order._id,
         customerName: order.receiver || "Không có tên",
@@ -56,7 +56,7 @@ const OrdersManagementPage = () => {
           price: item.product?.price || 0,
         })),
         totalAmount: order.totalPrice || 0,
-        status: mapOrderStatus(order.status),
+        status: order.status, // Use Order Service status directly
         createdAt: order.createdAt,
         address: order.address || "N/A",
       }));
@@ -68,38 +68,12 @@ const OrdersManagementPage = () => {
     }
   );
 
-  // Map Order Service status to UI status
-  const mapOrderStatus = (status) => {
-    const statusMap = {
-      Processed: "pending",
-      "Waiting Goods": "preparing",
-      Delivery: "delivering",
-      Success: "completed",
-      Cancelled: "cancelled",
-    };
-    return statusMap[status] || status?.toLowerCase() || "pending";
-  };
-
   const orders = ordersResponse || [];
-
-  // Map UI status back to Order Service status
-  const mapStatusToOrderService = (uiStatus) => {
-    const statusMap = {
-      pending: "Processed",
-      preparing: "Waiting Goods",
-      ready: "Waiting Goods",
-      delivering: "Delivery",
-      completed: "Success",
-      cancelled: "Cancelled",
-    };
-    return statusMap[uiStatus] || "Processed";
-  };
 
   const updateOrderStatusMutation = useMutation(
     async ({ orderId, status }) => {
-      // Map UI status to Order Service status
-      const orderServiceStatus = mapStatusToOrderService(status);
-      return orderApi.updateOrder(orderId, { status: orderServiceStatus });
+      // Use Order Service status directly
+      return orderApi.updateOrder(orderId, { status });
     },
     {
       onSuccess: () => {
@@ -133,51 +107,42 @@ const OrdersManagementPage = () => {
 
   const getStatusBadge = (status) => {
     const badges = {
-      pending: {
-        label: "Chờ xác nhận",
-        color: "bg-yellow-100 text-yellow-800",
-        icon: Clock,
-      },
-      preparing: {
-        label: "Đang chuẩn bị",
+      Processed: {
+        label: "Đã xử lý",
         color: "bg-blue-100 text-blue-800",
         icon: Clock,
       },
-      ready: {
-        label: "Sẵn sàng",
-        color: "bg-purple-100 text-purple-800",
-        icon: CheckCircle,
-      },
-      delivering: {
-        label: "Đang giao",
-        color: "bg-indigo-100 text-indigo-800",
+      "Waiting Goods": {
+        label: "Chờ hàng",
+        color: "bg-yellow-100 text-yellow-800",
         icon: Clock,
       },
-      completed: {
-        label: "Hoàn thành",
+      Delivery: {
+        label: "Đang giao",
+        color: "bg-purple-100 text-purple-800",
+        icon: Clock,
+      },
+      Success: {
+        label: "Thành công",
         color: "bg-green-100 text-green-800",
         icon: CheckCircle,
       },
-      cancelled: {
+      Cancelled: {
         label: "Đã hủy",
         color: "bg-red-100 text-red-800",
         icon: XCircle,
       },
     };
-    return badges[status] || badges.pending;
+    return badges[status] || badges.Processed;
   };
 
   const handleAcceptOrder = (orderId) => {
-    updateOrderStatusMutation.mutate({ orderId, status: "preparing" });
-  };
-
-  const handleReadyOrder = (orderId) => {
-    updateOrderStatusMutation.mutate({ orderId, status: "ready" });
+    updateOrderStatusMutation.mutate({ orderId, status: "Waiting Goods" });
   };
 
   const handleCancelOrder = (orderId) => {
     if (confirm("Bạn có chắc muốn hủy đơn hàng này?")) {
-      updateOrderStatusMutation.mutate({ orderId, status: "cancelled" });
+      updateOrderStatusMutation.mutate({ orderId, status: "Cancelled" });
     }
   };
 
@@ -246,12 +211,11 @@ const OrdersManagementPage = () => {
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 cursor-pointer"
           >
             <option value="all">Tất cả trạng thái</option>
-            <option value="pending">Chờ xác nhận</option>
-            <option value="preparing">Đang chuẩn bị</option>
-            <option value="ready">Sẵn sàng</option>
-            <option value="delivering">Đang giao</option>
-            <option value="completed">Hoàn thành</option>
-            <option value="cancelled">Đã hủy</option>
+            <option value="Processed">Đã xử lý</option>
+            <option value="Waiting Goods">Chờ hàng</option>
+            <option value="Delivery">Đang giao</option>
+            <option value="Success">Thành công</option>
+            <option value="Cancelled">Đã hủy</option>
           </select>
         </div>
       </div>
@@ -340,13 +304,13 @@ const OrdersManagementPage = () => {
                   </div>
 
                   <div className="flex flex-col gap-2 w-full">
-                    {order.status === "pending" && (
+                    {order.status === "Processed" && (
                       <>
                         <button
                           onClick={() => handleAcceptOrder(order._id)}
                           className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
                         >
-                          Xác nhận đơn
+                          Xác nhận đơn (Chờ hàng)
                         </button>
                         <button
                           onClick={() => handleCancelOrder(order._id)}
@@ -355,15 +319,6 @@ const OrdersManagementPage = () => {
                           Hủy đơn
                         </button>
                       </>
-                    )}
-
-                    {order.status === "preparing" && (
-                      <button
-                        onClick={() => handleReadyOrder(order._id)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-                      >
-                        Món đã sẵn sàng
-                      </button>
                     )}
 
                     <Link

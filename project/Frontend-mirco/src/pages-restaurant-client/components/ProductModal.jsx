@@ -15,6 +15,24 @@ const ProductModal = ({ product, onClose, onCreate, onUpdate }) => {
   });
   const [errors, setErrors] = useState({});
   const [imagePreview, setImagePreview] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Helper function to format number with dots (e.g., 69000 -> "69.000")
+  const formatPrice = (value) => {
+    if (!value && value !== 0) return "";
+    // Remove all non-digit characters
+    const numericValue = String(value).replace(/\D/g, "");
+    if (!numericValue) return "";
+    // Format with dots
+    return numericValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  };
+
+  // Helper function to parse formatted price to number
+  const parsePrice = (value) => {
+    if (!value) return "";
+    // Remove all non-digit characters
+    return value.replace(/\D/g, "");
+  };
 
   useEffect(() => {
     if (product) {
@@ -47,6 +65,7 @@ const ProductModal = ({ product, onClose, onCreate, onUpdate }) => {
 
     if (
       formData.promotion &&
+      formData.price &&
       Number(formData.promotion) >= Number(formData.price)
     ) {
       newErrors.promotion = "Giá khuyến mãi phải nhỏ hơn giá gốc";
@@ -66,6 +85,7 @@ const ProductModal = ({ product, onClose, onCreate, onUpdate }) => {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const data = {
         title: formData.title.trim(),
@@ -88,12 +108,22 @@ const ProductModal = ({ product, onClose, onCreate, onUpdate }) => {
     } catch (error) {
       console.error("Error saving product:", error);
       toast.error("Lưu thất bại!");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Format price, promotion, and stock fields with dots
+    if (name === "price" || name === "promotion" || name === "stock") {
+      const parsedValue = parsePrice(value);
+      setFormData((prev) => ({ ...prev, [name]: parsedValue }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
+
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
@@ -224,15 +254,15 @@ const ProductModal = ({ product, onClose, onCreate, onUpdate }) => {
                     Giá gốc (VNĐ) *
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     name="price"
-                    value={formData.price}
+                    value={formatPrice(formData.price)}
                     onChange={handleChange}
                     className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 ${
                       errors.price ? "border-red-500" : "border-gray-300"
                     }`}
-                    placeholder="50000"
-                    min="0"
+                    placeholder="69.000"
+                    inputMode="numeric"
                   />
                   {errors.price && (
                     <p className="mt-1 text-sm text-red-600 flex items-center">
@@ -247,14 +277,22 @@ const ProductModal = ({ product, onClose, onCreate, onUpdate }) => {
                     Giá khuyến mãi (VNĐ)
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     name="promotion"
-                    value={formData.promotion}
+                    value={formatPrice(formData.promotion)}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
-                    placeholder="45000"
-                    min="0"
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 ${
+                      errors.promotion ? "border-red-500" : "border-gray-300"
+                    }`}
+                    placeholder="45.000"
+                    inputMode="numeric"
                   />
+                  {errors.promotion && (
+                    <p className="mt-1 text-sm text-red-600 flex items-center">
+                      <AlertCircle className="h-4 w-4 mr-1" />
+                      {errors.promotion}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -291,15 +329,15 @@ const ProductModal = ({ product, onClose, onCreate, onUpdate }) => {
                     Số lượng trong kho *
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     name="stock"
-                    value={formData.stock}
+                    value={formatPrice(formData.stock)}
                     onChange={handleChange}
                     className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-orange-500 ${
                       errors.stock ? "border-red-500" : "border-gray-300"
                     }`}
                     placeholder="100"
-                    min="0"
+                    inputMode="numeric"
                   />
                   {errors.stock && (
                     <p className="mt-1 text-sm text-red-600 flex items-center">
@@ -338,10 +376,10 @@ const ProductModal = ({ product, onClose, onCreate, onUpdate }) => {
               </button>
               <button
                 type="submit"
-                disabled={saveProductMutation.isLoading}
+                disabled={isSubmitting}
                 className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
-                {saveProductMutation.isLoading ? (
+                {isSubmitting ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                     <span>Đang lưu...</span>

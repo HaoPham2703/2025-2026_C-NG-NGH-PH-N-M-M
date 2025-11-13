@@ -147,23 +147,38 @@ exports.setDefaultAddress = catchAsync(async (req, res) => {
   const user = req.user;
   const address = user.address;
   const index = req.body.id;
-  if (address.length > index) {
-    const current = await address.findIndex(
-      (value) => value.setDefault == true
-    );
-    address[index].setDefault = true;
-    address[current].setDefault = false;
-    user.address = address;
-    await user.save({ validateBeforeSave: false });
-    return res.status(200).json({
-      status: "success",
-      message: "Set default address successfully.",
-      data: user,
+
+  // Validate index
+  if (
+    index === undefined ||
+    index === null ||
+    index < 0 ||
+    index >= address.length
+  ) {
+    return res.status(400).json({
+      status: "error",
+      message: "Invalid address index. Please try again!!!",
     });
   }
-  res.status(500).json({
-    status: "error",
-    message: "This data is not exist. Please try again!!!",
+
+  // Find current default address index
+  const current = address.findIndex((value) => value.setDefault == true);
+
+  // Set new default
+  address[index].setDefault = true;
+
+  // Unset old default if exists
+  if (current !== -1 && current !== index) {
+    address[current].setDefault = false;
+  }
+
+  user.address = address;
+  await user.save({ validateBeforeSave: false });
+
+  return res.status(200).json({
+    status: "success",
+    message: "Set default address successfully.",
+    data: user,
   });
 });
 

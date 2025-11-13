@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { CreditCard, CheckCircle, XCircle, ArrowLeft } from "lucide-react";
+import { CreditCard, CheckCircle, XCircle } from "lucide-react";
+import { paymentApi } from "../api/paymentApi";
 import toast from "react-hot-toast";
 
 const VNPayMockPage = () => {
@@ -33,16 +34,40 @@ const VNPayMockPage = () => {
     setIsProcessing(true);
 
     // Simulate payment processing
-    setTimeout(() => {
+    setTimeout(async () => {
       // Mock validation
       if (formData.otp === "123456") {
-        setPaymentSuccess(true);
-        toast.success("Thanh toán thành công!");
+        try {
+          // Create mock VNPay params (similar to what VNPay returns)
+          const mockVnpParams = {
+            vnp_ResponseCode: "00", // Success code
+            vnp_TxnRef: orderId,
+            vnp_Amount: (Number(amount) * 100).toString(), // VNPay uses cents
+            vnp_OrderInfo: orderDescription || `Thanh toán đơn hàng #${orderId}`,
+            vnp_BankCode: "NCB",
+            vnp_TransactionNo: `MOCK${Date.now()}`,
+            vnp_TransactionStatus: "00",
+            vnp_CardType: "ATM",
+            vnp_PayDate: new Date().toISOString().replace(/[-:]/g, "").split(".")[0],
+          };
 
-        // Redirect after 2 seconds
-        setTimeout(() => {
-          navigate(`/orders/${orderId}?payment=success`);
-        }, 2000);
+          // Call API to verify payment (mock)
+          await paymentApi.returnVNPayStatus({
+            invoice: mockVnpParams,
+          });
+
+          setPaymentSuccess(true);
+          toast.success("Thanh toán thành công!");
+
+          // Redirect after 2 seconds
+          setTimeout(() => {
+            navigate(`/orders/${orderId}?payment=success`);
+          }, 2000);
+        } catch (error) {
+          console.error("Payment verification error:", error);
+          setPaymentSuccess(false);
+          toast.error("Có lỗi xảy ra khi xác thực thanh toán");
+        }
       } else {
         setPaymentSuccess(false);
         toast.error("Mã OTP không đúng!");
@@ -82,7 +107,7 @@ const VNPayMockPage = () => {
                 {new Intl.NumberFormat("vi-VN", {
                   style: "currency",
                   currency: "VND",
-                }).format(amount / 100 || 0)}
+                }).format(Number(amount) || 0)}
               </span>
             </div>
           </div>
@@ -150,7 +175,7 @@ const VNPayMockPage = () => {
                   {new Intl.NumberFormat("vi-VN", {
                     style: "currency",
                     currency: "VND",
-                  }).format(amount / 100 || 0)}
+                  }).format(Number(amount) || 0)}
                 </span>
               </div>
               <div className="flex justify-between">

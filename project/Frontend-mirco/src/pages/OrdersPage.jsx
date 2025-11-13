@@ -1,5 +1,5 @@
 import React from "react";
-import { useQuery } from "react-query";
+import { useQuery, useMutation, useQueryClient } from "react-query";
 import { Link } from "react-router-dom";
 import { orderApi } from "../api/orderApi";
 import {
@@ -11,9 +11,11 @@ import {
   CreditCard,
 } from "lucide-react";
 import Breadcrumb from "../components/Breadcrumb";
+import toast from "react-hot-toast";
 
 const OrdersPage = () => {
   const [selectedStatus, setSelectedStatus] = React.useState("all");
+  const queryClient = useQueryClient();
 
   const {
     data: orders,
@@ -22,6 +24,33 @@ const OrdersPage = () => {
   } = useQuery("orders", orderApi.getOrders, {
     refetchOnWindowFocus: false,
   });
+
+  // Mutation để hủy đơn hàng
+  const cancelOrderMutation = useMutation(
+    ({ orderId, status }) => orderApi.updateOrder(orderId, { status }),
+    {
+      onSuccess: (data, variables) => {
+        toast.success("Đã hủy đơn hàng thành công");
+        // Refetch orders để cập nhật danh sách
+        queryClient.invalidateQueries("orders");
+      },
+      onError: (error) => {
+        toast.error(
+          error?.response?.data?.message || "Có lỗi xảy ra khi hủy đơn hàng"
+        );
+      },
+    }
+  );
+
+  const handleCancelOrder = (orderId) => {
+    if (
+      window.confirm(
+        "Bạn có chắc chắn muốn hủy đơn hàng này? Hành động này không thể hoàn tác."
+      )
+    ) {
+      cancelOrderMutation.mutate({ orderId, status: "Cancelled" });
+    }
+  };
 
   // Filter orders based on selected status
   const filteredOrders = React.useMemo(() => {
@@ -402,8 +431,22 @@ const OrdersPage = () => {
                       </Link>
                     )}
                     {order.status === "Processed" && (
-                      <button className="inline-flex items-center px-4 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors duration-200">
-                        Hủy đơn hàng
+                      <button
+                        onClick={() => handleCancelOrder(order._id)}
+                        disabled={cancelOrderMutation.isLoading}
+                        className="inline-flex items-center px-4 py-2 text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {cancelOrderMutation.isLoading ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-700 mr-2"></div>
+                            Đang xử lý...
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="w-4 h-4 mr-1" />
+                            Hủy đơn hàng
+                          </>
+                        )}
                       </button>
                     )}
                     {order.status === "Success" && (

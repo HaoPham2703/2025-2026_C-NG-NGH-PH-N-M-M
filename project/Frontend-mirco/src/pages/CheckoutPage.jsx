@@ -78,12 +78,59 @@ const CheckoutPage = () => {
 
         // Handle different payment methods
         if (selectedPayment === "vnpay") {
+          // try {
+          //   // Gọi vnpay_nodejs để tạo payment URL
+          //   const paymentResponse = await fetch(
+          //     "http://localhost:8888/order/create_payment_url",
+          //     {
+          //       method: "POST",
+          //       headers: {
+          //         "Content-Type": "application/json",
+          //       },
+          //       body: JSON.stringify({
+          //         orderId: order._id,
+          //         amount: getTotalPrice(),
+          //         orderInfo: `Thanh toán đơn hàng #${order._id}`,
+          //         action: `Thanh toán đơn hàng #${order._id}`,
+          //       }),
+          //     }
+          //   );
+
+          //   if (!paymentResponse.ok) {
+          //     throw new Error(`HTTP error! status: ${paymentResponse.status}`);
+          //   }
+
+          //   const paymentData = await paymentResponse.json();
+
+          //   if (paymentData.status === "success" && paymentData.vnpUrl) {
+          //     // Redirect đến VNPay Sandbox
+          //     window.location.href = paymentData.vnpUrl;
+          //   } else {
+          //     toast.error(
+          //       paymentData.message || "Không thể tạo link thanh toán VNPay"
+          //     );
+          //   }
+          // } catch (error) {
+          //   console.error("VNPay error:", error);
+          //   toast.error(
+          //     error.message ||
+          //       "Có lỗi xảy ra khi tạo thanh toán VNPay. Vui lòng thử lại."
+          //   );
+          // }
           // Redirect to VNPay Mock Page
-          const paymentUrl = `/payment/vnpay?orderId=${order._id}&amount=${getTotalPrice() * 100}&orderDescription=${encodeURIComponent(`Thanh toán đơn hàng #${order._id}`)}`;
+          const paymentUrl = `/payment/vnpay?orderId=${
+            order._id
+          }&amount=${getTotalPrice()}&orderDescription=${encodeURIComponent(
+            `Thanh toán đơn hàng #${order._id}`
+          )}`;
           navigate(paymentUrl);
         } else if (selectedPayment === "momo") {
           // Redirect to MoMo Mock Page
-          const paymentUrl = `/payment/momo?orderId=${order._id}&amount=${getTotalPrice()}&orderDescription=${encodeURIComponent(`Thanh toán đơn hàng #${order._id}`)}`;
+          const paymentUrl = `/payment/momo?orderId=${
+            order._id
+          }&amount=${getTotalPrice()}&orderDescription=${encodeURIComponent(
+            `Thanh toán đơn hàng #${order._id}`
+          )}`;
           navigate(paymentUrl);
         } else {
           // COD - redirect to order success page

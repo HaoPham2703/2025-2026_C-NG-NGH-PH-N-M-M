@@ -15,8 +15,11 @@ import DroneHubPage from "./pages/DroneHubPage";
 import ProfilePage from "./pages/ProfilePage";
 import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
+import CheckoutPage_2 from "./pages/CheckoutPage_2";
 import NotFoundPage from "./pages/NotFoundPage";
 import VNPayMockPage from "./pages/VNPayMockPage";
+import VNPayCallbackPage from "./pages/VNPayCallbackPage";
+import VNPayTestPage from "./pages/VNPayTestPage";
 import MoMoMockPage from "./pages/MoMoMockPage";
 
 // Admin pages
@@ -55,8 +58,10 @@ function AppContent() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
 
-        {/* Payment Mock Pages - NO Layout */}
+        {/* Payment Pages - NO Layout */}
         <Route path="/payment/vnpay" element={<VNPayMockPage />} />
+        <Route path="/payment/vnpay/callback" element={<VNPayCallbackPage />} />
+        <Route path="/payment/vnpay/test" element={<VNPayTestPage />} />
         <Route path="/payment/momo" element={<MoMoMockPage />} />
 
         {/* Admin routes - NO Layout (has its own sidebar/header) */}
@@ -148,6 +153,10 @@ function AppContent() {
           <Route
             path="checkout"
             element={user ? <CheckoutPage /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="checkout-2"
+            element={user ? <CheckoutPage_2 /> : <Navigate to="/login" />}
           />
         </Route>
 

@@ -18,6 +18,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      "/payment-service-2": {
+        target: "http://localhost:3005", // Payment Service 2 port
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/payment-service-2/, ""),
+      },
     },
   },
 });

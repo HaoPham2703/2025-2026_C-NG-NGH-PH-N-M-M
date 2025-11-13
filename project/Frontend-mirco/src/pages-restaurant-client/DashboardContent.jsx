@@ -54,40 +54,79 @@ const DashboardContent = () => {
     ordersGrowth: 0,
   };
 
+  // Helper function to format time ago
+  const getTimeAgo = (dateString) => {
+    if (!dateString) return "";
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInSeconds = Math.floor((now - date) / 1000);
+
+    if (diffInSeconds < 60) {
+      return "Vừa xong";
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes} phút trước`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours} giờ trước`;
+    } else {
+      const days = Math.floor(diffInSeconds / 86400);
+      return `${days} ngày trước`;
+    }
+  };
+
+  // Map API status to frontend status format
+  const mapOrderStatus = (apiStatus) => {
+    const statusMap = {
+      Processed: "pending", // Chờ xác nhận
+      "Waiting Goods": "preparing", // Đang chuẩn bị
+      Delivery: "preparing", // Đang giao (coi như đang chuẩn bị)
+      Success: "completed", // Hoàn thành
+      Cancelled: "cancelled", // Đã hủy
+    };
+    return statusMap[apiStatus] || "pending";
+  };
+
+  // Fetch real orders from API
   const { data: recentOrders, error: ordersError } = useQuery(
     "recentOrders",
     async () => {
-      // Placeholder data
-      return [
-        {
-          id: "ORD-001",
-          customerName: "Nguyễn Văn A",
-          items: 3,
-          total: 250000,
-          status: "pending",
-          time: "5 phút trước",
-        },
-        {
-          id: "ORD-002",
-          customerName: "Trần Thị B",
-          items: 2,
-          total: 180000,
-          status: "preparing",
-          time: "15 phút trước",
-        },
-        {
-          id: "ORD-003",
-          customerName: "Lê Văn C",
-          items: 4,
-          total: 320000,
-          status: "completed",
-          time: "30 phút trước",
-        },
-      ];
+      try {
+        const response = await restaurantClient.get("/restaurant/orders");
+        const orders = response?.data?.orders || [];
+
+        // Sort orders by createdAt (newest first) and take only 3 most recent
+        const sortedOrders = [...orders].sort((a, b) => {
+          const dateA = new Date(a.createdAt || a.created_at || 0);
+          const dateB = new Date(b.createdAt || b.created_at || 0);
+          return dateB - dateA; // Descending order (newest first)
+        });
+
+        // Map orders to display format and take only 3 most recent
+        return sortedOrders
+          .slice(0, 3)
+          .map((order) => ({
+            id: order._id || order.id,
+            customerName:
+              order.customer?.name ||
+              order.user?.name ||
+              order.customerName ||
+              "Khách hàng",
+            items: order.items?.length || order.orderItems?.length || 0,
+            total: order.totalAmount || order.total || 0,
+            status: mapOrderStatus(order.status) || "pending",
+            time: getTimeAgo(order.createdAt || order.created_at),
+          }));
+      } catch (error) {
+        console.error("Error fetching recent orders:", error);
+        // Return empty array on error instead of mock data
+        return [];
+      }
     },
     {
       retry: 1,
       refetchOnWindowFocus: false,
+      enabled: !!localStorage.getItem("restaurant_token"),
     }
   );
 

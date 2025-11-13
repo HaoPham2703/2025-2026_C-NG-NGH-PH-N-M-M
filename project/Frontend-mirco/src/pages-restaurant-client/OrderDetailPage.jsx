@@ -109,14 +109,16 @@ const OrderDetailPage = () => {
 
   const getStatusBadge = (status) => {
     const badges = {
-      pending: { label: "Chờ xác nhận", color: "bg-yellow-100 text-yellow-800" },
-      preparing: { label: "Đang chuẩn bị", color: "bg-blue-100 text-blue-800" },
-      ready: { label: "Sẵn sàng", color: "bg-purple-100 text-purple-800" },
-      delivering: { label: "Đang giao", color: "bg-indigo-100 text-indigo-800" },
-      completed: { label: "Hoàn thành", color: "bg-green-100 text-green-800" },
-      cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
+      Processed: { label: "Đã xử lý", color: "bg-blue-100 text-blue-800" },
+      "Waiting Goods": {
+        label: "Chờ hàng",
+        color: "bg-yellow-100 text-yellow-800",
+      },
+      Delivery: { label: "Đang giao", color: "bg-purple-100 text-purple-800" },
+      Success: { label: "Thành công", color: "bg-green-100 text-green-800" },
+      Cancelled: { label: "Đã hủy", color: "bg-red-100 text-red-800" },
     };
-    return badges[status] || badges.pending;
+    return badges[status] || badges.Processed;
   };
 
   const getPaymentMethodLabel = (method) => {
@@ -130,7 +132,13 @@ const OrderDetailPage = () => {
   };
 
   const handleStatusChange = (newStatus) => {
-    if (confirm(`Bạn có chắc muốn chuyển đơn hàng sang trạng thái "${getStatusBadge(newStatus).label}"?`)) {
+    if (
+      confirm(
+        `Bạn có chắc muốn chuyển đơn hàng sang trạng thái "${
+          getStatusBadge(newStatus).label
+        }"?`
+      )
+    ) {
       updateOrderStatusMutation.mutate(newStatus);
     }
   };
@@ -232,7 +240,8 @@ const OrderDetailPage = () => {
                       {new Intl.NumberFormat("vi-VN", {
                         style: "currency",
                         currency: "VND",
-                      }).format(item.price)} / món
+                      }).format(item.price)}{" "}
+                      / món
                     </p>
                   </div>
                 </div>
@@ -276,7 +285,9 @@ const OrderDetailPage = () => {
           {/* Customer Note */}
           {order.note && (
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-              <h4 className="font-semibold text-blue-900 mb-2">Ghi chú từ khách hàng</h4>
+              <h4 className="font-semibold text-blue-900 mb-2">
+                Ghi chú từ khách hàng
+              </h4>
               <p className="text-blue-800">{order.note}</p>
             </div>
           )}
@@ -317,16 +328,22 @@ const OrderDetailPage = () => {
             <div className="space-y-3">
               <div>
                 <p className="text-sm text-gray-600">Tên khách hàng</p>
-                <p className="font-medium text-gray-900">{order.customerName}</p>
+                <p className="font-medium text-gray-900">
+                  {order.customerName}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Số điện thoại</p>
-                <p className="font-medium text-gray-900">{order.customerPhone}</p>
+                <p className="font-medium text-gray-900">
+                  {order.customerPhone}
+                </p>
               </div>
               {order.customerEmail && (
                 <div>
                   <p className="text-sm text-gray-600">Email</p>
-                  <p className="font-medium text-gray-900">{order.customerEmail}</p>
+                  <p className="font-medium text-gray-900">
+                    {order.customerEmail}
+                  </p>
                 </div>
               )}
             </div>
@@ -342,7 +359,8 @@ const OrderDetailPage = () => {
               <p className="font-medium text-gray-900">{order.address.name}</p>
               <p className="text-sm text-gray-600">{order.address.phone}</p>
               <p className="text-sm text-gray-900">
-                {order.address.detail}, {order.address.ward}, {order.address.district}, {order.address.province}
+                {order.address.detail}, {order.address.ward},{" "}
+                {order.address.district}, {order.address.province}
               </p>
             </div>
           </div>
@@ -369,7 +387,9 @@ const OrderDetailPage = () => {
                       : "bg-yellow-100 text-yellow-800"
                   }`}
                 >
-                  {order.paymentStatus === "paid" ? "Đã thanh toán" : "Chưa thanh toán"}
+                  {order.paymentStatus === "paid"
+                    ? "Đã thanh toán"
+                    : "Chưa thanh toán"}
                 </span>
               </div>
             </div>
@@ -381,31 +401,23 @@ const OrderDetailPage = () => {
               Thao tác
             </h3>
             <div className="space-y-2">
-              {order.status === "pending" && (
+              {order.status === "Processed" && (
                 <>
                   <button
-                    onClick={() => handleStatusChange("preparing")}
+                    onClick={() => handleStatusChange("Waiting Goods")}
                     className="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
                   >
                     <CheckCircle className="h-5 w-5" />
-                    <span>Xác nhận đơn</span>
+                    <span>Xác nhận đơn (Chờ hàng)</span>
                   </button>
                   <button
-                    onClick={() => handleStatusChange("cancelled")}
+                    onClick={() => handleStatusChange("Cancelled")}
                     className="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2"
                   >
                     <XCircle className="h-5 w-5" />
                     <span>Hủy đơn</span>
                   </button>
                 </>
-              )}
-              {order.status === "preparing" && (
-                <button
-                  onClick={() => handleStatusChange("ready")}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors"
-                >
-                  Món đã sẵn sàng
-                </button>
               )}
             </div>
           </div>
@@ -416,4 +428,3 @@ const OrderDetailPage = () => {
 };
 
 export default OrderDetailPage;
-

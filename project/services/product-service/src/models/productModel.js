@@ -22,7 +22,8 @@ const productSchema = new mongoose.Schema(
       validate: {
         validator: function (val) {
           // this only points to current doc on NEW document creation
-          return val <= this.price;
+          // Promotion must be less than price (not equal)
+          return !val || val < this.price;
         },
         message: "Giá giảm: ({VALUE}) phải nhỏ hơn giá gốc",
       },

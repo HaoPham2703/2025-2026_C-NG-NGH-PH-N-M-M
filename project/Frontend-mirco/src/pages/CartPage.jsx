@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Minus, Plus, Trash2, ShoppingCart } from "lucide-react";
+import { Minus, Plus, Trash2, ShoppingCart, AlertCircle } from "lucide-react";
 import { useCart } from "../contexts/CartContext";
 import Breadcrumb from "../components/Breadcrumb";
 
@@ -205,6 +205,13 @@ const CartPage = () => {
                   className="w-full btn-primary text-center block"
                 >
                   Thanh toán
+                </Link>
+                <Link
+                  to="/checkout-2"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg transition-colors text-center"
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  Thanh toán (Test VNPay)
                 </Link>
                 <Link
                   to="/products"

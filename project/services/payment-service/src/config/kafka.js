@@ -3,8 +3,6 @@ const { Kafka } = require("kafkajs");
 const kafka = new Kafka({
   clientId: "payment-service",
   brokers: [process.env.KAFKA_URL || "127.0.0.1:9092"],
-  logLevel: 0, // Disable Kafka logging
-  logCreator: () => () => {}, // Empty log function
 });
 
 const producer = kafka.producer();

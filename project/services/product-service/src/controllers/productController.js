@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const Product = require("../models/productModel");
 const Category = require("../models/categoryModel");
 const Brand = require("../models/brandModel");
@@ -53,6 +54,31 @@ const upload = multer({
 });
 
 const uploadFiles = upload.fields([{ name: "images", maxCount: 5 }]);
+
+// Helper function to convert category name to ObjectId
+const getCategoryId = async (categoryInput) => {
+  // If it's already an ObjectId, return it
+  if (
+    mongoose.Types.ObjectId.isValid(categoryInput) &&
+    categoryInput.length === 24
+  ) {
+    return categoryInput;
+  }
+
+  // If it's a string (category name), find or create the category
+  if (typeof categoryInput === "string" && categoryInput.trim()) {
+    let category = await Category.findOne({ name: categoryInput.trim() });
+
+    if (!category) {
+      // Create new category if it doesn't exist
+      category = await Category.create({ name: categoryInput.trim() });
+    }
+
+    return category._id;
+  }
+
+  return null;
+};
 
 exports.uploadProductImages = (req, res, next) => {
   uploadFiles(req, res, (err) => {
@@ -206,6 +232,16 @@ exports.getProduct = catchAsync(async (req, res, next) => {
 });
 
 exports.createProduct = catchAsync(async (req, res, next) => {
+  // Convert category name to ObjectId if needed
+  if (req.body.category) {
+    const categoryId = await getCategoryId(req.body.category);
+    if (categoryId) {
+      req.body.category = categoryId;
+    } else {
+      delete req.body.category; // Remove invalid category
+    }
+  }
+
   const newProduct = await Product.create(req.body);
 
   res.status(201).json({
@@ -217,6 +253,16 @@ exports.createProduct = catchAsync(async (req, res, next) => {
 });
 
 exports.updateProduct = catchAsync(async (req, res, next) => {
+  // Convert category name to ObjectId if needed
+  if (req.body.category) {
+    const categoryId = await getCategoryId(req.body.category);
+    if (categoryId) {
+      req.body.category = categoryId;
+    } else {
+      delete req.body.category; // Remove invalid category
+    }
+  }
+
   const product = await Product.findByIdAndUpdate(req.params.id, req.body, {
     new: true,
     runValidators: true,
