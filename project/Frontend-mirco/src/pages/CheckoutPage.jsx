@@ -15,12 +15,52 @@ const CheckoutPage = () => {
   const navigate = useNavigate();
   const [selectedPayment, setSelectedPayment] = useState("cash");
   const [selectedAddress, setSelectedAddress] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm();
+
+  // Group cart items by restaurant
+  const groupCartByRestaurant = () => {
+    const grouped = {};
+    
+    cartItems.forEach((item) => {
+      // Get restaurant identifier (restaurantId string or restaurant ObjectId or restaurantName)
+      const restaurantId = 
+        item.product?.restaurantId || 
+        item.product?.restaurant?._id || 
+        item.product?.restaurant ||
+        item.product?.restaurantName ||
+        "unknown";
+      
+      const restaurantName = 
+        item.product?.restaurantName ||
+        item.product?.restaurant?.restaurantName ||
+        item.product?.restaurant?.name ||
+        `Cửa hàng ${restaurantId}` ||
+        "Cửa hàng chưa xác định";
+
+      if (!grouped[restaurantId]) {
+        grouped[restaurantId] = {
+          restaurantId,
+          restaurantName,
+          items: [],
+          totalPrice: 0,
+        };
+      }
+
+      const itemPrice = (item.product.promotion || item.product.price) * item.quantity;
+      grouped[restaurantId].items.push(item);
+      grouped[restaurantId].totalPrice += itemPrice;
+    });
+
+    return Object.values(grouped);
+  };
+
+  const restaurantGroups = groupCartByRestaurant();
 
   // Check if cart is empty
   if (cartItems.length === 0) {
@@ -43,6 +83,8 @@ const CheckoutPage = () => {
 
   const onSubmit = async (data) => {
     try {
+      setIsSubmitting(true);
+      
       // Map payment method to backend format
       const paymentMapping = {
         cash: "tiền mặt",
@@ -50,94 +92,77 @@ const CheckoutPage = () => {
         momo: "momo",
       };
 
-      const orderData = {
-        address: user?.address?.[selectedAddress]?.detail || data.address,
-        receiver: user?.address?.[selectedAddress]?.name || data.receiver,
-        phone: user?.address?.[selectedAddress]?.phone || data.phone,
-        cart: cartItems,
-        totalPrice: getTotalPrice(),
-        payments: paymentMapping[selectedPayment] || "tiền mặt",
-      };
+      const address = user?.address?.[selectedAddress]?.detail || data.address;
+      const receiver = user?.address?.[selectedAddress]?.name || data.receiver;
+      const phone = user?.address?.[selectedAddress]?.phone || data.phone;
+      const paymentMethod = paymentMapping[selectedPayment] || "tiền mặt";
 
-      console.log("Order data:", orderData);
+      // Create orders for each restaurant group
+      const orderPromises = restaurantGroups.map(async (group) => {
+        const orderData = {
+          address,
+          receiver,
+          phone,
+          cart: group.items,
+          totalPrice: group.totalPrice,
+          payments: paymentMethod,
+          restaurant: group.restaurantId,
+        };
 
-      // Create order
-      const orderResponse = await orderApi.createOrder(orderData);
+        console.log(`Creating order for ${group.restaurantName}:`, orderData);
+        return orderApi.createOrder(orderData);
+      });
 
-      console.log("Order response:", orderResponse);
+      // Create all orders in parallel
+      const orderResponses = await Promise.all(orderPromises);
+      console.log("All order responses:", orderResponses);
 
-      // Backend returns { status: "success", data: { order: ... } }
-      // Axios interceptor already extracts response.data, so orderResponse is already the data object
-      if (orderResponse.status === "success" && orderResponse.data?.order) {
-        toast.success("Đặt hàng thành công!");
+      // Check if all orders were created successfully
+      const successfulOrders = orderResponses.filter(
+        (response) => response.status === "success" && response.data?.order
+      );
 
-        // Clear cart after successful order
-        clearCart();
+      if (successfulOrders.length === 0) {
+        toast.error("Không thể tạo đơn hàng. Vui lòng thử lại.");
+        setIsSubmitting(false);
+        return;
+      }
 
-        const order = orderResponse.data.order;
-
-        // Handle different payment methods
-        if (selectedPayment === "vnpay") {
-          // try {
-          //   // Gọi vnpay_nodejs để tạo payment URL
-          //   const paymentResponse = await fetch(
-          //     "http://localhost:8888/order/create_payment_url",
-          //     {
-          //       method: "POST",
-          //       headers: {
-          //         "Content-Type": "application/json",
-          //       },
-          //       body: JSON.stringify({
-          //         orderId: order._id,
-          //         amount: getTotalPrice(),
-          //         orderInfo: `Thanh toán đơn hàng #${order._id}`,
-          //         action: `Thanh toán đơn hàng #${order._id}`,
-          //       }),
-          //     }
-          //   );
-
-          //   if (!paymentResponse.ok) {
-          //     throw new Error(`HTTP error! status: ${paymentResponse.status}`);
-          //   }
-
-          //   const paymentData = await paymentResponse.json();
-
-          //   if (paymentData.status === "success" && paymentData.vnpUrl) {
-          //     // Redirect đến VNPay Sandbox
-          //     window.location.href = paymentData.vnpUrl;
-          //   } else {
-          //     toast.error(
-          //       paymentData.message || "Không thể tạo link thanh toán VNPay"
-          //     );
-          //   }
-          // } catch (error) {
-          //   console.error("VNPay error:", error);
-          //   toast.error(
-          //     error.message ||
-          //       "Có lỗi xảy ra khi tạo thanh toán VNPay. Vui lòng thử lại."
-          //   );
-          // }
-          // Redirect to VNPay Mock Page
-          const paymentUrl = `/payment/vnpay?orderId=${
-            order._id
-          }&amount=${getTotalPrice()}&orderDescription=${encodeURIComponent(
-            `Thanh toán đơn hàng #${order._id}`
-          )}`;
-          navigate(paymentUrl);
-        } else if (selectedPayment === "momo") {
-          // Redirect to MoMo Mock Page
-          const paymentUrl = `/payment/momo?orderId=${
-            order._id
-          }&amount=${getTotalPrice()}&orderDescription=${encodeURIComponent(
-            `Thanh toán đơn hàng #${order._id}`
-          )}`;
-          navigate(paymentUrl);
-        } else {
-          // COD - redirect to order success page
-          navigate(`/orders/${order._id}`);
-        }
+      if (successfulOrders.length < restaurantGroups.length) {
+        toast.warning(
+          `Đã tạo ${successfulOrders.length}/${restaurantGroups.length} đơn hàng thành công.`
+        );
       } else {
-        toast.error(orderResponse.message || "Có lỗi xảy ra khi đặt hàng");
+        toast.success(
+          `Đã tạo ${successfulOrders.length} đơn hàng thành công!`
+        );
+      }
+
+      // Clear cart after successful orders
+      clearCart();
+
+      // Handle payment based on payment method
+      if (selectedPayment === "vnpay" || selectedPayment === "momo") {
+        // For multiple orders, redirect to a payment summary page or first order
+        const firstOrder = successfulOrders[0].data.order;
+        const totalAmount = successfulOrders.reduce(
+          (sum, response) => sum + (response.data?.order?.totalPrice || 0),
+          0
+        );
+        
+        const orderIds = successfulOrders
+          .map((response) => response.data?.order?._id)
+          .filter(Boolean)
+          .join(",");
+
+        const paymentUrl = `/payment/${selectedPayment}?orderId=${orderIds}&amount=${totalAmount}&orderDescription=${encodeURIComponent(
+          `Thanh toán ${successfulOrders.length} đơn hàng`
+        )}`;
+        navigate(paymentUrl);
+      } else {
+        // COD - redirect to first order success page or orders list
+        const firstOrder = successfulOrders[0].data.order;
+        navigate(`/orders/${firstOrder._id}`);
       }
     } catch (error) {
       console.error("Checkout error:", error);
@@ -157,6 +182,7 @@ const CheckoutPage = () => {
       } else {
         toast.error("Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.");
       }
+      setIsSubmitting(false);
     }
   };
 
@@ -378,37 +404,67 @@ const CheckoutPage = () => {
               <div className="card sticky top-8">
                 <h2 className="text-xl font-semibold mb-4">Tóm tắt đơn hàng</h2>
 
-                <div className="space-y-3 mb-6">
-                  {cartItems.map((item) => (
-                    <div key={item.id} className="flex justify-between text-sm">
-                      <span>
-                        {item.product.title} x {item.quantity}
-                      </span>
-                      <span>
-                        {new Intl.NumberFormat("vi-VN", {
-                          style: "currency",
-                          currency: "VND",
-                        }).format(
-                          (item.product.promotion || item.product.price) *
-                            item.quantity
-                        )}
-                      </span>
+                <div className="space-y-6 mb-6">
+                  {restaurantGroups.map((group, groupIndex) => (
+                    <div key={group.restaurantId} className="border border-gray-200 rounded-lg p-4">
+                      {/* Restaurant Header */}
+                      <div className="mb-3 pb-2 border-b border-gray-200">
+                        <h3 className="font-semibold text-gray-900">
+                          {group.restaurantName}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {group.items.length} sản phẩm
+                        </p>
+                      </div>
+
+                      {/* Products in this restaurant */}
+                      <div className="space-y-2 mb-3">
+                        {group.items.map((item) => (
+                          <div key={item.product._id} className="flex justify-between text-sm">
+                            <span className="text-gray-700">
+                              {item.product.title} x {item.quantity}
+                            </span>
+                            <span className="text-gray-900 font-medium">
+                              {new Intl.NumberFormat("vi-VN", {
+                                style: "currency",
+                                currency: "VND",
+                              }).format(
+                                (item.product.promotion || item.product.price) *
+                                  item.quantity
+                              )}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Restaurant Subtotal */}
+                      <div className="pt-2 border-t border-gray-200">
+                        <div className="flex justify-between font-semibold">
+                          <span>Tạm tính:</span>
+                          <span className="text-primary-600">
+                            {new Intl.NumberFormat("vi-VN", {
+                              style: "currency",
+                              currency: "VND",
+                            }).format(group.totalPrice)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                          <span>Phí vận chuyển:</span>
+                          <span className="text-green-600">Miễn phí</span>
+                        </div>
+                      </div>
                     </div>
                   ))}
 
-                  <div className="border-t pt-3">
-                    <div className="flex justify-between">
-                      <span>Tạm tính:</span>
-                      <span>
-                        {new Intl.NumberFormat("vi-VN", {
-                          style: "currency",
-                          currency: "VND",
-                        }).format(getTotalPrice())}
-                      </span>
+                  {/* Total Summary */}
+                  <div className="border-t-2 pt-4">
+                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                      <span>Số cửa hàng:</span>
+                      <span className="font-medium">{restaurantGroups.length}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Phí vận chuyển:</span>
-                      <span className="text-green-600">Miễn phí</span>
+                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                      <span>Tổng sản phẩm:</span>
+                      <span className="font-medium">{getTotalItems()} sản phẩm</span>
                     </div>
                     <div className="flex justify-between text-lg font-bold border-t pt-3 mt-3">
                       <span>Tổng cộng:</span>
@@ -419,6 +475,11 @@ const CheckoutPage = () => {
                         }).format(getTotalPrice())}
                       </span>
                     </div>
+                    {restaurantGroups.length > 1 && (
+                      <p className="text-xs text-gray-500 mt-2 text-center">
+                        ⚠️ Bạn sẽ thanh toán {restaurantGroups.length} đơn hàng riêng biệt
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -430,7 +491,7 @@ const CheckoutPage = () => {
                   {isSubmitting ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mx-auto"></div>
                   ) : (
-                    "Đặt hàng"
+                    `Đặt hàng${restaurantGroups.length > 1 ? ` (${restaurantGroups.length} đơn)` : ""}`
                   )}
                 </button>
 

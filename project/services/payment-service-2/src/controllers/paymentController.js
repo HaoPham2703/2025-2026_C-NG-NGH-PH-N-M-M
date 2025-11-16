@@ -20,6 +20,12 @@ const catchAsync = (fn) => {
   };
 };
 
+// Helper to safely extract userId from req.user
+const getUserIdFromRequest = (req) => {
+  if (!req || !req.user) return null;
+  return req.user._id || req.user.id || req.user.userId || null;
+};
+
 // Helper function for creating errors
 const AppError = (message, statusCode) => {
   const error = new Error(message);
@@ -40,12 +46,17 @@ exports.createPaymentUrl = catchAsync(async (req, res, next) => {
 
     // Use orderId from request body if provided, otherwise generate one
     const orderId = req.body.orderId || moment(new Date()).format("DDHHmmss");
-    
+
     // Check if VNPay config is available
-    if (!process.env.vnp_TmnCode || !process.env.vnp_HashSecret || !process.env.vnp_Url) {
+    if (
+      !process.env.vnp_TmnCode ||
+      !process.env.vnp_HashSecret ||
+      !process.env.vnp_Url
+    ) {
       return res.status(500).json({
         status: "error",
-        message: "VNPay configuration is missing. Please check environment variables.",
+        message:
+          "VNPay configuration is missing. Please check environment variables.",
       });
     }
 
@@ -70,16 +81,15 @@ exports.returnPaymentStatus = catchAsync(async (req, res, next) => {
   const verification = verifyPayment(vnp_Params);
 
   if (verification.isValid) {
-    if (
-      verification.responseCode === "00" &&
-      vnp_Params.vnp_OrderInfo === "recharge"
-    ) {
+    const userId = getUserIdFromRequest(req);
+    if (verification.responseCode === "00") {
       const newRecord = {
-        user: req.user.id,
+        user: userId,
         amount: verification.amount,
         payments: "vnpay",
         invoicePayment: verification.params,
         status: "completed",
+        order: vnp_Params.vnp_TxnRef || vnp_Params.orderId || null,
       };
 
       const transaction = await Transaction.create(newRecord);
@@ -97,8 +107,9 @@ exports.returnPaymentStatus = catchAsync(async (req, res, next) => {
 });
 
 exports.returnPaypalStatus = catchAsync(async (req, res, next) => {
+  const userId = getUserIdFromRequest(req);
   const newRecord = {
-    user: req.user.id,
+    user: userId,
     amount: req.body.amount,
     payments: "paypal",
     invoicePayment: req.body.invoicePayment,
@@ -117,8 +128,9 @@ exports.createStripePayment = catchAsync(async (req, res, next) => {
   const result = await createPaymentIntent(amount, currency);
 
   if (result.success) {
+    const userId = getUserIdFromRequest(req);
     const newRecord = {
-      user: req.user.id,
+      user: userId,
       amount: amount,
       payments: "stripe",
       invoicePayment: result.paymentIntent,
@@ -175,8 +187,9 @@ exports.createRefund = catchAsync(async (req, res, next) => {
   const result = await createRefund(paymentIntentId, amount);
 
   if (result.success) {
+    const userId = getUserIdFromRequest(req);
     const newRecord = {
-      user: req.user.id,
+      user: userId,
       amount: -amount, // Negative for refund
       payments: "refund",
       invoicePayment: result.refund,

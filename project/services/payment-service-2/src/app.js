@@ -6,6 +6,7 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const compression = require("compression");
 const rateLimit = require("express-rate-limit");
+const axios = require("axios");
 
 const connectDB = require("./config/database");
 const {
@@ -21,10 +22,16 @@ const PORT = process.env.PORT || 3005;
 // Connect to database
 connectDB();
 
-// Connect to Kafka (optional - won't fail if Kafka is not available)
-connectKafka().catch((error) => {
-  console.warn("⚠️ Kafka connection skipped:", error.message);
-});
+const isKafkaEnabled =
+  process.env.KAFKA_ENABLED === "true" || process.env.KAFKA_ENABLED === "1";
+
+if (isKafkaEnabled) {
+  connectKafka().catch((error) => {
+    console.warn("⚠️ Kafka connection skipped:", error.message);
+  });
+} else {
+  console.log("ℹ️ Kafka is disabled (set KAFKA_ENABLED=true to enable).");
+}
 
 // CORS middleware (must be before helmet)
 app.use(
@@ -70,6 +77,82 @@ app.use("/api", limiter);
 // Body parsing middleware
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Extract user information from API gateway (Base64 encoded)
+app.use((req, res, next) => {
+  const userHeader = req.headers["x-user"];
+  if (userHeader) {
+    try {
+      const userJson = Buffer.from(userHeader, "base64").toString("utf-8");
+      req.user = JSON.parse(userJson);
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Payment Service 2] User extracted from header:", {
+          userId: req.user._id || req.user.id || req.user.userId,
+          role: req.user.role,
+          email: req.user.email,
+        });
+      }
+    } catch (error) {
+      console.error("[Payment Service 2] Error parsing user header:", error);
+      console.error("[Payment Service 2] User header value:", userHeader);
+    }
+  } else {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[Payment Service 2] No x-user header found in request");
+    }
+  }
+  next();
+});
+
+// Fallback: resolve user from Authorization token if x-user header is missing
+app.use(async (req, res, next) => {
+  if (req.user) {
+    return next();
+  }
+
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return next();
+  }
+
+  const token = authHeader.split(" ")[1];
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const userServiceUrl =
+      process.env.USER_SERVICE_URL ||
+      process.env.USER_SERVICE_INTERNAL_URL ||
+      "http://localhost:4001";
+
+    const response = await axios.get(`${userServiceUrl}/api/v1/auth/verify`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      timeout: 5000,
+    });
+
+    if (response.data?.status === "success" && response.data?.data?.user) {
+      req.user = response.data.data.user;
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Payment Service 2] User fetched via verify endpoint:", {
+          userId:
+            req.user._id || req.user.id || req.user.userId || "unknown-user",
+          role: req.user.role,
+          email: req.user.email,
+        });
+      }
+    }
+  } catch (error) {
+    console.error(
+      "[Payment Service 2] Failed to resolve user from auth token:",
+      error.message
+    );
+  }
+
+  next();
+});
 
 // Compression middleware
 app.use(compression());

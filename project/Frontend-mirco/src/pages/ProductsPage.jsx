@@ -62,6 +62,10 @@ const ProductsPage = () => {
     }
   );
 
+  // Get pagination info from API
+  const totalPages = products?.totalPages || 1;
+  const total = products?.total || 0;
+
   // Sử dụng topProducts làm fallback nếu products có lỗi
   const allProducts =
     products?.data?.products || topProducts?.data?.products || [];
@@ -629,30 +633,68 @@ const ProductsPage = () => {
                 )}
 
                 {/* Pagination Controls */}
-                {displayProducts?.length > 0 && (
-                  <div className="mt-12 flex justify-center">
+                {displayProducts?.length > 0 && totalPages > 1 && (
+                  <div className="mt-12 flex flex-col items-center">
                     <div className="flex items-center space-x-2">
                       <button
                         onClick={() =>
                           setCurrentPage(Math.max(1, currentPage - 1))
                         }
                         disabled={currentPage === 1}
-                        className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         Trước
                       </button>
 
-                      <span className="px-4 py-2 text-sm text-gray-700">
-                        Trang {currentPage}
-                      </span>
+                      {/* Page Numbers */}
+                      <div className="flex items-center space-x-1">
+                        {Array.from(
+                          { length: Math.min(5, totalPages) },
+                          (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) {
+                              // Show all pages if 5 or less
+                              pageNum = i + 1;
+                            } else if (currentPage <= 3) {
+                              // Show first 5 pages
+                              pageNum = i + 1;
+                            } else if (currentPage >= totalPages - 2) {
+                              // Show last 5 pages
+                              pageNum = totalPages - 4 + i;
+                            } else {
+                              // Show pages around current page
+                              pageNum = currentPage - 2 + i;
+                            }
+
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => setCurrentPage(pageNum)}
+                                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                                  currentPage === pageNum
+                                    ? "bg-primary-600 text-white"
+                                    : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            );
+                          }
+                        )}
+                      </div>
 
                       <button
-                        onClick={() => setCurrentPage(currentPage + 1)}
-                        disabled={displayProducts?.length < limit}
-                        className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() =>
+                          setCurrentPage(Math.min(totalPages, currentPage + 1))
+                        }
+                        disabled={currentPage >= totalPages}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         Sau
                       </button>
+                    </div>
+                    <div className="mt-4 text-sm text-gray-600">
+                      Trang {currentPage} / {totalPages} ({total} sản phẩm)
                     </div>
                   </div>
                 )}

@@ -16,17 +16,59 @@ import Breadcrumb from "../components/Breadcrumb";
 import toast from "react-hot-toast";
 
 const CheckoutPage_2 = () => {
-  const { user } = useAuth();
+  const { user, createAddress } = useAuth();
   const { items: cartItems, clearCart, getTotalPrice } = useCart();
   const navigate = useNavigate();
   const [selectedPayment, setSelectedPayment] = useState("cash");
   const [selectedAddress, setSelectedAddress] = useState(0);
+  const [showAddAddress, setShowAddAddress] = useState(false);
+  const [newAddress, setNewAddress] = useState({
+    name: "",
+    phone: "",
+    province: "",
+    district: "",
+    ward: "",
+    detail: "",
+    setDefault: false,
+  });
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm();
+
+  const handleCreateAddress = async (e) => {
+    e.preventDefault();
+    if (
+      !newAddress.name ||
+      !newAddress.phone ||
+      !newAddress.province ||
+      !newAddress.district ||
+      !newAddress.ward ||
+      !newAddress.detail
+    ) {
+      toast.error("Vui lòng điền đầy đủ thông tin địa chỉ");
+      return;
+    }
+    const res = await createAddress(newAddress);
+    if (res?.success) {
+      setShowAddAddress(false);
+      // Chọn địa chỉ mới nhất
+      const newIndex = user?.address?.length || 0;
+      setSelectedAddress(newIndex);
+      // Reset form
+      setNewAddress({
+        name: "",
+        phone: "",
+        province: "",
+        district: "",
+        ward: "",
+        detail: "",
+        setDefault: false,
+      });
+    }
+  };
 
   // Check if cart is empty
   if (cartItems.length === 0) {
@@ -96,8 +138,8 @@ const CheckoutPage_2 = () => {
               paymentResponse.status === "success" &&
               paymentResponse.vnpUrl
             ) {
-              // Redirect đến VNPay Sandbox (API thật)
-              window.location.href = paymentResponse.vnpUrl;
+              // Mở VNPay Sandbox trong tab mới
+              window.open(paymentResponse.vnpUrl, "_blank");
             } else {
               toast.error("Không thể tạo link thanh toán VNPay");
             }
@@ -257,6 +299,14 @@ const CheckoutPage_2 = () => {
                         </div>
                       </label>
                     ))}
+
+                    <button
+                      type="button"
+                      onClick={() => setShowAddAddress(true)}
+                      className="mt-2 text-primary-600 hover:underline text-sm"
+                    >
+                      + Thêm địa chỉ mới
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -478,6 +528,149 @@ const CheckoutPage_2 = () => {
             </div>
           </div>
         </form>
+
+        {showAddAddress && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-lg w-full max-w-lg p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Thêm địa chỉ mới</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAddAddress(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateAddress} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Họ và tên
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={newAddress.name}
+                      onChange={(e) =>
+                        setNewAddress((s) => ({ ...s, name: e.target.value }))
+                      }
+                      placeholder="Nguyễn Văn A"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Số điện thoại
+                    </label>
+                    <input
+                      type="tel"
+                      className="input-field"
+                      value={newAddress.phone}
+                      onChange={(e) =>
+                        setNewAddress((s) => ({ ...s, phone: e.target.value }))
+                      }
+                      placeholder="0912345678"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tỉnh/TP
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={newAddress.province}
+                      onChange={(e) =>
+                        setNewAddress((s) => ({
+                          ...s,
+                          province: e.target.value,
+                        }))
+                      }
+                      placeholder="TP. Hồ Chí Minh"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Quận/Huyện
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={newAddress.district}
+                      onChange={(e) =>
+                        setNewAddress((s) => ({
+                          ...s,
+                          district: e.target.value,
+                        }))
+                      }
+                      placeholder="Quận 1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Phường/Xã
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={newAddress.ward}
+                      onChange={(e) =>
+                        setNewAddress((s) => ({ ...s, ward: e.target.value }))
+                      }
+                      placeholder="Phường Bến Nghé"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Địa chỉ chi tiết
+                  </label>
+                  <textarea
+                    rows={3}
+                    className="input-field"
+                    value={newAddress.detail}
+                    onChange={(e) =>
+                      setNewAddress((s) => ({ ...s, detail: e.target.value }))
+                    }
+                    placeholder="Số nhà, đường, khu phố..."
+                  />
+                </div>
+
+                <label className="inline-flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={newAddress.setDefault}
+                    onChange={(e) =>
+                      setNewAddress((s) => ({
+                        ...s,
+                        setDefault: e.target.checked,
+                      }))
+                    }
+                  />
+                  <span className="text-sm">Đặt làm địa chỉ mặc định</span>
+                </label>
+
+                <div className="flex justify-end space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddAddress(false)}
+                    className="btn-secondary"
+                  >
+                    Hủy
+                  </button>
+                  <button type="submit" className="btn-primary">
+                    Lưu địa chỉ
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

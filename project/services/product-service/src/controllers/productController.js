@@ -145,7 +145,8 @@ exports.deleteImageCloud = catchAsync(async (req, res, next) => {
 exports.aliasTopProducts = (req, res, next) => {
   req.query.limit = "5";
   req.query.sort = "-ratingsAverage,price";
-  req.query.fields = "name,price,priceDiscount,ratingsAverage,title";
+  req.query.fields =
+    "name,price,priceDiscount,ratingsAverage,title,images,description,promotion,ratingsQuantity";
   next();
 };
 
@@ -165,19 +166,27 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
   let queryStr = JSON.stringify(queryObj);
   queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
 
-  let query = Product.find(JSON.parse(queryStr));
+  let baseQuery = JSON.parse(queryStr);
 
   // Search functionality
   if (req.query.search) {
     console.log("🔍 Search query:", req.query.search);
     const searchRegex = new RegExp(req.query.search, "i"); // Case insensitive search
-    query = query.or([
-      { title: searchRegex },
-      { description: searchRegex },
-      { name: searchRegex },
-    ]);
+    baseQuery = {
+      ...baseQuery,
+      $or: [
+        { title: searchRegex },
+        { description: searchRegex },
+        { name: searchRegex },
+      ],
+    };
     console.log("🔍 Search regex:", searchRegex);
   }
+
+  // Get total count before pagination
+  const total = await Product.countDocuments(baseQuery);
+
+  let query = Product.find(baseQuery);
 
   // Sorting
   if (req.query.sort) {
@@ -207,9 +216,15 @@ exports.getAllProducts = catchAsync(async (req, res, next) => {
     console.log("🔍 First result:", products[0].title || products[0].name);
   }
 
+  const totalPages = Math.ceil(total / limit);
+
   res.status(200).json({
     status: "success",
     results: products.length,
+    total,
+    totalPages,
+    currentPage: page,
+    limit,
     data: {
       products,
     },
