@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import AddressAutocomplete from "../components/AddressAutocomplete";
 import {
   User,
   Mail,
@@ -45,7 +46,6 @@ const ProfilePage = () => {
     ward: "",
     detail: "",
   });
-
   const {
     register,
     handleSubmit,
@@ -59,6 +59,56 @@ const ProfilePage = () => {
       dateOfBirth: user?.dateOfBirth || "",
     },
   });
+
+  // Xử lý khi chọn tỉnh/thành phố
+  const handleProvinceChange = (value) => {
+    setNewAddress({
+      ...newAddress,
+      province: value,
+      district: "",
+      ward: "",
+    });
+  };
+
+  const handleDistrictChange = (value) => {
+    setNewAddress({
+      ...newAddress,
+      district: value,
+      ward: "",
+    });
+  };
+
+  const handleWardChange = (value) => {
+    setNewAddress({
+      ...newAddress,
+      ward: value,
+    });
+  };
+
+  // Xử lý cho form edit
+  const handleEditProvinceChange = (value) => {
+    setEditingAddress({
+      ...editingAddress,
+      province: value,
+      district: "",
+      ward: "",
+    });
+  };
+
+  const handleEditDistrictChange = (value) => {
+    setEditingAddress({
+      ...editingAddress,
+      district: value,
+      ward: "",
+    });
+  };
+
+  const handleEditWardChange = (value) => {
+    setEditingAddress({
+      ...editingAddress,
+      ward: value,
+    });
+  };
 
   const onSubmit = async (data) => {
     try {
@@ -467,41 +517,33 @@ const ProfilePage = () => {
                       }
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
                     />
+                    
                     <div className="grid grid-cols-2 gap-3">
-                      <input
-                        type="text"
-                        placeholder="Tỉnh/Thành phố"
+                      <AddressAutocomplete
+                        type="province"
                         value={newAddress.province}
-                        onChange={(e) =>
-                          setNewAddress({
-                            ...newAddress,
-                            province: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
+                        onChange={handleProvinceChange}
+                        placeholder="Tỉnh/Thành phố"
                       />
-                      <input
-                        type="text"
-                        placeholder="Quận/Huyện"
+                      <AddressAutocomplete
+                        type="district"
                         value={newAddress.district}
-                        onChange={(e) =>
-                          setNewAddress({
-                            ...newAddress,
-                            district: e.target.value,
-                          })
-                        }
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
+                        onChange={handleDistrictChange}
+                        placeholder="Quận/Huyện"
+                        selectedProvince={newAddress.province}
+                        disabled={!newAddress.province}
                       />
                     </div>
+                    
                     <div className="grid grid-cols-2 gap-3">
-                      <input
-                        type="text"
-                        placeholder="Phường/Xã"
+                      <AddressAutocomplete
+                        type="ward"
                         value={newAddress.ward}
-                        onChange={(e) =>
-                          setNewAddress({ ...newAddress, ward: e.target.value })
-                        }
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
+                        onChange={handleWardChange}
+                        placeholder="Phường/Xã"
+                        selectedProvince={newAddress.province}
+                        selectedDistrict={newAddress.district}
+                        disabled={!newAddress.district}
                       />
                       <input
                         type="text"
@@ -579,44 +621,33 @@ const ProfilePage = () => {
                               }
                               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
                             />
+                            
                             <div className="grid grid-cols-2 gap-3">
-                              <input
-                                type="text"
-                                placeholder="Tỉnh/Thành phố"
+                              <AddressAutocomplete
+                                type="province"
                                 value={editingAddress.province}
-                                onChange={(e) =>
-                                  setEditingAddress({
-                                    ...editingAddress,
-                                    province: e.target.value,
-                                  })
-                                }
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
+                                onChange={handleEditProvinceChange}
+                                placeholder="Tỉnh/Thành phố"
                               />
-                              <input
-                                type="text"
-                                placeholder="Quận/Huyện"
+                              <AddressAutocomplete
+                                type="district"
                                 value={editingAddress.district}
-                                onChange={(e) =>
-                                  setEditingAddress({
-                                    ...editingAddress,
-                                    district: e.target.value,
-                                  })
-                                }
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
+                                onChange={handleEditDistrictChange}
+                                placeholder="Quận/Huyện"
+                                selectedProvince={editingAddress.province}
+                                disabled={!editingAddress.province}
                               />
                             </div>
+                            
                             <div className="grid grid-cols-2 gap-3">
-                              <input
-                                type="text"
-                                placeholder="Phường/Xã"
+                              <AddressAutocomplete
+                                type="ward"
                                 value={editingAddress.ward}
-                                onChange={(e) =>
-                                  setEditingAddress({
-                                    ...editingAddress,
-                                    ward: e.target.value,
-                                  })
-                                }
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
+                                onChange={handleEditWardChange}
+                                placeholder="Phường/Xã"
+                                selectedProvince={editingAddress.province}
+                                selectedDistrict={editingAddress.district}
+                                disabled={!editingAddress.district}
                               />
                               <input
                                 type="text"

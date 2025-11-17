@@ -30,15 +30,16 @@ const RestaurantLoginPage = () => {
         "/restaurant/login",
         credentials
       );
-      return response;
+      return response.data; // Axios response has data in response.data
     },
     {
       onSuccess: (data) => {
         console.log("Login response:", data);
         
         // Handle different response structures
-        const token = data.token || data.data?.token || data.data?.data?.token;
-        const restaurant = data.restaurant || data.data?.restaurant || data.data?.data?.restaurant;
+        // Backend returns: { status: 'success', token: '...', data: { restaurant: {...} } }
+        const token = data.token || data.data?.token;
+        const restaurant = data.data?.restaurant || data.restaurant;
         
         if (!token) {
           console.error("No token in response:", data);
@@ -53,6 +54,7 @@ const RestaurantLoginPage = () => {
           return;
         }
         
+        // Save token and restaurant data
         localStorage.setItem("restaurant_token", token);
         if (restaurant) {
           localStorage.setItem(
@@ -60,11 +62,17 @@ const RestaurantLoginPage = () => {
             JSON.stringify(restaurant)
           );
         }
+        
         toast.success("Đăng nhập thành công!");
-        navigate("/restaurant/dashboard");
+        
+        // Navigate to dashboard
+        setTimeout(() => {
+          navigate("/restaurant/dashboard", { replace: true });
+        }, 100);
       },
       onError: (error) => {
-        toast.error(error.message || "Đăng nhập thất bại!");
+        const message = error.response?.data?.message || error.message || "Đăng nhập thất bại!";
+        toast.error(message);
       },
     }
   );
