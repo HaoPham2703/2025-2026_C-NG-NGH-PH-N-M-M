@@ -20,4 +20,7 @@ router.put(
 router.get("/stats", restaurantController.getStats);
 router.get("/orders", restaurantController.getOrders);
 
+// Rating update endpoint (called by product-service)
+router.patch("/:id/ratings", restaurantController.updateRatings);
+
 module.exports = router;

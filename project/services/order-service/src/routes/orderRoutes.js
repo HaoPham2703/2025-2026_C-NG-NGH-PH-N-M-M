@@ -36,6 +36,11 @@ router
 router.route("/:id/status").patch(orderController.updateOrderStatus);
 router.route("/:id/delivery").patch(orderController.assignDeliveryPerson);
 
+// Review-related endpoints
+router.route("/:id/can-review").get(orderController.canReviewOrder);
+router.route("/:id/mark-reviewed").patch(orderController.markAsReviewed);
+router.route("/:id/unmark-reviewed").patch(orderController.unmarkAsReviewed);
+
 // Order queries by user/restaurant/delivery
 router.route("/user/:userId").get(orderController.getOrdersByUserId);
 router
