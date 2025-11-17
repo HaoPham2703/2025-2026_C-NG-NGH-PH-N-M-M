@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "react-query";
 import { productApi } from "../api/productApi";
 import {
@@ -26,6 +26,7 @@ import "../styles/ProductDetailPage.css";
 
 const ProductDetailPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const { addToCart, isInCart, getItemQuantity } = useCart();
@@ -70,8 +71,11 @@ const ProductDetailPage = () => {
   };
 
   const handleBuyNow = () => {
-    // TODO: Implement buy now functionality
-    console.log("Buy now:", { productId: id, quantity });
+    if (!productData) return;
+
+    addToCart(productData, quantity);
+    toast.success(`Đã thêm ${quantity} sản phẩm vào giỏ hàng!`);
+    navigate("/cart");
   };
 
   const breadcrumbItems = [

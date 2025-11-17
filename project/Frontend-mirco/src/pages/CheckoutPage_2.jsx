@@ -22,6 +22,7 @@ const CheckoutPage_2 = () => {
   const [selectedPayment, setSelectedPayment] = useState("cash");
   const [selectedAddress, setSelectedAddress] = useState(0);
   const [showAddAddress, setShowAddAddress] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [newAddress, setNewAddress] = useState({
     name: "",
     phone: "",
@@ -35,8 +36,69 @@ const CheckoutPage_2 = () => {
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm();
+
+  // Helper function to check if string is valid ObjectId
+  const isValidObjectId = (str) => {
+    if (!str || typeof str !== "string") return false;
+    return /^[0-9a-fA-F]{24}$/.test(str);
+  };
+
+  // Group cart items by restaurant
+  const groupCartByRestaurant = () => {
+    const grouped = {};
+
+    cartItems.forEach((item) => {
+      // Get restaurant ObjectId - ưu tiên restaurant ObjectId trước restaurantId string
+      // Chỉ lấy restaurantId nếu nó là ObjectId hợp lệ
+      let restaurantId =
+        item.product?.restaurant?._id || item.product?.restaurant || null;
+
+      // Nếu không có restaurant ObjectId, kiểm tra restaurantId có phải ObjectId không
+      if (!restaurantId && item.product?.restaurantId) {
+        if (isValidObjectId(item.product.restaurantId)) {
+          restaurantId = item.product.restaurantId;
+        } else {
+          // restaurantId là string không phải ObjectId (ví dụ: "restaurant_11")
+          // Không sử dụng nó, để restaurantId = null
+          console.warn(
+            `Product ${item.product._id} has invalid restaurantId: ${item.product.restaurantId}`
+          );
+        }
+      }
+
+      // Nếu vẫn không có restaurantId hợp lệ, dùng "unknown"
+      if (!restaurantId) {
+        restaurantId = "unknown";
+      }
+
+      const restaurantName =
+        item.product?.restaurantName ||
+        item.product?.restaurant?.restaurantName ||
+        item.product?.restaurant?.name ||
+        `Cửa hàng ${restaurantId}` ||
+        "Cửa hàng chưa xác định";
+
+      if (!grouped[restaurantId]) {
+        grouped[restaurantId] = {
+          restaurantId,
+          restaurantName,
+          items: [],
+          totalPrice: 0,
+        };
+      }
+
+      const itemPrice =
+        (item.product.promotion || item.product.price) * item.quantity;
+      grouped[restaurantId].items.push(item);
+      grouped[restaurantId].totalPrice += itemPrice;
+    });
+
+    return Object.values(grouped);
+  };
+
+  const restaurantGroups = groupCartByRestaurant();
 
   const handleCreateAddress = async (e) => {
     e.preventDefault();
@@ -91,6 +153,8 @@ const CheckoutPage_2 = () => {
 
   const onSubmit = async (data) => {
     try {
+      setIsSubmitting(true);
+
       // Map payment method to backend format
       const paymentMapping = {
         cash: "tiền mặt",
@@ -98,39 +162,83 @@ const CheckoutPage_2 = () => {
         momo: "momo",
       };
 
-      const orderData = {
-        address: user?.address?.[selectedAddress]?.detail || data.address,
-        receiver: user?.address?.[selectedAddress]?.name || data.receiver,
-        phone: user?.address?.[selectedAddress]?.phone || data.phone,
-        cart: cartItems,
-        totalPrice: getTotalPrice(),
-        payments: paymentMapping[selectedPayment] || "tiền mặt",
-      };
+      const address = user?.address?.[selectedAddress]?.detail || data.address;
+      const receiver = user?.address?.[selectedAddress]?.name || data.receiver;
+      const phone = user?.address?.[selectedAddress]?.phone || data.phone;
+      const paymentMethod = paymentMapping[selectedPayment] || "tiền mặt";
 
-      console.log("Order data:", orderData);
+      // Create orders for each restaurant group
+      const orderPromises = restaurantGroups.map(async (group) => {
+        const orderData = {
+          address,
+          receiver,
+          phone,
+          cart: group.items,
+          totalPrice: group.totalPrice,
+          payments: paymentMethod,
+        };
 
-      // Create order
-      const orderResponse = await orderApi.createOrder(orderData);
+        // Chỉ thêm restaurant nếu là ObjectId hợp lệ, không phải "unknown"
+        if (
+          group.restaurantId &&
+          group.restaurantId !== "unknown" &&
+          isValidObjectId(group.restaurantId)
+        ) {
+          orderData.restaurant = group.restaurantId;
+        }
+        // Nếu restaurantId là "unknown", không gửi field restaurant (sẽ là null/undefined)
 
-      console.log("Order response:", orderResponse);
+        console.log(`Creating order for ${group.restaurantName}:`, orderData);
+        return orderApi.createOrder(orderData);
+      });
 
-      // Backend returns { status: "success", data: { order: ... } }
-      if (orderResponse.status === "success" && orderResponse.data?.order) {
-        toast.success("Đặt hàng thành công!");
+      // Create all orders in parallel
+      const orderResponses = await Promise.all(orderPromises);
+      console.log("All order responses:", orderResponses);
 
-        // Clear cart after successful order
-        clearCart();
+      // Check if all orders were created successfully
+      const successfulOrders = orderResponses.filter(
+        (response) => response.status === "success" && response.data?.order
+      );
 
-        const order = orderResponse.data.order;
+      if (successfulOrders.length === 0) {
+        toast.error("Không thể tạo đơn hàng. Vui lòng thử lại.");
+        setIsSubmitting(false);
+        return;
+      }
 
-        // Handle different payment methods
-        if (selectedPayment === "vnpay") {
-          try {
-            // Gọi Payment Service 2 để tạo VNPay payment URL
+      if (successfulOrders.length < restaurantGroups.length) {
+        toast(
+          `Đã tạo ${successfulOrders.length}/${restaurantGroups.length} đơn hàng thành công.`,
+          {
+            icon: "⚠️",
+            duration: 4000,
+          }
+        );
+      } else {
+        toast.success(`Đã tạo ${successfulOrders.length} đơn hàng thành công!`);
+      }
+
+      // Clear cart after successful orders
+      clearCart();
+
+      // Handle payment based on payment method
+      if (selectedPayment === "vnpay") {
+        // For multiple orders, save payment URLs to database for each order
+        try {
+          const paymentPromises = successfulOrders.map(async (response) => {
+            const order = response.data.order;
+            // Lấy userId từ user object
+            const userId = user?._id || user?.id || user?.userId;
             const paymentResponse = await paymentApi2.createVNPayUrl({
               orderId: order._id,
-              amount: getTotalPrice(),
-              orderInfo: `Thanh toán đơn hàng #${order._id}`,
+              amount: order.totalPrice,
+              userId: userId, // Gửi userId trong request body
+              orderInfo: `Thanh toán đơn hàng #${order._id} - ${
+                restaurantGroups.find(
+                  (g) => g.restaurantId === order.restaurant
+                )?.restaurantName || "Cửa hàng"
+              }`,
               action: `Thanh toán đơn hàng #${order._id}`,
             });
 
@@ -138,61 +246,107 @@ const CheckoutPage_2 = () => {
               paymentResponse.status === "success" &&
               paymentResponse.vnpUrl
             ) {
-              // Mở VNPay Sandbox trong tab mới
-              window.open(paymentResponse.vnpUrl, "_blank");
+              // Kiểm tra xem transaction có được tạo thành công không
+              if (paymentResponse.transactionCreated) {
+                console.log(`✅ Transaction created for order ${order._id}`);
+              } else {
+                console.warn(
+                  `⚠️ Transaction NOT created for order ${order._id}`,
+                  paymentResponse.transactionError
+                    ? `Error: ${paymentResponse.transactionError}`
+                    : "Missing userId or orderId"
+                );
+                toast(
+                  `Link thanh toán đã được tạo nhưng chưa lưu vào database. Vui lòng kiểm tra lại.`,
+                  {
+                    icon: "⚠️",
+                    duration: 5000,
+                  }
+                );
+              }
+              return {
+                orderId: order._id,
+                success: true,
+                transactionCreated: paymentResponse.transactionCreated,
+              };
             } else {
-              toast.error("Không thể tạo link thanh toán VNPay");
+              toast.error(
+                `Không thể tạo link thanh toán VNPay cho đơn hàng #${order._id}`
+              );
+              return { orderId: order._id, success: false };
             }
-          } catch (error) {
-            console.error("VNPay error:", error);
-            console.error("Error details:", {
-              message: error.message,
-              response: error.response?.data,
-              status: error.response?.status,
-              config: error.config,
-            });
+          });
 
-            let errorMessage =
-              "Có lỗi xảy ra khi tạo thanh toán VNPay. Vui lòng thử lại.";
+          const paymentResults = await Promise.all(paymentPromises);
+          const successfulPayments = paymentResults.filter((r) => r.success);
 
-            if (
-              error.code === "ECONNREFUSED" ||
-              error.message?.includes("Network Error")
-            ) {
-              errorMessage =
-                "Không thể kết nối đến Payment Service 2 (port 3005).\nVui lòng:\n1. Kiểm tra Payment Service 2 có đang chạy không\n2. Chạy: cd services/payment-service-2 && npm start\n3. Kiểm tra: http://localhost:3005/health";
-            } else if (
-              error.code === "ETIMEDOUT" ||
-              error.message?.includes("timeout")
-            ) {
-              errorMessage =
-                "Kết nối đến Payment Service 2 bị timeout. Vui lòng kiểm tra service.";
-            } else if (error.response?.data?.message) {
-              errorMessage = error.response.data.message;
-            } else if (error.response?.status === 500) {
-              errorMessage =
-                "Lỗi server. Vui lòng kiểm tra cấu hình VNPay trong Payment Service 2.";
-            } else if (error.message) {
-              errorMessage = error.message;
-            }
-
-            console.error("Full error object:", error);
-            toast.error(errorMessage, { duration: 5000 });
+          if (successfulPayments.length > 0) {
+            toast.success(
+              `Đã tạo ${successfulPayments.length} đơn hàng với link thanh toán VNPay. Bạn có thể thanh toán sau trong trang đơn hàng.`
+            );
+            // Redirect đến đơn hàng đầu tiên
+            const firstOrder = successfulOrders[0].data.order;
+            navigate(`/orders/${firstOrder._id}`);
           }
-        } else if (selectedPayment === "momo") {
-          // Redirect to MoMo Mock Page
-          const paymentUrl = `/payment/momo?orderId=${
-            order._id
-          }&amount=${getTotalPrice()}&orderDescription=${encodeURIComponent(
-            `Thanh toán đơn hàng #${order._id}`
-          )}`;
-          navigate(paymentUrl);
-        } else {
-          // COD - redirect to order success page
-          navigate(`/orders/${order._id}`);
+        } catch (error) {
+          console.error("VNPay error:", error);
+          console.error("Error details:", {
+            message: error.message,
+            response: error.response?.data,
+            status: error.response?.status,
+            config: error.config,
+          });
+
+          let errorMessage =
+            "Có lỗi xảy ra khi tạo thanh toán VNPay. Vui lòng thử lại.";
+
+          if (
+            error.code === "ECONNREFUSED" ||
+            error.message?.includes("Network Error")
+          ) {
+            errorMessage =
+              "Không thể kết nối đến Payment Service 2 (port 3005).\nVui lòng:\n1. Kiểm tra Payment Service 2 có đang chạy không\n2. Chạy: cd services/payment-service-2 && npm start\n3. Kiểm tra: http://localhost:3005/health";
+          } else if (
+            error.code === "ETIMEDOUT" ||
+            error.message?.includes("timeout")
+          ) {
+            errorMessage =
+              "Kết nối đến Payment Service 2 bị timeout. Vui lòng kiểm tra service.";
+          } else if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+          } else if (error.response?.status === 500) {
+            errorMessage =
+              "Lỗi server. Vui lòng kiểm tra cấu hình VNPay trong Payment Service 2.";
+          } else if (error.message) {
+            errorMessage = error.message;
+          }
+
+          console.error("Full error object:", error);
+          toast.error(errorMessage, { duration: 5000 });
+          // Vẫn redirect đến đơn hàng ngay cả khi có lỗi tạo payment URL
+          if (successfulOrders.length > 0) {
+            const firstOrder = successfulOrders[0].data.order;
+            navigate(`/orders/${firstOrder._id}`);
+          }
         }
+      } else if (selectedPayment === "momo") {
+        // For multiple orders, redirect to first order or show message
+        if (successfulOrders.length > 1) {
+          toast.info(
+            `Đã tạo ${successfulOrders.length} đơn hàng. Bạn sẽ được chuyển đến thanh toán đơn hàng đầu tiên.`
+          );
+        }
+        const firstOrder = successfulOrders[0].data.order;
+        const paymentUrl = `/payment/momo?orderId=${firstOrder._id}&amount=${
+          firstOrder.totalPrice
+        }&orderDescription=${encodeURIComponent(
+          `Thanh toán đơn hàng #${firstOrder._id}`
+        )}`;
+        navigate(paymentUrl);
       } else {
-        toast.error(orderResponse.message || "Có lỗi xảy ra khi đặt hàng");
+        // COD - redirect to first order success page or orders list
+        const firstOrder = successfulOrders[0].data.order;
+        navigate(`/orders/${firstOrder._id}`);
       }
     } catch (error) {
       console.error("Checkout error:", error);
@@ -212,6 +366,7 @@ const CheckoutPage_2 = () => {
       } else {
         toast.error("Có lỗi xảy ra khi đặt hàng. Vui lòng thử lại.");
       }
+      setIsSubmitting(false);
     }
   };
 
@@ -461,37 +616,81 @@ const CheckoutPage_2 = () => {
               <div className="card sticky top-8">
                 <h2 className="text-xl font-semibold mb-4">Tóm tắt đơn hàng</h2>
 
-                <div className="space-y-3 mb-6">
-                  {cartItems.map((item) => (
-                    <div key={item.id} className="flex justify-between text-sm">
-                      <span>
-                        {item.product.title} x {item.quantity}
-                      </span>
-                      <span>
-                        {new Intl.NumberFormat("vi-VN", {
-                          style: "currency",
-                          currency: "VND",
-                        }).format(
-                          (item.product.promotion || item.product.price) *
-                            item.quantity
-                        )}
-                      </span>
+                <div className="space-y-6 mb-6">
+                  {restaurantGroups.map((group, groupIndex) => (
+                    <div
+                      key={group.restaurantId}
+                      className="border border-gray-200 rounded-lg p-4"
+                    >
+                      {/* Restaurant Header */}
+                      <div className="mb-3 pb-2 border-b border-gray-200">
+                        <h3 className="font-semibold text-gray-900">
+                          {group.restaurantName}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {group.items.length} sản phẩm
+                        </p>
+                      </div>
+
+                      {/* Products in this restaurant */}
+                      <div className="space-y-2 mb-3">
+                        {group.items.map((item) => (
+                          <div
+                            key={item.product._id}
+                            className="flex justify-between text-sm"
+                          >
+                            <span className="text-gray-700">
+                              {item.product.title} x {item.quantity}
+                            </span>
+                            <span className="text-gray-900 font-medium">
+                              {new Intl.NumberFormat("vi-VN", {
+                                style: "currency",
+                                currency: "VND",
+                              }).format(
+                                (item.product.promotion || item.product.price) *
+                                  item.quantity
+                              )}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Restaurant Subtotal */}
+                      <div className="pt-2 border-t border-gray-200">
+                        <div className="flex justify-between font-semibold">
+                          <span>Tạm tính:</span>
+                          <span className="text-primary-600">
+                            {new Intl.NumberFormat("vi-VN", {
+                              style: "currency",
+                              currency: "VND",
+                            }).format(group.totalPrice)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                          <span>Phí vận chuyển:</span>
+                          <span className="text-green-600">Miễn phí</span>
+                        </div>
+                      </div>
                     </div>
                   ))}
 
-                  <div className="border-t pt-3">
-                    <div className="flex justify-between">
-                      <span>Tạm tính:</span>
-                      <span>
-                        {new Intl.NumberFormat("vi-VN", {
-                          style: "currency",
-                          currency: "VND",
-                        }).format(getTotalPrice())}
+                  {/* Total Summary */}
+                  <div className="border-t-2 pt-4">
+                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                      <span>Số cửa hàng:</span>
+                      <span className="font-medium">
+                        {restaurantGroups.length}
                       </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Phí vận chuyển:</span>
-                      <span className="text-green-600">Miễn phí</span>
+                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                      <span>Tổng sản phẩm:</span>
+                      <span className="font-medium">
+                        {cartItems.reduce(
+                          (sum, item) => sum + item.quantity,
+                          0
+                        )}{" "}
+                        sản phẩm
+                      </span>
                     </div>
                     <div className="flex justify-between text-lg font-bold border-t pt-3 mt-3">
                       <span>Tổng cộng:</span>
@@ -502,6 +701,12 @@ const CheckoutPage_2 = () => {
                         }).format(getTotalPrice())}
                       </span>
                     </div>
+                    {restaurantGroups.length > 1 && (
+                      <p className="text-xs text-gray-500 mt-2 text-center">
+                        ⚠️ Bạn sẽ thanh toán {restaurantGroups.length} đơn hàng
+                        riêng biệt
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -513,7 +718,11 @@ const CheckoutPage_2 = () => {
                   {isSubmitting ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mx-auto"></div>
                   ) : (
-                    "Đặt hàng"
+                    `Đặt hàng${
+                      restaurantGroups.length > 1
+                        ? ` (${restaurantGroups.length} đơn)`
+                        : ""
+                    }`
                   )}
                 </button>
 

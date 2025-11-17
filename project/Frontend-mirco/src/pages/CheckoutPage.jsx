@@ -26,17 +26,17 @@ const CheckoutPage = () => {
   // Group cart items by restaurant
   const groupCartByRestaurant = () => {
     const grouped = {};
-    
+
     cartItems.forEach((item) => {
       // Get restaurant identifier (restaurantId string or restaurant ObjectId or restaurantName)
-      const restaurantId = 
-        item.product?.restaurantId || 
-        item.product?.restaurant?._id || 
+      const restaurantId =
+        item.product?.restaurantId ||
+        item.product?.restaurant?._id ||
         item.product?.restaurant ||
         item.product?.restaurantName ||
         "unknown";
-      
-      const restaurantName = 
+
+      const restaurantName =
         item.product?.restaurantName ||
         item.product?.restaurant?.restaurantName ||
         item.product?.restaurant?.name ||
@@ -52,7 +52,8 @@ const CheckoutPage = () => {
         };
       }
 
-      const itemPrice = (item.product.promotion || item.product.price) * item.quantity;
+      const itemPrice =
+        (item.product.promotion || item.product.price) * item.quantity;
       grouped[restaurantId].items.push(item);
       grouped[restaurantId].totalPrice += itemPrice;
     });
@@ -84,7 +85,7 @@ const CheckoutPage = () => {
   const onSubmit = async (data) => {
     try {
       setIsSubmitting(true);
-      
+
       // Map payment method to backend format
       const paymentMapping = {
         cash: "tiền mặt",
@@ -129,13 +130,15 @@ const CheckoutPage = () => {
       }
 
       if (successfulOrders.length < restaurantGroups.length) {
-        toast.warning(
-          `Đã tạo ${successfulOrders.length}/${restaurantGroups.length} đơn hàng thành công.`
+        toast(
+          `Đã tạo ${successfulOrders.length}/${restaurantGroups.length} đơn hàng thành công.`,
+          {
+            icon: "⚠️",
+            duration: 4000,
+          }
         );
       } else {
-        toast.success(
-          `Đã tạo ${successfulOrders.length} đơn hàng thành công!`
-        );
+        toast.success(`Đã tạo ${successfulOrders.length} đơn hàng thành công!`);
       }
 
       // Clear cart after successful orders
@@ -149,7 +152,7 @@ const CheckoutPage = () => {
           (sum, response) => sum + (response.data?.order?.totalPrice || 0),
           0
         );
-        
+
         const orderIds = successfulOrders
           .map((response) => response.data?.order?._id)
           .filter(Boolean)
@@ -406,7 +409,10 @@ const CheckoutPage = () => {
 
                 <div className="space-y-6 mb-6">
                   {restaurantGroups.map((group, groupIndex) => (
-                    <div key={group.restaurantId} className="border border-gray-200 rounded-lg p-4">
+                    <div
+                      key={group.restaurantId}
+                      className="border border-gray-200 rounded-lg p-4"
+                    >
                       {/* Restaurant Header */}
                       <div className="mb-3 pb-2 border-b border-gray-200">
                         <h3 className="font-semibold text-gray-900">
@@ -420,7 +426,10 @@ const CheckoutPage = () => {
                       {/* Products in this restaurant */}
                       <div className="space-y-2 mb-3">
                         {group.items.map((item) => (
-                          <div key={item.product._id} className="flex justify-between text-sm">
+                          <div
+                            key={item.product._id}
+                            className="flex justify-between text-sm"
+                          >
                             <span className="text-gray-700">
                               {item.product.title} x {item.quantity}
                             </span>
@@ -460,11 +469,15 @@ const CheckoutPage = () => {
                   <div className="border-t-2 pt-4">
                     <div className="flex justify-between text-sm text-gray-600 mb-2">
                       <span>Số cửa hàng:</span>
-                      <span className="font-medium">{restaurantGroups.length}</span>
+                      <span className="font-medium">
+                        {restaurantGroups.length}
+                      </span>
                     </div>
                     <div className="flex justify-between text-sm text-gray-600 mb-2">
                       <span>Tổng sản phẩm:</span>
-                      <span className="font-medium">{getTotalItems()} sản phẩm</span>
+                      <span className="font-medium">
+                        {getTotalItems()} sản phẩm
+                      </span>
                     </div>
                     <div className="flex justify-between text-lg font-bold border-t pt-3 mt-3">
                       <span>Tổng cộng:</span>
@@ -477,7 +490,8 @@ const CheckoutPage = () => {
                     </div>
                     {restaurantGroups.length > 1 && (
                       <p className="text-xs text-gray-500 mt-2 text-center">
-                        ⚠️ Bạn sẽ thanh toán {restaurantGroups.length} đơn hàng riêng biệt
+                        ⚠️ Bạn sẽ thanh toán {restaurantGroups.length} đơn hàng
+                        riêng biệt
                       </p>
                     )}
                   </div>
@@ -491,7 +505,11 @@ const CheckoutPage = () => {
                   {isSubmitting ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mx-auto"></div>
                   ) : (
-                    `Đặt hàng${restaurantGroups.length > 1 ? ` (${restaurantGroups.length} đơn)` : ""}`
+                    `Đặt hàng${
+                      restaurantGroups.length > 1
+                        ? ` (${restaurantGroups.length} đơn)`
+                        : ""
+                    }`
                   )}
                 </button>
 

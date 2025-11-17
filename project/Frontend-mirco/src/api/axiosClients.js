@@ -44,7 +44,22 @@ const createErrorInterceptor = (serviceName) => (error) => {
     status: response?.status,
     url: config?.url,
     message: response?.data?.message || error.message,
+    code: error.code,
   });
+
+  // Handle network errors (service not available)
+  if (
+    error.code === "ECONNREFUSED" ||
+    error.code === "ETIMEDOUT" ||
+    error.message?.includes("Network Error") ||
+    error.message?.includes("timeout")
+  ) {
+    toast.error(
+      `${serviceName} service is not available. Please check if the service is running.`,
+      { duration: 5000 }
+    );
+    return Promise.reject(error);
+  }
 
   // Handle different error statuses
   if (response?.status === 401) {
@@ -65,6 +80,11 @@ const createErrorInterceptor = (serviceName) => (error) => {
     toast.error("Access denied. You do not have permission.");
   } else if (response?.status === 404) {
     toast.error("Resource not found.");
+  } else if (response?.status === 503) {
+    toast.error(
+      `${serviceName} service is temporarily unavailable. Please try again later.`,
+      { duration: 5000 }
+    );
   } else if (response?.status === 500) {
     toast.error("Server error. Please try again later.");
   } else if (response?.data?.message) {

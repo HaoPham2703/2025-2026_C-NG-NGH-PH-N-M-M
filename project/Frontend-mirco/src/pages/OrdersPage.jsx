@@ -2,6 +2,7 @@ import React from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { Link } from "react-router-dom";
 import { orderApi } from "../api/orderApi";
+import { paymentApi2 } from "../api/paymentApi2";
 import {
   Package,
   Clock,
@@ -24,6 +25,34 @@ const OrdersPage = () => {
   } = useQuery("orders", orderApi.getOrders, {
     refetchOnWindowFocus: false,
   });
+
+  // Lấy transactions cho các đơn VNPay chưa thanh toán
+  const vnpayOrderIds = React.useMemo(() => {
+    if (!orders?.data?.orders) return [];
+    return orders.data.orders
+      .filter(
+        (order) =>
+          order.payments === "vnpay" &&
+          order.status !== "Success" &&
+          order.status !== "Cancelled"
+      )
+      .map((order) => order._id);
+  }, [orders]);
+
+  const { data: transactionsData, isLoading: isLoadingTransactions } = useQuery(
+    ["transactions", vnpayOrderIds],
+    () => paymentApi2.getTransactionsByOrderIds(vnpayOrderIds),
+    {
+      enabled: vnpayOrderIds.length > 0,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  // Tạo map để lookup paymentUrl theo orderId
+  const paymentUrlMap = React.useMemo(() => {
+    if (!transactionsData?.data?.transactions) return {};
+    return transactionsData.data.transactions;
+  }, [transactionsData]);
 
   // Mutation để hủy đơn hàng
   const cancelOrderMutation = useMutation(
@@ -130,13 +159,44 @@ const OrdersPage = () => {
   }
 
   if (error) {
+    const errorMessage =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Không thể kết nối đến Order Service";
+    const isNetworkError =
+      error?.code === "ECONNREFUSED" ||
+      error?.code === "ETIMEDOUT" ||
+      error?.message?.includes("Network Error");
+
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <XCircle className="w-10 h-10 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
             Lỗi tải đơn hàng
           </h2>
-          <p className="text-gray-600">Vui lòng thử lại sau</p>
+          <p className="text-gray-600 mb-4">{errorMessage}</p>
+          {isNetworkError && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 text-left">
+              <p className="text-sm text-yellow-800 font-semibold mb-2">
+                Order Service không khả dụng
+              </p>
+              <p className="text-xs text-yellow-700">Vui lòng kiểm tra:</p>
+              <ul className="text-xs text-yellow-700 list-disc list-inside mt-2 space-y-1">
+                <li>Order Service có đang chạy không (port 4003)</li>
+                <li>API Gateway có đang chạy không (port 5001)</li>
+                <li>Kiểm tra console để xem lỗi chi tiết</li>
+              </ul>
+            </div>
+          )}
+          <button
+            onClick={() => window.location.reload()}
+            className="btn-primary"
+          >
+            Thử lại
+          </button>
         </div>
       </div>
     );
@@ -420,6 +480,21 @@ const OrdersPage = () => {
                     >
                       Xem chi tiết
                     </Link>
+                    {/* Nút Thanh toán VNPay - chỉ hiển thị khi có paymentUrl */}
+                    {order.payments === "vnpay" &&
+                      paymentUrlMap[order._id]?.paymentUrl &&
+                      order.status !== "Success" &&
+                      order.status !== "Cancelled" && (
+                        <a
+                          href={paymentUrlMap[order._id].paymentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-200 shadow-sm"
+                        >
+                          <CreditCard className="w-4 h-4 mr-1" />
+                          Thanh toán VNPay
+                        </a>
+                      )}
                     {(order.status === "Delivery" ||
                       order.status === "Waiting Goods") && (
                       <Link

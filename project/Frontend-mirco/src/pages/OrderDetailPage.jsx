@@ -1,7 +1,9 @@
+import React from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "react-query";
 import { Link } from "react-router-dom";
 import { orderApi } from "../api/orderApi";
+import { paymentApi2 } from "../api/paymentApi2";
 import {
   Package,
   Clock,
@@ -25,6 +27,54 @@ const OrderDetailPage = () => {
   } = useQuery(["order", id], () => orderApi.getOrder(id), {
     refetchOnWindowFocus: false,
   });
+
+  // Lấy transaction để lấy paymentUrl - luôn query khi có orderId
+  const {
+    data: transactionData,
+    isLoading: isLoadingTransaction,
+    error: transactionError,
+  } = useQuery(
+    ["transaction", id],
+    () => paymentApi2.getTransactionByOrderId(id),
+    {
+      refetchOnWindowFocus: false,
+      enabled: !!id, // Luôn query khi có orderId
+    }
+  );
+
+  // Debug logging - chỉ log khi có data
+  React.useEffect(() => {
+    try {
+      if (order?.data?.order) {
+        console.log("[OrderDetailPage] Order data:", {
+          orderId: order.data.order._id,
+          payments: order.data.order.payments,
+          status: order.data.order.status,
+        });
+      }
+      if (transactionData) {
+        console.log(
+          "[OrderDetailPage] Transaction data (full):",
+          JSON.stringify(transactionData, null, 2)
+        );
+        const transaction =
+          transactionData?.data?.transaction || transactionData?.transaction;
+        console.log("[OrderDetailPage] Transaction details:", {
+          hasData: !!transactionData?.data,
+          hasTransaction: !!transaction,
+          transaction: transaction,
+          status: transaction?.status,
+          hasPaymentUrl: !!transaction?.paymentUrl,
+          paymentUrl: transaction?.paymentUrl,
+        });
+      }
+      if (transactionError) {
+        console.error("[OrderDetailPage] Transaction error:", transactionError);
+      }
+    } catch (err) {
+      console.error("[OrderDetailPage] Error in useEffect:", err);
+    }
+  }, [order, transactionData, transactionError]);
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -358,6 +408,84 @@ const OrderDetailPage = () => {
                         : orderData.payments}
                     </p>
                   </div>
+
+                  {/* Nút "Chờ thanh toán" - Hiển thị khi có transaction với status "pending" */}
+                  {(() => {
+                    const transaction =
+                      transactionData?.data?.transaction ||
+                      transactionData?.transaction;
+                    const hasPendingTransaction =
+                      transaction &&
+                      transaction.status === "pending" &&
+                      transaction.paymentUrl;
+
+                    if (
+                      orderData.payments === "vnpay" &&
+                      !isLoadingTransaction &&
+                      hasPendingTransaction &&
+                      orderData.status !== "Success" &&
+                      orderData.status !== "Cancelled"
+                    ) {
+                      return (
+                        <a
+                          href={transaction.paymentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors duration-200 shadow-md flex items-center justify-center gap-2 mb-3"
+                        >
+                          <CreditCard className="w-5 h-5" />
+                          Chờ thanh toán
+                        </a>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Thông báo khi đang tải */}
+                  {orderData.payments === "vnpay" && isLoadingTransaction && (
+                    <div className="block w-full py-3 px-4 bg-gray-100 text-gray-600 rounded-lg text-sm mb-3 text-center">
+                      Đang tải thông tin thanh toán...
+                    </div>
+                  )}
+
+                  {/* Thông báo khi chưa có transaction hoặc chưa có paymentUrl */}
+                  {(() => {
+                    const transaction =
+                      transactionData?.data?.transaction ||
+                      transactionData?.transaction;
+                    const hasNoPaymentUrl =
+                      orderData.payments === "vnpay" &&
+                      !isLoadingTransaction &&
+                      (!transaction || !transaction.paymentUrl) &&
+                      orderData.status !== "Success" &&
+                      orderData.status !== "Cancelled";
+
+                    if (hasNoPaymentUrl) {
+                      return (
+                        <div className="block w-full py-3 px-4 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-lg text-sm mb-3">
+                          ⚠️ Chưa có link thanh toán. Vui lòng thử lại sau.
+                          <br />
+                          <span className="text-xs mt-1 block">
+                            Debug: transaction ={" "}
+                            {transaction ? "exists" : "null"}, paymentUrl ={" "}
+                            {transaction?.paymentUrl ? "exists" : "missing"}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Thông báo đã thanh toán */}
+                  {orderData.payments === "vnpay" &&
+                    !isLoadingTransaction &&
+                    transactionData?.data?.transaction?.status ===
+                      "completed" && (
+                      <div className="block w-full py-3 px-4 bg-green-50 border border-green-200 text-green-700 font-medium rounded-lg flex items-center justify-center gap-2 mb-3">
+                        <CheckCircle className="w-5 h-5" />
+                        Đã thanh toán
+                      </div>
+                    )}
 
                   {(orderData.status === "Delivery" ||
                     orderData.status === "Waiting Goods") && (

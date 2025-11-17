@@ -30,6 +30,12 @@ router
   .route("/get-all-payments")
   .get(paymentController.setUser, paymentController.getAllPayments);
 
+router.route("/order/:orderId").get(paymentController.getTransactionByOrderId);
+
+router
+  .route("/transactions/by-orders")
+  .post(paymentController.getTransactionsByOrderIds);
+
 router.route("/:id").get(paymentController.getPayment);
 
 module.exports = router;

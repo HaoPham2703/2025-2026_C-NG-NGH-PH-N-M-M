@@ -61,4 +61,12 @@ export const paymentApi2 = {
     paymentService2Client.post("/payments/create_payment_url", data),
   returnVNPayStatus: (data) =>
     paymentService2Client.post("/payments/return_payment_status", data),
+  // Get transaction by orderId
+  getTransactionByOrderId: (orderId) =>
+    paymentService2Client.get(`/payments/order/${orderId}`),
+  // Get transactions by multiple orderIds
+  getTransactionsByOrderIds: (orderIds) =>
+    paymentService2Client.post("/payments/transactions/by-orders", {
+      orderIds,
+    }),
 };

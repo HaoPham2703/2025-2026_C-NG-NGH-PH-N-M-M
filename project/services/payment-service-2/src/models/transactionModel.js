@@ -27,6 +27,10 @@ const transactionSchema = new mongoose.Schema(
     },
     order: String,
     invoicePayment: Object,
+    paymentUrl: {
+      type: String,
+      default: null,
+    },
     status: {
       type: String,
       enum: ["pending", "completed", "failed", "cancelled"],
@@ -45,10 +49,25 @@ const transactionSchema = new mongoose.Schema(
 );
 
 transactionSchema.pre(/^find/, function (next) {
-  this.populate({
-    path: "user",
-    select: "name email",
-  });
+  // Skip populate nếu query có option skipPopulate hoặc đang dùng lean()
+  // Kiểm tra xem có option skipPopulate không
+  if (this.getOptions().skipPopulate || this.getOptions().lean) {
+    return next();
+  }
+
+  // Chỉ populate nếu không có option skipPopulate
+  try {
+    this.populate({
+      path: "user",
+      select: "name email",
+    });
+  } catch (error) {
+    // Nếu populate fail (ví dụ: model User chưa được đăng ký), bỏ qua
+    console.warn(
+      "[Transaction Model] Populate failed, skipping:",
+      error.message
+    );
+  }
 
   next();
 });
