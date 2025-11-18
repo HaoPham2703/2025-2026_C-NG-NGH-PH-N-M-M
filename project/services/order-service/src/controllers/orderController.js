@@ -88,16 +88,49 @@ const catchAsync = (fn) => {
 };
 
 exports.checkStatusOrder = catchAsync(async (req, res, next) => {
-  if (
-    req.user.role == "user" &&
-    ((req.body.status == "Cancelled" && req.order.status != "Processed") ||
-      req.body.status != "Cancelled")
-  ) {
-    return next(new AppError("Bạn không có quyền thực hiện.", 403));
+  const userRole = req.user.role;
+  const userId = req.user._id || req.user.id;
+  const newStatus = req.body.status;
+  const currentStatus = req.order.status;
+
+  console.log("[checkStatusOrder] User role:", userRole, "User ID:", userId);
+  console.log("[checkStatusOrder] Attempting to change status to:", newStatus);
+  console.log("[checkStatusOrder] Current order status:", currentStatus);
+
+  // Cho phép admin và restaurant thay đổi status tự do
+  if (userRole === "admin" || userRole === "restaurant") {
+    console.log(
+      userRole === "admin"
+        ? "[checkStatusOrder] Admin access granted"
+        : "[checkStatusOrder] Restaurant access granted"
+    );
+    // Kiểm tra xem order đã bị hủy hoặc thành công chưa
+    if (currentStatus === "Cancelled" || currentStatus === "Success") {
+      return next(new AppError(`Đơn hàng này đã ${currentStatus}`, 403));
+    }
+    return next();
   }
-  if (req.order.status == "Cancelled" || req.order.status == "Success") {
-    return next(new AppError(`Đơn hàng nãy đã ${req.order.status}`, 403));
+
+  // Chỉ user mới bị giới hạn:
+  // - User chỉ được hủy đơn khi status = "Processed"
+  // - User không được thay đổi status sang các trạng thái khác
+  if (userRole === "user") {
+    if (
+      (newStatus === "Cancelled" && currentStatus !== "Processed") ||
+      newStatus !== "Cancelled"
+    ) {
+      console.log(
+        "[checkStatusOrder] User access denied - not allowed to change status"
+      );
+      return next(new AppError("Bạn không có quyền thực hiện.", 403));
+    }
   }
+
+  // Kiểm tra xem order đã bị hủy hoặc thành công chưa
+  if (currentStatus === "Cancelled" || currentStatus === "Success") {
+    return next(new AppError(`Đơn hàng này đã ${currentStatus}`, 403));
+  }
+
   next();
 });
 
