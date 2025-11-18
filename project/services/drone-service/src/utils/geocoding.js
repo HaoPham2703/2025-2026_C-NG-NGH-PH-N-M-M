@@ -44,6 +44,43 @@ async function geocodeAddress(address) {
 }
 
 /**
+ * Reverse geocode latitude/longitude to a human-readable address string
+ * Uses OpenStreetMap Nominatim reverse API. Falls back to "lat, lon" string.
+ */
+async function reverseGeocode(latitude, longitude) {
+  try {
+    if (
+      typeof latitude !== "number" ||
+      typeof longitude !== "number" ||
+      isNaN(latitude) ||
+      isNaN(longitude)
+    ) {
+      throw new Error("Invalid coordinates");
+    }
+
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`;
+    const response = await axios.get(url, {
+      headers: { "User-Agent": "FastFood-Drone-Service/1.0" },
+      timeout: 5000,
+    });
+
+    const displayName = response.data?.display_name;
+    const addressStr = displayName || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+    return {
+      latitude,
+      longitude,
+      address: addressStr,
+    };
+  } catch (error) {
+    return {
+      latitude,
+      longitude,
+      address: `${parseFloat(latitude).toFixed(6)}, ${parseFloat(longitude).toFixed(6)}`,
+    };
+  }
+}
+
+/**
  * Generate simulated coordinates within Ho Chi Minh City bounds
  * This is used as a fallback when real geocoding fails
  */
@@ -155,8 +192,77 @@ async function getOrderAddress(orderId, authToken = null) {
   }
 }
 
+/**
+ * Get full order details (includes restaurant ObjectId)
+ */
+async function getOrderDetails(orderId, authToken = null) {
+  try {
+    const apiGatewayUrl =
+      process.env.API_GATEWAY_URL || "http://localhost:5001";
+    const orderServiceUrl =
+      process.env.ORDER_SERVICE_URL || "http://localhost:4003";
+
+    const headers = {};
+    if (authToken) headers.Authorization = `Bearer ${authToken}`;
+
+    // Try via API Gateway first
+    try {
+      const res = await axios.get(
+        `${apiGatewayUrl}/api/v1/orders/${orderId}`,
+        { headers, timeout: 5000 }
+      );
+      if (res.data?.status === "success" && res.data.data?.order) {
+        return res.data.data.order;
+      }
+    } catch (_) {}
+
+    // Fallback direct
+    const res = await axios.get(
+      `${orderServiceUrl}/api/v1/orders/${orderId}`,
+      { headers, timeout: 5000 }
+    );
+    if (res.data?.status === "success" && res.data.data?.order) {
+      return res.data.data.order;
+    }
+    throw new Error("Order not found or invalid response");
+  } catch (error) {
+    throw new Error(`Không thể lấy thông tin đơn hàng: ${error.message}`);
+  }
+}
+
+/**
+ * Try to get restaurant info by ID through known endpoints.
+ * Note: Current restaurant service routes are protected; this returns null if inaccessible.
+ */
+async function tryGetRestaurantInfo(restaurantId, authToken = null) {
+  const apiGatewayUrl = process.env.API_GATEWAY_URL || "http://localhost:5001";
+  const restaurantServiceUrl =
+    process.env.RESTAURANT_SERVICE_URL || "http://localhost:4006";
+  const headers = {};
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
+
+  const candidates = [
+    // Potential future/admin/public endpoints – try gracefully
+    `${apiGatewayUrl}/api/restaurant/restaurants/${restaurantId}`,
+    `${restaurantServiceUrl}/api/restaurant/restaurants/${restaurantId}`,
+  ];
+
+  for (const url of candidates) {
+    try {
+      const res = await axios.get(url, { headers, timeout: 4000 });
+      if (res.data?.data) return res.data.data;
+    } catch (_) {
+      // ignore and try next
+    }
+  }
+  return null;
+}
+
 module.exports = {
   geocodeAddress,
   generateSimulatedCoordinates,
   getOrderAddress,
+  getOrderDetails,
+  reverseGeocode,
+  tryGetRestaurantInfo,
 };

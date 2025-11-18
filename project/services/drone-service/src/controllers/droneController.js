@@ -1,5 +1,11 @@
 const Drone = require("../models/droneModel");
-const { geocodeAddress, getOrderAddress } = require("../utils/geocoding");
+const {
+  geocodeAddress,
+  getOrderAddress,
+  getOrderDetails,
+  reverseGeocode,
+  tryGetRestaurantInfo,
+} = require("../utils/geocoding");
 
 // Get all drones
 exports.getAllDrones = async (req, res) => {
@@ -135,13 +141,33 @@ exports.assignDroneToOrder = async (req, res) => {
       });
     }
 
-    // If destination is not provided, fetch from order and geocode
-    let finalDestination = destination;
+    // Resolve final destination
+    let finalDestination = null;
+
+    // Case 1: Destination provided (coordinates and optional address)
     if (
-      !finalDestination ||
-      !finalDestination.latitude ||
-      !finalDestination.longitude
+      destination &&
+      typeof destination.latitude === "number" &&
+      typeof destination.longitude === "number"
     ) {
+      // If no human-readable address is provided, reverse geocode
+      if (!destination.address) {
+        const rev = await reverseGeocode(
+          destination.latitude,
+          destination.longitude
+        );
+        finalDestination = rev;
+      } else {
+        finalDestination = {
+          latitude: destination.latitude,
+          longitude: destination.longitude,
+          address: destination.address,
+        };
+      }
+    }
+
+    // Case 2: Destination not provided -> fetch order address and geocode
+    if (!finalDestination) {
       try {
         // Get auth token from request if available
         const authToken =
@@ -158,8 +184,62 @@ exports.assignDroneToOrder = async (req, res) => {
           });
         }
 
-        // Geocode the address to get coordinates
+        // Geocode the address to get coordinates (address is preserved)
         finalDestination = await geocodeAddress(orderAddress);
+
+        // Try to resolve restaurant start location from order first
+        try {
+          const order = await getOrderDetails(orderId, authToken);
+          let startLocation = null;
+          
+          // Priority 1: Use restaurantAddress directly from order if available
+          if (order?.restaurantAddress) {
+            const geo = await geocodeAddress(order.restaurantAddress);
+            startLocation = {
+              latitude: geo.latitude,
+              longitude: geo.longitude,
+              address: order.restaurantAddress,
+              restaurantId: String(order.restaurant || ''),
+              restaurantName: order.restaurantName || "Nhà hàng",
+            };
+          }
+          // Priority 2: Try to fetch from restaurant service (may fail if protected)
+          else if (order?.restaurant) {
+            const restaurantInfo = await tryGetRestaurantInfo(
+              order.restaurant,
+              authToken
+            );
+
+            if (restaurantInfo?.address) {
+              // Build full address string if structured
+              const addr =
+                typeof restaurantInfo.address === "string"
+                  ? restaurantInfo.address
+                  : [
+                      restaurantInfo.address?.detail,
+                      restaurantInfo.address?.ward,
+                      restaurantInfo.address?.district,
+                      restaurantInfo.address?.city,
+                    ]
+                      .filter(Boolean)
+                      .join(", ");
+              const geo = await geocodeAddress(addr);
+              startLocation = {
+                latitude: geo.latitude,
+                longitude: geo.longitude,
+                address: addr || "Địa chỉ nhà hàng",
+                restaurantId: String(order.restaurant),
+                restaurantName:
+                  restaurantInfo.restaurantName || restaurantInfo.name || "Nhà hàng",
+              };
+            }
+          }
+
+          req._startLocation = startLocation || null;
+        } catch (e) {
+          // Non-fatal: continue without startLocation
+          req._startLocation = null;
+        }
       } catch (error) {
         return res.status(400).json({
           status: "error",
@@ -169,14 +249,53 @@ exports.assignDroneToOrder = async (req, res) => {
     }
 
     // Validate destination has coordinates
-    if (!finalDestination.latitude || !finalDestination.longitude) {
+    if (
+      !finalDestination ||
+      typeof finalDestination.latitude !== "number" ||
+      typeof finalDestination.longitude !== "number"
+    ) {
       return res.status(400).json({
         status: "error",
         message: "Destination phải có latitude và longitude",
       });
     }
 
-    // Calculate estimated arrival time
+    // Determine startLocation (restaurant) if not already set
+    let startLocation = req._startLocation || null;
+    if (!startLocation) {
+      try {
+        const authToken = req.headers.authorization?.replace("Bearer ", "") || null;
+        const order = await getOrderDetails(orderId, authToken);
+        
+        // Try restaurantAddress from order first
+        if (order?.restaurantAddress) {
+          const geo = await geocodeAddress(order.restaurantAddress);
+          startLocation = {
+            latitude: geo.latitude,
+            longitude: geo.longitude,
+            address: order.restaurantAddress,
+            restaurantId: String(order.restaurant || ''),
+            restaurantName: order.restaurantName || "Nhà hàng",
+          };
+        }
+        // Last resort: generate pseudo address from restaurantId
+        else if (order?.restaurant) {
+          const pseudoAddr = `Restaurant ${String(order.restaurant).slice(-6)}`;
+          const geo = await geocodeAddress(pseudoAddr);
+          startLocation = {
+            latitude: geo.latitude,
+            longitude: geo.longitude,
+            address: pseudoAddr,
+            restaurantId: String(order.restaurant),
+            restaurantName: order.restaurantName || "Nhà hàng",
+          };
+        }
+      } catch (_) {
+        // ignore fallback failure
+      }
+    }
+
+    // Calculate estimated arrival time from current position to destination
     const distance = calculateDistance(
       drone.currentLocation.latitude,
       drone.currentLocation.longitude,
@@ -200,11 +319,30 @@ exports.assignDroneToOrder = async (req, res) => {
     // Update drone
     drone.orderId = orderId;
     drone.status = "flying";
-    drone.destination = {
+    if (startLocation) {
+      drone.startLocation = startLocation;
+    } else {
+      drone.startLocation = undefined;
+    }
+
+    // Save final delivery destination
+    drone.deliveryDestination = {
       latitude: finalDestination.latitude,
       longitude: finalDestination.longitude,
       address: finalDestination.address || "Địa chỉ giao hàng",
     };
+
+    // First leg: go to restaurant if present; else go directly to delivery
+    if (startLocation) {
+      drone.destination = {
+        latitude: startLocation.latitude,
+        longitude: startLocation.longitude,
+        address: startLocation.address || "Nhà hàng",
+      };
+    } else {
+      drone.destination = { ...drone.deliveryDestination };
+    }
+
     drone.assignedAt = new Date();
     drone.estimatedArrival = estimatedArrival;
 

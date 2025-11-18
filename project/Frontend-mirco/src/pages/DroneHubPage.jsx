@@ -24,6 +24,7 @@ const DroneHubPage = () => {
   const [map, setMap] = useState(null);
   const mapRef = useRef(null);
   const markersRef = useRef({});
+  const startLocationMarkersRef = useRef({});
   const destinationMarkersRef = useRef({});
   const pathLinesRef = useRef({});
   const initialBoundsSetRef = useRef(false); // Track if initial bounds have been set
@@ -290,6 +291,14 @@ const DroneHubPage = () => {
     });
     destinationMarkersRef.current = {};
 
+    // Clear existing start location markers (restaurants)
+    Object.values(startLocationMarkersRef.current).forEach((marker) => {
+      if (marker && map.hasLayer(marker)) {
+        map.removeLayer(marker);
+      }
+    });
+    startLocationMarkersRef.current = {};
+
     // Clear existing path lines
     Object.values(pathLinesRef.current).forEach((line) => {
       if (line && map.hasLayer(line)) {
@@ -339,18 +348,68 @@ const DroneHubPage = () => {
 
         markersRef.current[drone._id] = marker;
 
-        // Add destination marker if drone has a destination
+        // Add start location marker if present (restaurant)
         if (
-          drone.destination &&
-          drone.destination.latitude !== undefined &&
-          drone.destination.longitude !== undefined &&
+          drone.startLocation &&
+          typeof drone.startLocation.latitude === "number" &&
+          typeof drone.startLocation.longitude === "number" &&
+          !isNaN(drone.startLocation.latitude) &&
+          !isNaN(drone.startLocation.longitude)
+        ) {
+          try {
+            const startMarker = window.L.marker(
+              [drone.startLocation.latitude, drone.startLocation.longitude],
+              {
+                icon: window.L.divIcon({
+                  className: "start-marker-hub",
+                  html: `<div style="background: #10b981; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 12px;">🏪</div>`,
+                  iconSize: [20, 20],
+                  iconAnchor: [10, 10],
+                }),
+              }
+            ).addTo(map);
+
+            startMarker.bindPopup(
+              `<b>🏪 Nhà hàng</b><br/>${
+                drone.startLocation.restaurantName || "Nhà hàng"
+              }<br/><small>${
+                drone.startLocation.address || "Địa chỉ nhà hàng"
+              }</small><br/><small>${drone.startLocation.latitude.toFixed(6)}, ${
+                drone.startLocation.longitude.toFixed(6)
+              }</small>`
+            );
+
+            startLocationMarkersRef.current[drone._id] = startMarker;
+          } catch (error) {
+            console.error(
+              `[DroneHubPage] Error adding start location marker for drone ${drone._id}:`,
+              error
+            );
+          }
+        }
+
+        // Add final destination marker (prefer deliveryDestination over current destination)
+        const finalDest =
+          (drone.deliveryDestination &&
+            typeof drone.deliveryDestination.latitude === "number" &&
+            typeof drone.deliveryDestination.longitude === "number" &&
+            !isNaN(drone.deliveryDestination.latitude) &&
+            !isNaN(drone.deliveryDestination.longitude)
+            ? drone.deliveryDestination
+            : null) ||
+          (drone.destination &&
+          typeof drone.destination.latitude === "number" &&
+          typeof drone.destination.longitude === "number" &&
           !isNaN(drone.destination.latitude) &&
           !isNaN(drone.destination.longitude)
-        ) {
+            ? drone.destination
+            : null);
+
+        if (finalDest) {
           try {
             // Add destination marker
             const destMarker = window.L.marker(
-              [drone.destination.latitude, drone.destination.longitude],
+              [finalDest.latitude, finalDest.longitude],
               {
                 icon: window.L.divIcon({
                   className: "destination-marker-hub",
@@ -363,33 +422,41 @@ const DroneHubPage = () => {
 
             destMarker.bindPopup(
               `<b>📍 Điểm đến</b><br/>${
-                drone.destination.address || "Địa chỉ giao hàng"
+                finalDest.address || "Địa chỉ giao hàng"
               }<br/><small>Drone: ${
                 drone.name
-              }</small><br/><small>${drone.destination.latitude.toFixed(
+              }</small><br/><small>${finalDest.latitude.toFixed(
                 6
-              )}, ${drone.destination.longitude.toFixed(6)}</small>`
+              )}, ${finalDest.longitude.toFixed(6)}</small>`
             );
 
             destinationMarkersRef.current[drone._id] = destMarker;
 
-            // Draw line from drone to destination
+            // Draw line: current -> (restaurant?) -> destination
             if (drone.currentLocation) {
-              const pathLine = window.L.polyline(
-                [
-                  [
-                    drone.currentLocation.latitude,
-                    drone.currentLocation.longitude,
-                  ],
-                  [drone.destination.latitude, drone.destination.longitude],
-                ],
-                {
-                  color: "#ef4444",
-                  weight: 2,
-                  opacity: 0.6,
-                  dashArray: "5, 10",
-                }
-              ).addTo(map);
+              const points = [];
+              points.push([
+                drone.currentLocation.latitude,
+                drone.currentLocation.longitude,
+              ]);
+              if (
+                drone.startLocation &&
+                typeof drone.startLocation.latitude === "number" &&
+                typeof drone.startLocation.longitude === "number"
+              ) {
+                points.push([
+                  drone.startLocation.latitude,
+                  drone.startLocation.longitude,
+                ]);
+              }
+              points.push([finalDest.latitude, finalDest.longitude]);
+
+              const pathLine = window.L.polyline(points, {
+                color: "#ef4444",
+                weight: 2,
+                opacity: 0.6,
+                dashArray: "5, 10",
+              }).addTo(map);
 
               pathLinesRef.current[drone._id] = pathLine;
             }
@@ -418,17 +485,35 @@ const DroneHubPage = () => {
           ]);
         });
 
-      // Add destination positions
+      // Add start (restaurant) positions
       drones
         .filter(
           (d) =>
-            d.destination &&
-            d.destination.latitude !== undefined &&
-            d.destination.longitude !== undefined
+            d.startLocation &&
+            typeof d.startLocation.latitude === "number" &&
+            typeof d.startLocation.longitude === "number"
         )
         .forEach((d) => {
-          bounds.push([d.destination.latitude, d.destination.longitude]);
+          bounds.push([d.startLocation.latitude, d.startLocation.longitude]);
         });
+
+      // Add final destination positions (prefer deliveryDestination)
+      drones.forEach((d) => {
+        const finalDest =
+          (d.deliveryDestination &&
+            typeof d.deliveryDestination.latitude === "number" &&
+            typeof d.deliveryDestination.longitude === "number"
+            ? d.deliveryDestination
+            : null) ||
+          (d.destination &&
+            typeof d.destination.latitude === "number" &&
+            typeof d.destination.longitude === "number"
+            ? d.destination
+            : null);
+        if (finalDest) {
+          bounds.push([finalDest.latitude, finalDest.longitude]);
+        }
+      });
 
       // Only fitBounds on initial load, not on every update
       if (bounds.length > 0 && !initialBoundsSetRef.current) {

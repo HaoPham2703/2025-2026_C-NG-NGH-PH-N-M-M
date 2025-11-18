@@ -203,11 +203,38 @@ class DroneSimulation {
   }
 
   async handleArrival(drone) {
+    // Snap to reached destination
+    drone.currentLocation.latitude = drone.destination.latitude;
+    drone.currentLocation.longitude = drone.destination.longitude;
+
+    // If reached restaurant first, switch to delivery leg
+    const atRestaurant =
+      drone.startLocation &&
+      typeof drone.startLocation.latitude === "number" &&
+      typeof drone.startLocation.longitude === "number" &&
+      Math.abs(drone.destination.latitude - drone.startLocation.latitude) < 1e-6 &&
+      Math.abs(drone.destination.longitude - drone.startLocation.longitude) < 1e-6;
+
+    if (drone.status === "flying" && atRestaurant && drone.deliveryDestination) {
+      drone.destination = {
+        latitude: drone.deliveryDestination.latitude,
+        longitude: drone.deliveryDestination.longitude,
+        address: drone.deliveryDestination.address || "Địa chỉ giao hàng",
+      };
+      await drone.save();
+
+      this.io.emit("drone:status", {
+        droneId: drone.droneId,
+        status: "flying",
+        orderId: drone.orderId,
+        leg: "to-destination",
+      });
+      return; // continue flying to final destination
+    }
+
     if (drone.status === "flying" || drone.status === "delivering") {
-      // Drone arrived at destination
+      // Arrived at final destination: deliver then return
       drone.status = "delivering";
-      drone.currentLocation.latitude = drone.destination.latitude;
-      drone.currentLocation.longitude = drone.destination.longitude;
 
       // Simulate delivery time (5 seconds for faster demo)
       setTimeout(async () => {
@@ -254,6 +281,8 @@ class DroneSimulation {
       drone.status = "available";
       drone.orderId = null;
       drone.destination = null;
+      drone.deliveryDestination = undefined;
+      drone.startLocation = undefined;
       drone.assignedAt = null;
       drone.estimatedArrival = null;
 
