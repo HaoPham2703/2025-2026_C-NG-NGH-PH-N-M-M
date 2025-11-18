@@ -23,6 +23,9 @@ import toast from "react-hot-toast";
 const DroneHubPage = () => {
   const [map, setMap] = useState(null);
   const mapRef = useRef(null);
+  const modalMapRef = useRef(null); // Map trong modal
+  const [modalMap, setModalMap] = useState(null);
+  const modalMarkersRef = useRef({}); // Markers của drones hiện có trên modal map
   const markersRef = useRef({});
   const destinationMarkersRef = useRef({});
   const pathLinesRef = useRef({});
@@ -263,6 +266,172 @@ const DroneHubPage = () => {
       }
     };
   }, []);
+
+  // Initialize map trong modal khi modal mở và clickToPlace = true
+  useEffect(() => {
+    if (!showCreateModal || !clickToPlace) {
+      // Cleanup modal map khi đóng modal hoặc tắt clickToPlace
+      if (modalMapRef.current) {
+        try {
+          // Xóa tất cả markers trên modal map
+          Object.values(modalMarkersRef.current).forEach((marker) => {
+            if (marker && modalMapRef.current.hasLayer(marker)) {
+              modalMapRef.current.removeLayer(marker);
+            }
+          });
+          modalMarkersRef.current = {};
+          
+          modalMapRef.current.remove();
+          modalMapRef.current = null;
+          setModalMap(null);
+        } catch (error) {
+          console.error("Error removing modal map:", error);
+        }
+      }
+      return;
+    }
+
+    // Chờ DOM element sẵn sàng
+    const initModalMap = () => {
+      const mapContainer = document.getElementById("modal-drone-map");
+      if (!mapContainer) {
+        setTimeout(initModalMap, 100);
+        return;
+      }
+
+      if (!window.L) {
+        setTimeout(initModalMap, 100);
+        return;
+      }
+
+      if (modalMapRef.current) {
+        return; // Đã khởi tạo rồi
+      }
+
+      try {
+        const defaultLat = newDrone.latitude || 10.7769;
+        const defaultLon = newDrone.longitude || 106.7009;
+
+        const mapInstance = window.L.map("modal-drone-map", {
+          zoomControl: true,
+        }).setView([defaultLat, defaultLon], 13);
+
+        window.L.tileLayer(
+          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          {
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19,
+          }
+        ).addTo(mapInstance);
+
+        // Fix Leaflet default marker icon issue
+        delete window.L.Icon.Default.prototype._getIconUrl;
+        window.L.Icon.Default.mergeOptions({
+          iconRetinaUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+          iconUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+          shadowUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+        });
+
+        // Add click handler
+        mapInstance.on("click", (e) => {
+          const { lat, lng } = e.latlng;
+          setNewDrone((prev) => ({
+            ...prev,
+            latitude: lat,
+            longitude: lng,
+          }));
+
+          // Remove existing preview marker
+          if (previewMarker && modalMapRef.current) {
+            modalMapRef.current.removeLayer(previewMarker);
+          }
+
+          // Add preview marker
+          const marker = window.L.marker([lat, lng], {
+            icon: window.L.divIcon({
+              className: "preview-drone-marker",
+              html: `<div style="background: #22c55e; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 20px; animation: pulse 2s infinite;">📍</div>`,
+              iconSize: [32, 32],
+              iconAnchor: [16, 16],
+            }),
+          }).addTo(mapInstance);
+
+          marker.bindPopup("Vị trí drone mới").openPopup();
+          setPreviewMarker(marker);
+
+          toast.success(
+            `Đã chọn vị trí: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
+          );
+        });
+
+        // Hiển thị các drone hiện có trên modal map
+        if (drones && drones.length > 0) {
+          drones.forEach((drone) => {
+            if (
+              drone.currentLocation &&
+              drone.currentLocation.latitude &&
+              drone.currentLocation.longitude
+            ) {
+              const iconColor = getStatusColorForMap(drone.status);
+              const existingMarker = window.L.marker(
+                [
+                  drone.currentLocation.latitude,
+                  drone.currentLocation.longitude,
+                ],
+                {
+                  icon: window.L.divIcon({
+                    className: "existing-drone-marker-modal",
+                    html: `<div style="background: ${iconColor}; width: 28px; height: 28px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer;">🚁</div>`,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14],
+                  }),
+                }
+              ).addTo(mapInstance);
+
+              const popupContent = `
+                <div style="min-width: 180px; font-size: 12px;">
+                  <b>${drone.name}</b><br/>
+                  <small style="color: #666;">${drone.droneId}</small><br/>
+                  <span style="color: ${iconColor}; font-weight: bold; font-size: 11px;">${getStatusText(
+                drone.status
+              )}</span><br/>
+                  <small style="color: #888;">📍 ${drone.currentLocation.latitude.toFixed(
+                4
+              )}, ${drone.currentLocation.longitude.toFixed(4)}</small>
+                </div>
+              `;
+              existingMarker.bindPopup(popupContent);
+              modalMarkersRef.current[drone._id] = existingMarker;
+            }
+          });
+        }
+
+        modalMapRef.current = mapInstance;
+        setModalMap(mapInstance);
+        console.log(
+          "Modal map initialized successfully with",
+          Object.keys(modalMarkersRef.current).length,
+          "existing drones"
+        );
+      } catch (error) {
+        console.error("Error initializing modal map:", error);
+      }
+    };
+
+    // Delay nhỏ để đảm bảo modal đã render
+    setTimeout(initModalMap, 300);
+  }, [
+    showCreateModal,
+    clickToPlace,
+    newDrone.latitude,
+    newDrone.longitude,
+    previewMarker,
+    drones,
+  ]);
 
   // Update map markers when drones data changes
   useEffect(() => {
@@ -520,8 +689,13 @@ const DroneHubPage = () => {
         toast.success("Tạo drone thành công!");
 
         // Remove preview marker
-        if (previewMarker && map) {
-          map.removeLayer(previewMarker);
+        if (previewMarker) {
+          if (map) {
+            map.removeLayer(previewMarker);
+          }
+          if (modalMap) {
+            modalMap.removeLayer(previewMarker);
+          }
           setPreviewMarker(null);
         }
         setClickToPlace(false);
@@ -1261,6 +1435,44 @@ const DroneHubPage = () => {
                   />
                 </div>
 
+                {/* Map trong modal để chọn tọa độ */}
+                {clickToPlace && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <span className="text-green-600 font-semibold">
+                        💡 Click trên bản đồ bên dưới để chọn vị trí
+                      </span>
+                      {drones && drones.length > 0 && (
+                        <span className="ml-2 text-xs text-gray-600">
+                          (Hiển thị {drones.length} drone hiện có: 🚁)
+                        </span>
+                      )}
+                    </label>
+                    <div
+                      id="modal-drone-map"
+                      className="w-full h-[300px] bg-gray-100 rounded-lg border-2 border-green-300"
+                      style={{ zIndex: 1 }}
+                    >
+                      {!modalMap && (
+                        <div className="w-full h-full flex items-center justify-center text-gray-500">
+                          <div className="text-center">
+                            <Loader className="w-6 h-6 animate-spin mx-auto mb-2" />
+                            <p className="text-sm">Đang tải bản đồ...</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Click vào bất kỳ đâu trên bản đồ để đặt vị trí drone mới
+                      {drones && drones.length > 0 && (
+                        <span className="ml-1">
+                          • 🚁 = Drone hiện có (click để xem thông tin)
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
@@ -1414,8 +1626,13 @@ const DroneHubPage = () => {
                           duration: 2000,
                         });
                       } else {
-                        if (previewMarker && map) {
-                          map.removeLayer(previewMarker);
+                        if (previewMarker) {
+                          if (map) {
+                            map.removeLayer(previewMarker);
+                          }
+                          if (modalMap) {
+                            modalMap.removeLayer(previewMarker);
+                          }
                           setPreviewMarker(null);
                         }
                       }
