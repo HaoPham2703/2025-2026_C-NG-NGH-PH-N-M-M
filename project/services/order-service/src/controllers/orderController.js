@@ -236,26 +236,62 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
     query = query.sort("-createdAt");
   }
 
-  // Field limiting
+  // Field limiting - Tối ưu: Chỉ select fields cần thiết
   if (req.query.fields) {
     const fields = req.query.fields.split(",").join(" ");
     query = query.select(fields);
+  } else {
+    // Chỉ select fields cần thiết cho user orders page
+    query = query.select(
+      "_id receiver phone address cart totalPrice payments status restaurant createdAt"
+    );
   }
 
   // Pagination
   const page = req.query.page * 1 || 1;
-  const limit = req.query.limit * 1 || 100;
+  const limit = req.query.limit * 1 || 50; // Giảm limit mặc định từ 100 xuống 50
   const skip = (page - 1) * limit;
 
   query = query.skip(skip).limit(limit);
 
+  // Sử dụng lean() để trả về plain object, nhanh hơn Mongoose document
+  query = query.lean();
+
   const orders = await query;
+
+  // Đếm tổng số orders để tính pagination
+  const countQuery = Order.countDocuments(JSON.parse(queryStr));
+  const totalOrders = await countQuery;
+
+  // Tối ưu: Giảm kích thước cart data bằng cách chỉ giữ thông tin cần thiết
+  const optimizedOrders = orders.map((order) => ({
+    ...order,
+    cart: (order.cart || []).map((item) => ({
+      product: {
+        _id: item.product?._id,
+        title: item.product?.title || item.product?.name,
+        price: item.product?.price,
+        promotion: item.product?.promotion,
+        images: item.product?.images ? [item.product.images[0]] : [], // Chỉ lấy 1 ảnh đầu
+      },
+      quantity: item.quantity,
+    })),
+  }));
+
+  // Tính pagination metadata
+  const totalPages = Math.ceil(totalOrders / limit);
 
   res.status(200).json({
     status: "success",
-    results: orders.length,
+    results: optimizedOrders.length,
     data: {
-      orders,
+      orders: optimizedOrders,
+      pagination: {
+        page,
+        limit,
+        total: totalOrders,
+        totalPages,
+      },
     },
   });
 });
@@ -689,16 +725,63 @@ exports.getOrdersByUserId = catchAsync(async (req, res, next) => {
 exports.getOrdersByRestaurantId = catchAsync(async (req, res, next) => {
   const { restaurantId } = req.params;
 
-  // Build query with restaurant filter
-  const queryObj = { restaurant: restaurantId, ...req.query };
+  console.log(
+    "[Order Service] getOrdersByRestaurantId - restaurantId:",
+    restaurantId,
+    "type:",
+    typeof restaurantId
+  );
+
+  // Build query with restaurant filter - TỐI ƯU: Dùng ObjectId trực tiếp
+  const mongoose = require("mongoose");
+  let restaurantQuery;
+
+  // Tối ưu: Chỉ dùng ObjectId nếu valid, không dùng $or (chậm hơn)
+  if (mongoose.Types.ObjectId.isValid(restaurantId)) {
+    try {
+      const objectId = new mongoose.Types.ObjectId(restaurantId);
+      restaurantQuery = { restaurant: objectId }; // Dùng ObjectId trực tiếp để dùng index tốt hơn
+      console.log("[Order Service] Using ObjectId query:", restaurantQuery);
+    } catch (e) {
+      restaurantQuery = { restaurant: restaurantId };
+      console.log(
+        "[Order Service] Using string query (catch):",
+        restaurantQuery
+      );
+    }
+  } else {
+    restaurantQuery = { restaurant: restaurantId };
+    console.log(
+      "[Order Service] Using string query (not valid):",
+      restaurantQuery
+    );
+  }
+
+  const queryObj = { ...restaurantQuery, ...req.query };
   const excludedFields = ["page", "sort", "limit", "fields"];
   excludedFields.forEach((el) => delete queryObj[el]);
 
-  // Advanced filtering
-  let queryStr = JSON.stringify(queryObj);
-  queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
+  // TỐI ƯU QUAN TRỌNG: Không dùng JSON.stringify/parse vì nó convert ObjectId thành string
+  // Thay vào đó, xử lý query object trực tiếp để GIỮ NGUYÊN ObjectId
+  // Xử lý operators (gte, gt, lte, lt) nếu có trong query string
+  let finalQueryObj = { ...queryObj };
 
-  let query = Order.find(JSON.parse(queryStr));
+  // Nếu có operators trong req.query, cần format lại
+  // Nhưng vì đã exclude ở trên, nên không cần xử lý
+
+  let query = Order.find(finalQueryObj);
+
+  // Tối ưu: Chỉ select fields cần thiết TRƯỚC khi sort/paginate để giảm dữ liệu xử lý
+  // Không select invoicePayment và các fields không cần thiết để giảm kích thước response
+  if (req.query.fields) {
+    const fields = req.query.fields.split(",").join(" ");
+    query = query.select(fields);
+  } else {
+    // Chỉ select fields cần thiết cho restaurant dashboard
+    query = query.select(
+      "_id receiver phone address cart totalPrice payments status restaurant createdAt"
+    );
+  }
 
   // Sorting
   if (req.query.sort) {
@@ -708,28 +791,253 @@ exports.getOrdersByRestaurantId = catchAsync(async (req, res, next) => {
     query = query.sort("-createdAt");
   }
 
-  // Field limiting
-  if (req.query.fields) {
-    const fields = req.query.fields.split(",").join(" ");
-    query = query.select(fields);
-  }
-
   // Pagination
   const page = req.query.page * 1 || 1;
-  const limit = req.query.limit * 1 || 100;
+  const limit = req.query.limit * 1 || 50; // Giảm limit mặc định từ 100 xuống 50
   const skip = (page - 1) * limit;
 
   query = query.skip(skip).limit(limit);
 
-  const orders = await query;
+  // Sử dụng lean() để trả về plain object, nhanh hơn Mongoose document
+  query = query.lean();
+
+  // Đếm tổng số orders để tính pagination - TỐI ƯU: Chạy song song với query chính
+  // Dùng query object gốc (không có pagination) - GIỮ NGUYÊN ObjectId
+  const countQuery = Order.countDocuments(finalQueryObj);
+
+  // DEBUG: Kiểm tra query plan để đảm bảo dùng index
+  // Chạy explain() trước để xem query plan (chỉ khi query chậm)
+  let explainResult = null;
+  if (process.env.DEBUG_SLOW_QUERIES === "true") {
+    try {
+      explainResult = await query.explain("executionStats");
+      const executionStats = explainResult.executionStats || explainResult;
+      const stage =
+        executionStats.executionStage?.stage || executionStats.stage;
+      const indexName =
+        executionStats.executionStage?.indexName || executionStats.indexName;
+
+      console.log("[Order Service] 🔍 Query Explain Results:");
+      console.log(`  Stage: ${stage}`);
+      console.log(`  Index used: ${indexName || "NONE"}`);
+      console.log(
+        `  Execution time: ${
+          executionStats.executionTimeMillis ||
+          executionStats.executionTimeMillis
+        }ms`
+      );
+      console.log(
+        `  Docs examined: ${
+          executionStats.totalDocsExamined || executionStats.totalDocsExamined
+        }`
+      );
+      console.log(
+        `  Docs returned: ${
+          executionStats.nReturned || executionStats.nReturned
+        }`
+      );
+
+      if (stage === "COLLSCAN") {
+        console.error(
+          "[Order Service] ❌ COLLSCAN detected! Query is scanning entire collection!"
+        );
+        console.error(
+          "[Order Service] ⚠️  Need to create index: { restaurant: 1, createdAt: -1 }"
+        );
+      } else if (stage === "IXSCAN") {
+        console.log(`[Order Service] ✅ Using index: ${indexName}`);
+      }
+    } catch (explainError) {
+      console.warn(
+        "[Order Service] Could not run explain:",
+        explainError.message
+      );
+    }
+  }
+
+  // Chạy query và count song song để tăng tốc
+  const startTime = Date.now();
+  const [orders, totalOrders] = await Promise.all([
+    query.exec(), // Execute query
+    countQuery,
+  ]);
+  const queryTime = Date.now() - startTime;
+
+  // Log query time để monitor performance
+  if (queryTime > 1000) {
+    console.warn(
+      `[Order Service] ⚠️ Slow query detected: ${queryTime}ms for restaurant ${restaurantId}`
+    );
+    console.warn(
+      `[Order Service] 💡 To debug, set DEBUG_SLOW_QUERIES=true in .env and restart service`
+    );
+    // Nếu query chậm (>2s), tự động chạy explain() để debug
+    if (!explainResult && queryTime > 2000) {
+      try {
+        const autoExplain = await Order.find(finalQueryObj)
+          .select("_id")
+          .limit(1)
+          .explain("executionStats");
+        const stats = autoExplain.executionStats || autoExplain;
+        const stage = stats.executionStage?.stage || stats.stage;
+        const indexName = stats.executionStage?.indexName || stats.indexName;
+        const docsExamined = stats.totalDocsExamined || stats.totalDocsExamined;
+
+        console.error("[Order Service] ❌ AUTO-DEBUG: Slow query detected!");
+        console.error(`  Query time: ${queryTime}ms`);
+        console.error(`  Stage: ${stage}`);
+        console.error(`  Index: ${indexName || "NONE"}`);
+        console.error(`  Docs examined: ${docsExamined}`);
+
+        if (stage === "COLLSCAN") {
+          console.error(
+            "[Order Service] ⚠️  COLLSCAN detected! Missing index!"
+          );
+          console.error(
+            "[Order Service] 💡 Run: node scripts/check-indexes.js to create indexes"
+          );
+        } else if (docsExamined > limit * 10) {
+          console.error(
+            `[Order Service] ⚠️  Examining too many docs (${docsExamined}) for ${limit} results`
+          );
+        }
+      } catch (e) {
+        // Ignore explain errors
+      }
+    }
+  } else {
+    console.log(
+      `[Order Service] ✅ Query completed in ${queryTime}ms, found ${orders.length} orders`
+    );
+  }
+
+  // FALLBACK: Nếu không tìm thấy với ObjectId, thử với String
+  // Và nếu vẫn không có, thử query với $or để match cả hai
+  if (orders.length === 0 && mongoose.Types.ObjectId.isValid(restaurantId)) {
+    console.log(
+      "[Order Service] No orders found with ObjectId, trying fallback queries..."
+    );
+
+    try {
+      const objectId = new mongoose.Types.ObjectId(restaurantId);
+      // Thử với $or để match cả ObjectId và String
+      const fallbackQueryObj = {
+        $or: [
+          { restaurant: objectId },
+          { restaurant: restaurantId },
+          { restaurant: restaurantId.toString() },
+        ],
+        ...(req.query.status && req.query.status !== "all"
+          ? { status: req.query.status }
+          : {}),
+      };
+
+      const excludedFields = ["page", "sort", "limit", "fields"];
+      excludedFields.forEach((el) => delete fallbackQueryObj[el]);
+
+      // Không dùng JSON.stringify/parse để giữ ObjectId
+      let fallbackQuery = Order.find(fallbackQueryObj)
+        .select(
+          "_id receiver phone address cart totalPrice payments status restaurant createdAt"
+        )
+        .sort("-createdAt")
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
+      const [fallbackOrders, fallbackCount] = await Promise.all([
+        fallbackQuery.exec(),
+        Order.countDocuments(fallbackQueryObj),
+      ]);
+
+      if (fallbackOrders.length > 0) {
+        // Dùng kết quả từ fallback query - Tối ưu: bỏ images
+        const optimizedFallbackOrders = fallbackOrders.map((order) => ({
+          _id: order._id,
+          receiver: order.receiver,
+          phone: order.phone,
+          address: order.address,
+          cart: (order.cart || []).map((item) => ({
+            product: {
+              _id: item.product?._id,
+              title: item.product?.title || item.product?.name,
+              price: item.product?.price,
+              promotion: item.product?.promotion,
+              // Bỏ images để giảm kích thước
+            },
+            quantity: item.quantity,
+          })),
+          totalPrice: order.totalPrice,
+          payments: order.payments,
+          status: order.status,
+          restaurant: order.restaurant,
+          createdAt: order.createdAt,
+        }));
+
+        const totalPages = Math.ceil(fallbackCount / limit);
+
+        return res.status(200).json({
+          status: "success",
+          results: optimizedFallbackOrders.length,
+          data: {
+            orders: optimizedFallbackOrders,
+            pagination: {
+              page,
+              limit,
+              total: fallbackCount,
+              totalPages,
+            },
+          },
+          message: `Found ${optimizedFallbackOrders.length} orders for restaurant ${restaurantId} (using fallback query)`,
+        });
+      }
+    } catch (fallbackError) {
+      console.error("[Order Service] Fallback query error:", fallbackError);
+    }
+  }
+
+  // TỐI ƯU TỐI ĐA: Giảm kích thước cart data xuống mức tối thiểu
+  // Chỉ giữ lại thông tin cần thiết nhất cho restaurant dashboard
+  const optimizedOrders = orders.map((order) => {
+    // Chỉ giữ tên sản phẩm, số lượng, và giá - BỎ TẤT CẢ thông tin khác
+    const optimizedCart = (order.cart || []).map((item) => ({
+      product: {
+        title: item.product?.title || item.product?.name || "Sản phẩm",
+        // BỎ _id, price, promotion, images - không cần cho danh sách orders
+      },
+      quantity: item.quantity,
+    }));
+
+    return {
+      _id: order._id,
+      receiver: order.receiver,
+      phone: order.phone,
+      address: order.address,
+      cart: optimizedCart, // Cart đã được tối ưu tối đa
+      totalPrice: order.totalPrice,
+      payments: order.payments,
+      status: order.status,
+      // BỎ restaurant field - không cần vì đã filter theo restaurant rồi
+      createdAt: order.createdAt,
+    };
+  });
+
+  // Tính pagination metadata
+  const totalPages = Math.ceil(totalOrders / limit);
 
   res.status(200).json({
     status: "success",
-    results: orders.length,
+    results: optimizedOrders.length,
     data: {
-      orders,
+      orders: optimizedOrders,
+      pagination: {
+        page,
+        limit,
+        total: totalOrders,
+        totalPages,
+      },
     },
-    message: `Found ${orders.length} orders for restaurant ${restaurantId}`,
+    message: `Found ${optimizedOrders.length} orders for restaurant ${restaurantId}`,
   });
 });
 

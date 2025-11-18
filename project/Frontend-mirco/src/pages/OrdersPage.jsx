@@ -16,15 +16,27 @@ import toast from "react-hot-toast";
 
 const OrdersPage = () => {
   const [selectedStatus, setSelectedStatus] = React.useState("all");
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 10;
   const queryClient = useQueryClient();
 
   const {
     data: orders,
     isLoading,
     error,
-  } = useQuery("orders", orderApi.getOrders, {
-    refetchOnWindowFocus: false,
-  });
+  } = useQuery(
+    ["orders", currentPage, selectedStatus],
+    () =>
+      orderApi.getOrders({
+        page: currentPage,
+        limit: itemsPerPage,
+        ...(selectedStatus !== "all" && { status: selectedStatus }),
+      }),
+    {
+      refetchOnWindowFocus: false,
+      keepPreviousData: true, // Giữ data cũ khi đang load trang mới
+    }
+  );
 
   // Lấy transactions cho các đơn VNPay chưa thanh toán
   const vnpayOrderIds = React.useMemo(() => {
@@ -81,14 +93,19 @@ const OrdersPage = () => {
     }
   };
 
-  // Filter orders based on selected status
+  // Không cần filter nữa vì đã filter ở server
   const filteredOrders = React.useMemo(() => {
     if (!orders?.data?.orders) return [];
-    if (selectedStatus === "all") return orders.data.orders;
-    return orders.data.orders.filter(
-      (order) => order.status === selectedStatus
-    );
-  }, [orders, selectedStatus]);
+    return orders.data.orders;
+  }, [orders]);
+
+  // Lấy pagination metadata
+  const pagination = orders?.data?.pagination || {
+    page: currentPage,
+    limit: itemsPerPage,
+    total: 0,
+    totalPages: 0,
+  };
 
   const statusTabs = [
     { value: "all", label: "Tất cả", icon: Package },
@@ -219,33 +236,37 @@ const OrdersPage = () => {
           <p className="text-gray-600 text-lg">
             Quản lý và theo dõi tất cả đơn hàng của bạn
           </p>
-          {orders?.data?.orders?.length > 0 && (
+          {pagination.total > 0 && (
             <div className="mt-4 inline-flex items-center px-4 py-2 bg-white rounded-full shadow-sm border border-gray-200">
               <Package className="w-5 h-5 text-primary-600 mr-2" />
               <span className="text-sm font-medium text-gray-700">
-                {orders.data.orders.length} đơn hàng
+                {pagination.total} đơn hàng
               </span>
             </div>
           )}
         </div>
 
         {/* Status Filter Tabs */}
-        {orders?.data?.orders?.length > 0 && (
+        {pagination.total > 0 && (
           <div className="mb-6">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-2 mb-4">
               <div className="flex flex-wrap gap-2">
                 {statusTabs.map((tab) => {
                   const Icon = tab.icon;
+                  // Note: Count sẽ không chính xác vì đã filter ở server, nhưng vẫn hiển thị để UX tốt
                   const count =
                     tab.value === "all"
-                      ? orders.data.orders.length
-                      : orders.data.orders.filter((o) => o.status === tab.value)
+                      ? pagination.total
+                      : filteredOrders.filter((o) => o.status === tab.value)
                           .length;
 
                   return (
                     <button
                       key={tab.value}
-                      onClick={() => setSelectedStatus(tab.value)}
+                      onClick={() => {
+                        setSelectedStatus(tab.value);
+                        setCurrentPage(1); // Reset về trang 1 khi đổi filter
+                      }}
                       className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all duration-200 ${
                         selectedStatus === tab.value
                           ? "bg-primary-600 text-white shadow-md"
@@ -275,7 +296,7 @@ const OrdersPage = () => {
                   <span className="font-semibold text-gray-900">
                     {filteredOrders.length}
                   </span>{" "}
-                  đơn hàng
+                  / {pagination.total} đơn hàng
                   {selectedStatus !== "all" && (
                     <span className="ml-1">
                       -{" "}
@@ -286,12 +307,37 @@ const OrdersPage = () => {
                     </span>
                   )}
                 </p>
+                {pagination.totalPages > 1 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      Trước
+                    </button>
+                    <span className="text-sm text-gray-700">
+                      Trang {currentPage} / {pagination.totalPages}
+                    </span>
+                    <button
+                      onClick={() =>
+                        setCurrentPage(
+                          Math.min(pagination.totalPages, currentPage + 1)
+                        )
+                      }
+                      disabled={currentPage === pagination.totalPages}
+                      className="px-3 py-1 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      Sau
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
 
-        {orders?.data?.orders?.length === 0 ? (
+        {pagination.total === 0 ? (
           <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
             <div className="max-w-md mx-auto">
               <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">

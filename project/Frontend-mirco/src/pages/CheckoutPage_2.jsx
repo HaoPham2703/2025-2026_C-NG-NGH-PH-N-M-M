@@ -167,6 +167,16 @@ const CheckoutPage_2 = () => {
       const phone = user?.address?.[selectedAddress]?.phone || data.phone;
       const paymentMethod = paymentMapping[selectedPayment] || "tiền mặt";
 
+      // ============================================
+      // BƯỚC 1: TẠO ORDER TRƯỚC (ghi vào Order DB)
+      // ============================================
+      // Order được tạo ngay lập tức, không phụ thuộc vào payment method
+      // Đối với VNPay: Order được tạo trước, sau đó mới tạo transaction trong Payment Service
+      // Đối với COD: Chỉ cần tạo order
+      console.log(
+        `[Checkout] Bắt đầu tạo ${restaurantGroups.length} đơn hàng với phương thức thanh toán: ${paymentMethod}`
+      );
+
       // Create orders for each restaurant group
       const orderPromises = restaurantGroups.map(async (group) => {
         const orderData = {
@@ -175,7 +185,7 @@ const CheckoutPage_2 = () => {
           phone,
           cart: group.items,
           totalPrice: group.totalPrice,
-          payments: paymentMethod,
+          payments: paymentMethod, // Ghi phương thức thanh toán vào order
         };
 
         // Chỉ thêm restaurant nếu là ObjectId hợp lệ, không phải "unknown"
@@ -188,13 +198,24 @@ const CheckoutPage_2 = () => {
         }
         // Nếu restaurantId là "unknown", không gửi field restaurant (sẽ là null/undefined)
 
-        console.log(`Creating order for ${group.restaurantName}:`, orderData);
+        console.log(`[Checkout] Đang tạo order cho ${group.restaurantName}:`, {
+          restaurantId: group.restaurantId,
+          totalPrice: orderData.totalPrice,
+          itemsCount: orderData.cart.length,
+          payments: orderData.payments,
+        });
         return orderApi.createOrder(orderData);
       });
 
-      // Create all orders in parallel
+      // Create all orders in parallel - GHI VÀO ORDER DB
       const orderResponses = await Promise.all(orderPromises);
-      console.log("All order responses:", orderResponses);
+      console.log(
+        "[Checkout] Kết quả tạo orders:",
+        orderResponses.map((r) => ({
+          success: r.status === "success",
+          orderId: r.data?.order?._id,
+        }))
+      );
 
       // Check if all orders were created successfully
       const successfulOrders = orderResponses.filter(
@@ -219,74 +240,200 @@ const CheckoutPage_2 = () => {
         toast.success(`Đã tạo ${successfulOrders.length} đơn hàng thành công!`);
       }
 
-      // Clear cart after successful orders
+      // Clear cart after successful orders (order đã được tạo thành công vào Order DB)
       clearCart();
 
-      // Handle payment based on payment method
+      // ============================================
+      // BƯỚC 2: TẠO TRANSACTION CHO TẤT CẢ PAYMENT METHODS
+      // ============================================
+      // LƯU Ý: Order đã được ghi vào Order DB ở BƯỚC 1
+      // Bây giờ tạo transaction trong Payment Service cho TẤT CẢ payment methods
+      // - COD (tiền mặt): status = "completed" ngay
+      // - VNPay: tạo payment URL và transaction với status = "pending"
+      // - MoMo: tạo transaction với status = "pending"
+      // Nếu tạo transaction thất bại, order vẫn tồn tại trong Order DB
+
+      // Map payment method từ frontend sang backend
+      const paymentMethodMap = {
+        cash: "tiền mặt",
+        vnpay: "vnpay",
+        momo: "momo",
+      };
+
+      const backendPaymentMethod =
+        paymentMethodMap[selectedPayment] || selectedPayment;
+      const userId = user?._id || user?.id || user?.userId;
+
+      // Tạo transaction cho tất cả orders (trừ VNPay vì VNPay sẽ tạo transaction riêng với payment URL)
+      if (selectedPayment !== "vnpay") {
+        console.log(
+          `[Checkout] Tạo transaction cho ${successfulOrders.length} orders với payment method: ${backendPaymentMethod}`
+        );
+        try {
+          const transactionPromises = successfulOrders.map(async (response) => {
+            const order = response.data.order;
+            try {
+              console.log(
+                `[Checkout] Tạo transaction cho order ${order._id} với payment method: ${backendPaymentMethod}`
+              );
+              const transactionResponse = await paymentApi2.createTransaction({
+                orderId: order._id,
+                amount: order.totalPrice,
+                userId: userId,
+                paymentMethod: backendPaymentMethod,
+                // COD = completed ngay, các payment khác = pending
+                status:
+                  backendPaymentMethod === "tiền mặt" ? "completed" : "pending",
+              });
+
+              if (transactionResponse.status === "success") {
+                console.log(
+                  `✅ Transaction created for order ${order._id}:`,
+                  transactionResponse.data?.transaction?._id
+                );
+                return { orderId: order._id, success: true };
+              } else {
+                console.warn(
+                  `⚠️ Transaction creation failed for order ${order._id}`
+                );
+                return { orderId: order._id, success: false };
+              }
+            } catch (transactionError) {
+              console.error(
+                `Error creating transaction for order ${order._id}:`,
+                transactionError
+              );
+              return {
+                orderId: order._id,
+                success: false,
+                error: transactionError,
+              };
+            }
+          });
+
+          const transactionResults = await Promise.all(transactionPromises);
+          const successfulTransactions = transactionResults.filter(
+            (r) => r.success
+          );
+          const failedTransactions = transactionResults.filter(
+            (r) => !r.success
+          );
+
+          if (successfulTransactions.length > 0) {
+            console.log(
+              `✅ Created ${successfulTransactions.length} transactions successfully`
+            );
+          }
+
+          if (failedTransactions.length > 0) {
+            console.warn(
+              `⚠️ Failed to create ${failedTransactions.length} transactions`
+            );
+            toast(
+              `Đơn hàng đã được tạo thành công. ${failedTransactions.length} transaction chưa được tạo.`,
+              {
+                icon: "⚠️",
+                duration: 4000,
+              }
+            );
+          }
+        } catch (error) {
+          console.error("Error creating transactions:", error);
+          // Không hiển thị toast để tránh spam, vì order đã được tạo thành công
+        }
+      }
+
+      // Xử lý riêng cho VNPay (tạo payment URL và transaction)
       if (selectedPayment === "vnpay") {
+        console.log(
+          "[Checkout] Bắt đầu tạo payment URL và transaction cho VNPay"
+        );
         // For multiple orders, save payment URLs to database for each order
+        // Order đã được tạo vào Order DB, giờ tạo transaction trong Payment Service
         try {
           const paymentPromises = successfulOrders.map(async (response) => {
             const order = response.data.order;
             // Lấy userId từ user object
             const userId = user?._id || user?.id || user?.userId;
-            const paymentResponse = await paymentApi2.createVNPayUrl({
-              orderId: order._id,
-              amount: order.totalPrice,
-              userId: userId, // Gửi userId trong request body
-              orderInfo: `Thanh toán đơn hàng #${order._id} - ${
-                restaurantGroups.find(
-                  (g) => g.restaurantId === order.restaurant
-                )?.restaurantName || "Cửa hàng"
-              }`,
-              action: `Thanh toán đơn hàng #${order._id}`,
-            });
 
-            if (
-              paymentResponse.status === "success" &&
-              paymentResponse.vnpUrl
-            ) {
-              // Kiểm tra xem transaction có được tạo thành công không
-              if (paymentResponse.transactionCreated) {
-                console.log(`✅ Transaction created for order ${order._id}`);
+            try {
+              console.log(
+                `[Checkout] Tạo payment URL cho order ${order._id} (đã có trong Order DB)`
+              );
+              // Tạo transaction trong Payment Service (ghi vào Transaction DB)
+              // Order đã được tạo ở BƯỚC 1, giờ chỉ cần tạo transaction
+              const paymentResponse = await paymentApi2.createVNPayUrl({
+                orderId: order._id, // Order ID đã có từ Order DB
+                amount: order.totalPrice,
+                userId: userId, // Gửi userId trong request body
+                orderInfo: `Thanh toán đơn hàng #${order._id} - ${
+                  restaurantGroups.find(
+                    (g) => g.restaurantId === order.restaurant
+                  )?.restaurantName || "Cửa hàng"
+                }`,
+                action: `Thanh toán đơn hàng #${order._id}`,
+              });
+
+              if (
+                paymentResponse.status === "success" &&
+                paymentResponse.vnpUrl
+              ) {
+                // Kiểm tra xem transaction có được tạo thành công không
+                if (paymentResponse.transactionCreated) {
+                  console.log(`✅ Transaction created for order ${order._id}`);
+                } else {
+                  console.warn(
+                    `⚠️ Transaction NOT created for order ${order._id}`,
+                    paymentResponse.transactionError
+                      ? `Error: ${paymentResponse.transactionError}`
+                      : "Missing userId or orderId"
+                  );
+                }
+                return {
+                  orderId: order._id,
+                  success: true,
+                  transactionCreated: paymentResponse.transactionCreated,
+                };
               } else {
                 console.warn(
-                  `⚠️ Transaction NOT created for order ${order._id}`,
-                  paymentResponse.transactionError
-                    ? `Error: ${paymentResponse.transactionError}`
-                    : "Missing userId or orderId"
+                  `⚠️ Payment URL creation failed for order ${order._id}`
                 );
-                toast(
-                  `Link thanh toán đã được tạo nhưng chưa lưu vào database. Vui lòng kiểm tra lại.`,
-                  {
-                    icon: "⚠️",
-                    duration: 5000,
-                  }
-                );
+                return { orderId: order._id, success: false };
               }
+            } catch (paymentError) {
+              // Nếu tạo payment URL thất bại, vẫn trả về success cho order
+              // vì order đã được tạo rồi
+              console.error(
+                `Error creating payment URL for order ${order._id}:`,
+                paymentError
+              );
               return {
                 orderId: order._id,
-                success: true,
-                transactionCreated: paymentResponse.transactionCreated,
+                success: false,
+                error: paymentError,
               };
-            } else {
-              toast.error(
-                `Không thể tạo link thanh toán VNPay cho đơn hàng #${order._id}`
-              );
-              return { orderId: order._id, success: false };
             }
           });
 
           const paymentResults = await Promise.all(paymentPromises);
           const successfulPayments = paymentResults.filter((r) => r.success);
+          const failedPayments = paymentResults.filter((r) => !r.success);
 
+          // Thông báo kết quả
           if (successfulPayments.length > 0) {
             toast.success(
               `Đã tạo ${successfulPayments.length} đơn hàng với link thanh toán VNPay. Bạn có thể thanh toán sau trong trang đơn hàng.`
             );
-            // Redirect đến đơn hàng đầu tiên
-            const firstOrder = successfulOrders[0].data.order;
-            navigate(`/orders/${firstOrder._id}`);
+          }
+
+          if (failedPayments.length > 0) {
+            toast(
+              `Đơn hàng đã được tạo thành công. ${failedPayments.length} link thanh toán chưa được tạo, bạn có thể tạo lại sau trong trang đơn hàng.`,
+              {
+                icon: "⚠️",
+                duration: 5000,
+              }
+            );
           }
         } catch (error) {
           console.error("VNPay error:", error);
@@ -297,38 +444,19 @@ const CheckoutPage_2 = () => {
             config: error.config,
           });
 
-          let errorMessage =
-            "Có lỗi xảy ra khi tạo thanh toán VNPay. Vui lòng thử lại.";
-
-          if (
-            error.code === "ECONNREFUSED" ||
-            error.message?.includes("Network Error")
-          ) {
-            errorMessage =
-              "Không thể kết nối đến Payment Service 2 (port 3005).\nVui lòng:\n1. Kiểm tra Payment Service 2 có đang chạy không\n2. Chạy: cd services/payment-service-2 && npm start\n3. Kiểm tra: http://localhost:3005/health";
-          } else if (
-            error.code === "ETIMEDOUT" ||
-            error.message?.includes("timeout")
-          ) {
-            errorMessage =
-              "Kết nối đến Payment Service 2 bị timeout. Vui lòng kiểm tra service.";
-          } else if (error.response?.data?.message) {
-            errorMessage = error.response.data.message;
-          } else if (error.response?.status === 500) {
-            errorMessage =
-              "Lỗi server. Vui lòng kiểm tra cấu hình VNPay trong Payment Service 2.";
-          } else if (error.message) {
-            errorMessage = error.message;
-          }
-
-          console.error("Full error object:", error);
-          toast.error(errorMessage, { duration: 5000 });
-          // Vẫn redirect đến đơn hàng ngay cả khi có lỗi tạo payment URL
-          if (successfulOrders.length > 0) {
-            const firstOrder = successfulOrders[0].data.order;
-            navigate(`/orders/${firstOrder._id}`);
-          }
+          // Thông báo lỗi nhưng vẫn redirect vì order đã được tạo
+          toast(
+            "Đơn hàng đã được tạo thành công. Có lỗi khi tạo link thanh toán VNPay, bạn có thể tạo lại sau trong trang đơn hàng.",
+            {
+              icon: "⚠️",
+              duration: 5000,
+            }
+          );
         }
+
+        // LUÔN redirect đến đơn hàng đầu tiên (order đã được tạo)
+        const firstOrder = successfulOrders[0].data.order;
+        navigate(`/orders/${firstOrder._id}`);
       } else if (selectedPayment === "momo") {
         // For multiple orders, redirect to first order or show message
         if (successfulOrders.length > 1) {
