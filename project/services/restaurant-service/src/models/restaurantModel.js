@@ -79,6 +79,17 @@ const restaurantSchema = new mongoose.Schema(
       min: 0,
       max: 5,
     },
+    ratingsAverage: {
+      type: Number,
+      default: 4.5,
+      min: 0,
+      max: 5,
+      set: (val) => Math.round(val * 10) / 10, // Round to 1 decimal
+    },
+    ratingsQuantity: {
+      type: Number,
+      default: 0,
+    },
     totalOrders: {
       type: Number,
       default: 0,

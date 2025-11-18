@@ -401,3 +401,38 @@ exports.getOrders = catchAsync(async (req, res, next) => {
     });
   }
 });
+
+// @desc    Update restaurant ratings
+// @route   PATCH /api/restaurant/:id/ratings
+// @access  Private (called by product-service)
+exports.updateRatings = catchAsync(async (req, res, next) => {
+  const { ratingsAverage, ratingsQuantity } = req.body;
+
+  const restaurant = await Restaurant.findByIdAndUpdate(
+    req.params.id,
+    {
+      ratingsAverage: ratingsAverage || 0,
+      ratingsQuantity: ratingsQuantity || 0,
+    },
+    {
+      new: true,
+      runValidators: false,
+    }
+  );
+
+  if (!restaurant) {
+    return next(new AppError("Restaurant not found", 404));
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      restaurant: {
+        _id: restaurant._id,
+        restaurantName: restaurant.restaurantName,
+        ratingsAverage: restaurant.ratingsAverage,
+        ratingsQuantity: restaurant.ratingsQuantity,
+      },
+    },
+  });
+});
