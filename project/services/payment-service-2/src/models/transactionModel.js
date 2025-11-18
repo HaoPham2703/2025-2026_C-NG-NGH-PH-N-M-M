@@ -20,7 +20,7 @@ const transactionSchema = new mongoose.Schema(
       type: String,
       required: [true, "Phải có phương thức thanh toán"],
       enum: {
-        values: ["vnpay", "paypal", "refund", "stripe"],
+        values: ["vnpay", "paypal", "refund", "stripe", "tiền mặt", "momo", "số dư"],
         message: "Phải có phương thức nhận tiền",
       },
       default: "refund",

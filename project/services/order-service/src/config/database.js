@@ -34,6 +34,19 @@ const connectDB = async () => {
 
     console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
     console.log(`📊 Database: ${conn.connection.name}`);
+
+    // Đảm bảo indexes được tạo khi service khởi động
+    // Mongoose sẽ tự động tạo indexes từ schema, nhưng đảm bảo chắc chắn
+    try {
+      const Order = require("../models/orderModel");
+      // Mongoose sẽ tự động tạo indexes từ schema.index() khi model được load
+      // Nhưng có thể cần sync indexes nếu đã có data
+      await Order.ensureIndexes();
+      console.log(`✅ Order indexes ensured`);
+    } catch (indexError) {
+      console.warn(`⚠️  Could not ensure indexes: ${indexError.message}`);
+      console.warn(`💡 Run: node scripts/check-indexes.js to create indexes manually`);
+    }
   } catch (error) {
     console.error("❌ MongoDB connection error:", error.message);
     process.exit(1);

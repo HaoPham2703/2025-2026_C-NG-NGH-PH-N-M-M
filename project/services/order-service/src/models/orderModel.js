@@ -66,6 +66,12 @@ const orderSchema = new mongoose.Schema(
 
 orderSchema.index({ "$**": "text" });
 
+// Compound index cho query restaurant orders - TỐI ƯU QUAN TRỌNG
+// Index này giúp query nhanh hơn khi filter theo restaurant và sort theo createdAt
+orderSchema.index({ restaurant: 1, createdAt: -1 });
+// Index cho status filter
+orderSchema.index({ restaurant: 1, status: 1, createdAt: -1 });
+
 // Note: In microservices architecture, we don't populate user from User Service
 // User data should be fetched separately via API if needed
 // orderSchema.pre(/^find/, function (next) {

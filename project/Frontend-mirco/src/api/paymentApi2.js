@@ -69,4 +69,7 @@ export const paymentApi2 = {
     paymentService2Client.post("/payments/transactions/by-orders", {
       orderIds,
     }),
+  // Tạo transaction cho tất cả payment methods (COD, VNPay, MoMo, etc.)
+  createTransaction: (data) =>
+    paymentService2Client.post("/payments/transactions/create", data),
 };

@@ -355,40 +355,64 @@ exports.getOrders = catchAsync(async (req, res, next) => {
   const axios = require("axios");
   const restaurantId = req.restaurant.id;
 
+  // Giảm log để tăng performance
+  // console.log("[Restaurant Service] getOrders - Restaurant ID:", restaurantId);
+
   try {
     // Get orders from Order Service directly
     const orderServiceUrl =
       process.env.ORDER_SERVICE_URL || "http://localhost:4003";
-    const orderResponse = await axios.get(
-      `${orderServiceUrl}/api/v1/orders/restaurant/${restaurantId}`,
-      {
-        headers: {
-          "x-user": Buffer.from(
-            JSON.stringify({
-              id: restaurantId,
-              role: "restaurant",
-            })
-          ).toString("base64"),
-        },
-        timeout: 5000,
-      }
-    );
+    const orderEndpoint = `${orderServiceUrl}/api/v1/orders/restaurant/${restaurantId}`;
+
+    // Truyền query params từ request xuống Order Service
+    const queryParams = {
+      page: req.query.page || 1,
+      limit: req.query.limit || 50,
+      ...(req.query.status && { status: req.query.status }),
+      ...(req.query.sort && { sort: req.query.sort }),
+    };
+
+    // Giảm log để tăng performance
+    // console.log("[Restaurant Service] Calling Order Service:", orderEndpoint, "with params:", queryParams);
+
+    const orderResponse = await axios.get(orderEndpoint, {
+      params: queryParams,
+      headers: {
+        "x-user": Buffer.from(
+          JSON.stringify({
+            id: restaurantId,
+            role: "restaurant",
+          })
+        ).toString("base64"),
+      },
+      timeout: 5000, // Giảm timeout xuống 5 giây (đủ cho query tối ưu)
+    });
+
+    // Giảm log để tăng performance
+    // console.log("[Restaurant Service] Order Service response:", {...});
 
     const orders = orderResponse.data?.data?.orders || [];
+    const pagination = orderResponse.data?.data?.pagination;
+
+    // Giảm log để tăng performance
+    // console.log("[Restaurant Service] Returning orders:", orders.length, "orders");
 
     res.status(200).json({
       status: "success",
       results: orders.length,
       data: {
         orders,
+        ...(pagination && { pagination }),
       },
+      ...(pagination && { pagination }), // Cũng trả về ở top level để dễ access
     });
   } catch (error) {
-    console.error("Error fetching restaurant orders:", error);
-    console.error("Error details:", {
+    console.error("[Restaurant Service] Error fetching restaurant orders:", {
       message: error.message,
+      code: error.code,
       response: error.response?.data,
       status: error.response?.status,
+      url: error.config?.url,
     });
 
     // Return empty array if service unavailable
