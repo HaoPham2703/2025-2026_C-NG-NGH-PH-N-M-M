@@ -891,6 +891,114 @@ exports.getTransactionsByOrderIds = catchAsync(async (req, res, next) => {
   });
 });
 
+// Tạo transaction cho tất cả payment methods (COD, VNPay, MoMo, etc.)
+exports.createTransaction = catchAsync(async (req, res, next) => {
+  try {
+    const { orderId, amount, userId, paymentMethod, status } = req.body;
+
+    // Validate required fields
+    if (!orderId || !amount || !userId || !paymentMethod) {
+      return res.status(400).json({
+        status: "error",
+        message:
+          "Missing required fields: orderId, amount, userId, paymentMethod",
+      });
+    }
+
+    // Map payment method từ frontend sang format trong DB
+    const paymentMethodMap = {
+      cash: "tiền mặt",
+      "tiền mặt": "tiền mặt",
+      vnpay: "vnpay",
+      momo: "momo",
+      "số dư": "số dư",
+      paypal: "paypal",
+      stripe: "stripe",
+    };
+
+    const payments = paymentMethodMap[paymentMethod] || paymentMethod;
+
+    // Xác định status mặc định
+    // COD (tiền mặt) = completed ngay (thanh toán khi nhận hàng)
+    // VNPay, MoMo = pending (chờ thanh toán)
+    const defaultStatus =
+      payments === "tiền mặt" ? "completed" : status || "pending";
+
+    console.log("[Payment Service 2] createTransaction:", {
+      orderId,
+      amount,
+      userId,
+      payments,
+      status: defaultStatus,
+    });
+
+    // Kiểm tra xem đã có transaction nào với orderId này chưa
+    const existingTransaction = await Transaction.findOne({
+      order: orderId,
+      payments: payments,
+    })
+      .setOptions({ skipPopulate: true })
+      .lean();
+
+    let transaction;
+
+    if (existingTransaction) {
+      // Update transaction hiện có
+      console.log(
+        "[Payment Service 2] Updating existing transaction:",
+        existingTransaction._id
+      );
+      transaction = await Transaction.findByIdAndUpdate(
+        existingTransaction._id,
+        {
+          amount,
+          status: defaultStatus,
+          ...(req.body.paymentUrl && { paymentUrl: req.body.paymentUrl }),
+        },
+        { new: true }
+      ).setOptions({ skipPopulate: true });
+    } else {
+      // Tạo transaction mới
+      const transactionData = {
+        user: userId,
+        amount,
+        payments,
+        order: orderId,
+        status: defaultStatus,
+        ...(req.body.paymentUrl && { paymentUrl: req.body.paymentUrl }),
+      };
+
+      transaction = await Transaction.create(transactionData);
+      console.log(
+        "[Payment Service 2] Transaction created successfully:",
+        transaction._id
+      );
+    }
+
+    res.status(201).json({
+      status: "success",
+      data: {
+        transaction: {
+          _id: transaction._id,
+          order: transaction.order,
+          amount: transaction.amount,
+          payments: transaction.payments,
+          status: transaction.status,
+          paymentUrl: transaction.paymentUrl,
+          createdAt: transaction.createdAt,
+        },
+      },
+      message: "Transaction created successfully",
+    });
+  } catch (error) {
+    console.error("[Payment Service 2] Error creating transaction:", error);
+    res.status(500).json({
+      status: "error",
+      message: error.message || "Failed to create transaction",
+    });
+  }
+});
+
 exports.setUser = catchAsync(async (req, res, next) => {
   if (req.user.role !== "admin") req.query.user = req.user.id;
   next();

@@ -36,6 +36,9 @@ router
   .route("/transactions/by-orders")
   .post(paymentController.getTransactionsByOrderIds);
 
+// Tạo transaction cho tất cả payment methods
+router.route("/transactions/create").post(paymentController.createTransaction);
+
 router.route("/:id").get(paymentController.getPayment);
 
 module.exports = router;
