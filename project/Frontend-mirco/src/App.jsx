@@ -21,8 +21,6 @@ import VNPayMockPage from "./pages/VNPayMockPage";
 import VNPayCallbackPage from "./pages/VNPayCallbackPage";
 import VNPayTestPage from "./pages/VNPayTestPage";
 import MoMoMockPage from "./pages/MoMoMockPage";
-import RestaurantReviewsPage from "./pages/RestaurantReviewsPage";
-import UserReviewsPage from "./pages/UserReviewsPage";
 
 // Admin pages
 import { DashboardPage, AdminLoginPage, AdminSignupPage } from "./pages-admin";
@@ -159,14 +157,6 @@ function AppContent() {
           <Route
             path="checkout-2"
             element={user ? <CheckoutPage_2 /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="my-reviews"
-            element={user ? <UserReviewsPage /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="restaurants/:restaurantId/reviews"
-            element={<RestaurantReviewsPage />}
           />
         </Route>
 

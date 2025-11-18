@@ -57,21 +57,12 @@ const orderSchema = new mongoose.Schema(
       index: true,
     },
     invoicePayment: Object,
-    isReviewed: {
-      type: Boolean,
-      default: false,
-    },
   },
   {
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }
 );
-
-// Virtual field to check if order can be reviewed
-orderSchema.virtual("canReview").get(function () {
-  return this.status === "Success" && !this.isReviewed;
-});
 
 orderSchema.index({ "$**": "text" });
 

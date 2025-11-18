@@ -9,7 +9,6 @@ const rateLimit = require("express-rate-limit");
 
 const connectDB = require("./config/database");
 const productRoutes = require("./routes/productRoutes");
-const reviewRoutes = require("./routes/reviewRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 4002;
@@ -85,7 +84,6 @@ app.get("/health", (req, res) => {
 
 // Routes
 app.use("/api/v1/products", productRoutes);
-app.use("/api/v1/reviews", reviewRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

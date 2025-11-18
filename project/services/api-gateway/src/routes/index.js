@@ -38,9 +38,6 @@ router.use("/api/v1/products", optionalAuth, proxies.productProxy);
 router.use("/api/v1/categories", optionalAuth, proxies.productProxy);
 router.use("/api/v1/brands", optionalAuth, proxies.productProxy);
 
-// Review routes - FIXED to product service (reviews managed there)
-router.use("/api/v1/reviews", optionalAuth, proxies.productProxy);
-
 // Order routes (require authentication) - FIXED to order service
 router.use("/api/v1/orders", verifyToken, proxies.orderProxy);
 
@@ -86,7 +83,6 @@ router.all("*", (req, res) => {
       "/api/v1/auth/*",
       "/api/v1/users/*",
       "/api/v1/products/*",
-      "/api/v1/reviews/*",
       "/api/v1/orders/*",
       "/api/v1/payments/*",
       "/api/v1/drones/*",

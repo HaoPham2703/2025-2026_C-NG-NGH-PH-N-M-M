@@ -1,10 +1,9 @@
-import React, { useState } from "react";
+import React from "react";
 import { useParams } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "react-query";
+import { useQuery } from "react-query";
 import { Link } from "react-router-dom";
 import { orderApi } from "../api/orderApi";
 import { paymentApi2 } from "../api/paymentApi2";
-import { reviewApi } from "../api";
 import {
   Package,
   Clock,
@@ -15,16 +14,11 @@ import {
   Phone,
   User,
   CreditCard,
-  Star,
 } from "lucide-react";
 import Breadcrumb from "../components/Breadcrumb";
-import ReviewModal from "../components/ReviewModal";
-import ReviewCard from "../components/ReviewCard";
 
 const OrderDetailPage = () => {
   const { id } = useParams();
-  const queryClient = useQueryClient();
-  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
   const {
     data: order,
@@ -33,19 +27,6 @@ const OrderDetailPage = () => {
   } = useQuery(["order", id], () => orderApi.getOrder(id), {
     refetchOnWindowFocus: false,
   });
-
-  // Lấy review nếu order đã được review
-  const {
-    data: reviewData,
-    isLoading: isLoadingReview,
-  } = useQuery(
-    ["review", id],
-    () => reviewApi.getReviewByOrder(id),
-    {
-      enabled: !!order?.data?.order?.isReviewed,
-      refetchOnWindowFocus: false,
-    }
-  );
 
   // Lấy transaction để lấy paymentUrl - luôn query khi có orderId
   const {
@@ -61,76 +42,6 @@ const OrderDetailPage = () => {
     }
   );
 
-  // Mutation để tạo/update review
-  const createReviewMutation = useMutation(
-    (reviewData) => reviewApi.createReview(id, reviewData),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(["order", id]);
-        queryClient.invalidateQueries(["review", id]);
-        setIsReviewModalOpen(false);
-        alert("Đánh giá thành công!");
-      },
-      onError: (error) => {
-        console.error("Create review error:", error);
-        alert(error?.response?.data?.message || "Có lỗi xảy ra khi đánh giá");
-      },
-    }
-  );
-
-  const updateReviewMutation = useMutation(
-    (reviewData) => reviewApi.updateReview(reviewData.reviewId, reviewData.data),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(["review", id]);
-        setIsReviewModalOpen(false);
-        alert("Cập nhật đánh giá thành công!");
-      },
-      onError: (error) => {
-        console.error("Update review error:", error);
-        alert(error?.response?.data?.message || "Có lỗi xảy ra khi cập nhật");
-      },
-    }
-  );
-
-  const deleteReviewMutation = useMutation(
-    (reviewId) => reviewApi.deleteReview(reviewId),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(["order", id]);
-        queryClient.invalidateQueries(["review", id]);
-        alert("Đã xóa đánh giá!");
-      },
-      onError: (error) => {
-        console.error("Delete review error:", error);
-        alert(error?.response?.data?.message || "Có lỗi xảy ra khi xóa");
-      },
-    }
-  );
-
-  const handleSubmitReview = (reviewData) => {
-    const existingReview = reviewData?.data?.review;
-    if (existingReview) {
-      // Update existing review
-      updateReviewMutation.mutate({
-        reviewId: existingReview._id,
-        data: reviewData,
-      });
-    } else {
-      // Create new review
-      createReviewMutation.mutate(reviewData);
-    }
-  };
-
-  const handleDeleteReview = () => {
-    if (window.confirm("Bạn có chắc muốn xóa đánh giá này?")) {
-      const existingReview = reviewData?.data?.review;
-      if (existingReview) {
-        deleteReviewMutation.mutate(existingReview._id);
-      }
-    }
-  };
-
   // Debug logging - chỉ log khi có data
   React.useEffect(() => {
     try {
@@ -139,7 +50,6 @@ const OrderDetailPage = () => {
           orderId: order.data.order._id,
           payments: order.data.order.payments,
           status: order.data.order.status,
-          isReviewed: order.data.order.isReviewed,
         });
       }
       if (transactionData) {
@@ -374,56 +284,6 @@ const OrderDetailPage = () => {
                 </div>
               </div>
             </div>
-
-            {/* Review Section */}
-            {orderData.status === "Success" && (
-              <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
-                <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 px-6 py-4 border-b border-yellow-200">
-                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                    <Star className="w-5 h-5 text-yellow-600" />
-                    Đánh giá đơn hàng
-                  </h2>
-                </div>
-                <div className="p-6">
-                  {!orderData.isReviewed ? (
-                    <div className="text-center py-6">
-                      <Star className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
-                      <p className="text-gray-600 mb-4">
-                        Bạn đã nhận hàng? Hãy đánh giá để giúp người khác!
-                      </p>
-                      <button
-                        onClick={() => setIsReviewModalOpen(true)}
-                        className="px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-lg transition-colors duration-200 shadow-md flex items-center justify-center gap-2 mx-auto"
-                      >
-                        <Star className="w-5 h-5" />
-                        Đánh giá ngay
-                      </button>
-                    </div>
-                  ) : (
-                    <div>
-                      {isLoadingReview ? (
-                        <div className="flex justify-center py-4">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-                        </div>
-                      ) : reviewData?.data?.review ? (
-                        <div>
-                          <ReviewCard
-                            review={reviewData.data.review}
-                            canEdit={true}
-                            onEdit={() => setIsReviewModalOpen(true)}
-                            onDelete={handleDeleteReview}
-                          />
-                        </div>
-                      ) : (
-                        <p className="text-gray-500 text-center py-4">
-                          Không tìm thấy đánh giá
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
 
             {/* Delivery Info */}
             <div className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden">
@@ -683,27 +543,6 @@ const OrderDetailPage = () => {
           </div>
         </div>
       </div>
-
-      {/* Review Modal */}
-      <ReviewModal
-        isOpen={isReviewModalOpen}
-        onClose={() => setIsReviewModalOpen(false)}
-        order={{
-          ...orderData,
-          items: orderData.cart?.map(item => ({
-            product: {
-              _id: item.product._id,
-              name: item.product.title,
-              image: item.product.images?.[0],
-            },
-            quantity: item.quantity,
-          }))
-        }}
-        restaurant={orderData.restaurant}
-        existingReview={reviewData?.data?.review}
-        onSubmit={handleSubmitReview}
-        loading={createReviewMutation.isLoading || updateReviewMutation.isLoading}
-      />
     </div>
   );
 };
