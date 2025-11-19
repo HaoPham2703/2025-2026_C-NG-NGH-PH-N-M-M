@@ -73,6 +73,7 @@ const DroneHubPage = () => {
       },
     }
   );
+  // check newDrone
   const [newDrone, setNewDrone] = useState({
     droneId: "",
     name: "",
