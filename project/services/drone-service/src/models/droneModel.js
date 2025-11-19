@@ -54,6 +54,20 @@ const droneSchema = new mongoose.Schema(
       longitude: Number,
       address: String,
     },
+    // Final delivery destination (kept when destination is temporarily set to startLocation)
+    deliveryDestination: {
+      latitude: Number,
+      longitude: Number,
+      address: String,
+    },
+    // Start location (restaurant) for the assigned order
+    startLocation: {
+      latitude: Number,
+      longitude: Number,
+      address: String,
+      restaurantId: String,
+      restaurantName: String,
+    },
     homeLocation: {
       latitude: {
         type: Number,

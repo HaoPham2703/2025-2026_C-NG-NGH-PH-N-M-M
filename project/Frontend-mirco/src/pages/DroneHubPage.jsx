@@ -23,17 +23,13 @@ import toast from "react-hot-toast";
 const DroneHubPage = () => {
   const [map, setMap] = useState(null);
   const mapRef = useRef(null);
-<<<<<<< Updated upstream
   const modalMapRef = useRef(null); // Map trong modal
   const [modalMap, setModalMap] = useState(null);
   const modalMarkersRef = useRef({}); // Markers của drones hiện có trên modal map
-=======
-  const [modalMap, setModalMap] = useState(null);
-  const modalMapRef = useRef(null);
   const modalPreviewMarkerRef = useRef(null);
->>>>>>> Stashed changes
   const markersRef = useRef({});
   const destinationMarkersRef = useRef({});
+  const startLocationMarkersRef = useRef({});
   const pathLinesRef = useRef({});
   const initialBoundsSetRef = useRef(false); // Track if initial bounds have been set
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -286,7 +282,7 @@ const DroneHubPage = () => {
             }
           });
           modalMarkersRef.current = {};
-          
+
           modalMapRef.current.remove();
           modalMapRef.current = null;
           setModalMap(null);
@@ -369,9 +365,7 @@ const DroneHubPage = () => {
           marker.bindPopup("Vị trí drone mới").openPopup();
           setPreviewMarker(marker);
 
-          toast.success(
-            `Đã chọn vị trí: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
-          );
+          toast.success(`Đã chọn vị trí: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
         });
 
         // Hiển thị các drone hiện có trên modal map
@@ -406,8 +400,8 @@ const DroneHubPage = () => {
                 drone.status
               )}</span><br/>
                   <small style="color: #888;">📍 ${drone.currentLocation.latitude.toFixed(
-                4
-              )}, ${drone.currentLocation.longitude.toFixed(4)}</small>
+                    4
+                  )}, ${drone.currentLocation.longitude.toFixed(4)}</small>
                 </div>
               `;
               existingMarker.bindPopup(popupContent);
@@ -514,13 +508,8 @@ const DroneHubPage = () => {
 
         markersRef.current[drone._id] = marker;
 
-        // Add destination marker if drone has a destination
+        // Add start location marker (restaurant) if drone has one
         if (
-<<<<<<< Updated upstream
-          drone.destination &&
-          drone.destination.latitude !== undefined &&
-          drone.destination.longitude !== undefined &&
-=======
           drone.startLocation &&
           typeof drone.startLocation.latitude === "number" &&
           typeof drone.startLocation.longitude === "number" &&
@@ -571,14 +560,16 @@ const DroneHubPage = () => {
           (drone.destination &&
           typeof drone.destination.latitude === "number" &&
           typeof drone.destination.longitude === "number" &&
->>>>>>> Stashed changes
           !isNaN(drone.destination.latitude) &&
           !isNaN(drone.destination.longitude)
-        ) {
+            ? drone.destination
+            : null);
+
+        if (finalDest) {
           try {
             // Add destination marker
             const destMarker = window.L.marker(
-              [drone.destination.latitude, drone.destination.longitude],
+              [finalDest.latitude, finalDest.longitude],
               {
                 icon: window.L.divIcon({
                   className: "destination-marker-hub",
@@ -591,12 +582,12 @@ const DroneHubPage = () => {
 
             destMarker.bindPopup(
               `<b>📍 Điểm đến</b><br/>${
-                drone.destination.address || "Địa chỉ giao hàng"
+                finalDest.address || "Địa chỉ giao hàng"
               }<br/><small>Drone: ${
                 drone.name
-              }</small><br/><small>${drone.destination.latitude.toFixed(
+              }</small><br/><small>${finalDest.latitude.toFixed(
                 6
-              )}, ${drone.destination.longitude.toFixed(6)}</small>`
+              )}, ${finalDest.longitude.toFixed(6)}</small>`
             );
 
             destinationMarkersRef.current[drone._id] = destMarker;
@@ -609,7 +600,7 @@ const DroneHubPage = () => {
                     drone.currentLocation.latitude,
                     drone.currentLocation.longitude,
                   ],
-                  [drone.destination.latitude, drone.destination.longitude],
+                  [finalDest.latitude, finalDest.longitude],
                 ],
                 {
                   color: "#ef4444",
@@ -658,8 +649,6 @@ const DroneHubPage = () => {
           bounds.push([d.destination.latitude, d.destination.longitude]);
         });
 
-<<<<<<< Updated upstream
-=======
       // Add final destination positions (prefer deliveryDestination)
       drones.forEach((d) => {
         const finalDest =
@@ -677,8 +666,6 @@ const DroneHubPage = () => {
           bounds.push([finalDest.latitude, finalDest.longitude]);
         }
       });
-
->>>>>>> Stashed changes
       // Only fitBounds on initial load, not on every update
       if (bounds.length > 0 && !initialBoundsSetRef.current) {
         map.fitBounds(bounds, { padding: [50, 50] });
@@ -768,22 +755,14 @@ const DroneHubPage = () => {
       onSuccess: (response) => {
         toast.success("Tạo drone thành công!");
 
-<<<<<<< Updated upstream
-        // Remove preview marker
-        if (previewMarker) {
-          if (map) {
-            map.removeLayer(previewMarker);
-          }
-          if (modalMap) {
-            modalMap.removeLayer(previewMarker);
-          }
-=======
         // Remove preview markers
         if (previewMarker && map) {
           map.removeLayer(previewMarker);
->>>>>>> Stashed changes
-          setPreviewMarker(null);
         }
+        if (previewMarker && modalMap) {
+          modalMap.removeLayer(previewMarker);
+        }
+        setPreviewMarker(null);
         if (modalPreviewMarkerRef.current && modalMapRef.current) {
           modalMapRef.current.removeLayer(modalPreviewMarkerRef.current);
           modalPreviewMarkerRef.current = null;
@@ -1671,7 +1650,6 @@ const DroneHubPage = () => {
                   />
                 </div>
 
-<<<<<<< Updated upstream
                 {/* Map trong modal để chọn tọa độ */}
                 {clickToPlace && (
                   <div className="mb-4">
@@ -1684,14 +1662,6 @@ const DroneHubPage = () => {
                           (Hiển thị {drones.length} drone hiện có: 🚁)
                         </span>
                       )}
-=======
-                {/* Map for selecting location */}
-                {clickToPlace && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Chọn vị trí trên bản đồ{" "}
-                      <span className="text-green-600">(Click để chọn)</span>
->>>>>>> Stashed changes
                     </label>
                     <div
                       id="modal-drone-map"
@@ -1702,26 +1672,18 @@ const DroneHubPage = () => {
                         <div className="w-full h-full flex items-center justify-center text-gray-500">
                           <div className="text-center">
                             <Loader className="w-6 h-6 animate-spin mx-auto mb-2" />
-<<<<<<< Updated upstream
                             <p className="text-sm">Đang tải bản đồ...</p>
-=======
-                            <p>Đang tải bản đồ...</p>
->>>>>>> Stashed changes
                           </div>
                         </div>
                       )}
                     </div>
                     <p className="mt-1 text-xs text-gray-500">
-<<<<<<< Updated upstream
                       Click vào bất kỳ đâu trên bản đồ để đặt vị trí drone mới
                       {drones && drones.length > 0 && (
                         <span className="ml-1">
                           • 🚁 = Drone hiện có (click để xem thông tin)
                         </span>
                       )}
-=======
-                      Click trên bản đồ để chọn vị trí khởi tạo drone
->>>>>>> Stashed changes
                     </p>
                   </div>
                 )}
@@ -1879,21 +1841,14 @@ const DroneHubPage = () => {
                           duration: 2000,
                         });
                       } else {
-<<<<<<< Updated upstream
-                        if (previewMarker) {
-                          if (map) {
-                            map.removeLayer(previewMarker);
-                          }
-                          if (modalMap) {
-                            modalMap.removeLayer(previewMarker);
-                          }
-=======
                         // Clean up markers
                         if (previewMarker && map) {
                           map.removeLayer(previewMarker);
->>>>>>> Stashed changes
-                          setPreviewMarker(null);
                         }
+                        if (previewMarker && modalMap) {
+                          modalMap.removeLayer(previewMarker);
+                        }
+                        setPreviewMarker(null);
                         if (
                           modalPreviewMarkerRef.current &&
                           modalMapRef.current
