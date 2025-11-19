@@ -87,36 +87,34 @@ const DashboardContent = () => {
     return statusMap[apiStatus] || "pending";
   };
 
-  // Fetch real orders from API
+  // Fetch real orders from API - chỉ lấy 3 đơn mới nhất từ server để tối ưu
   const { data: recentOrders, error: ordersError } = useQuery(
     "recentOrders",
     async () => {
       try {
-        const response = await restaurantClient.get("/restaurant/orders");
+        // Tối ưu: chỉ lấy 3 đơn mới nhất từ server với sort và limit
+        const response = await restaurantClient.get("/restaurant/orders", {
+          params: {
+            limit: 3,
+            sort: "-createdAt", // Sort mới nhất trước
+          },
+        });
         const orders = response?.data?.orders || [];
 
-        // Sort orders by createdAt (newest first) and take only 3 most recent
-        const sortedOrders = [...orders].sort((a, b) => {
-          const dateA = new Date(a.createdAt || a.created_at || 0);
-          const dateB = new Date(b.createdAt || b.created_at || 0);
-          return dateB - dateA; // Descending order (newest first)
-        });
-
-        // Map orders to display format and take only 3 most recent
-        return sortedOrders
-          .slice(0, 3)
-          .map((order) => ({
-            id: order._id || order.id,
-            customerName:
-              order.customer?.name ||
-              order.user?.name ||
-              order.customerName ||
-              "Khách hàng",
-            items: order.items?.length || order.orderItems?.length || 0,
-            total: order.totalAmount || order.total || 0,
-            status: mapOrderStatus(order.status) || "pending",
-            time: getTimeAgo(order.createdAt || order.created_at),
-          }));
+        // Map orders to display format (đã được sort và limit ở server)
+        return orders.map((order) => ({
+          id: order._id || order.id,
+          customerName:
+            order.receiver ||
+            order.customer?.name ||
+            order.user?.name ||
+            order.customerName ||
+            "Khách hàng",
+          items: order.cart?.length || order.items?.length || order.orderItems?.length || 0,
+          total: order.totalPrice || 0, // Sửa: dùng totalPrice thay vì totalAmount
+          status: mapOrderStatus(order.status) || "pending",
+          time: getTimeAgo(order.createdAt || order.created_at),
+        }));
       } catch (error) {
         console.error("Error fetching recent orders:", error);
         // Return empty array on error instead of mock data
@@ -127,6 +125,8 @@ const DashboardContent = () => {
       retry: 1,
       refetchOnWindowFocus: false,
       enabled: !!localStorage.getItem("restaurant_token"),
+      // Cache trong 30 giây để tăng tốc độ
+      staleTime: 30000,
     }
   );
 
