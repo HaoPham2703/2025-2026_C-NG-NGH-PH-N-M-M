@@ -23,13 +23,12 @@ import toast from "react-hot-toast";
 const DroneHubPage = () => {
   const [map, setMap] = useState(null);
   const mapRef = useRef(null);
-  const modalMapRef = useRef(null); // Map trong modal
   const [modalMap, setModalMap] = useState(null);
+  const modalMapRef = useRef(null); // Map trong modal
   const modalMarkersRef = useRef({}); // Markers của drones hiện có trên modal map
-  const modalPreviewMarkerRef = useRef(null);
   const markersRef = useRef({});
-  const destinationMarkersRef = useRef({});
   const startLocationMarkersRef = useRef({});
+  const destinationMarkersRef = useRef({});
   const pathLinesRef = useRef({});
   const initialBoundsSetRef = useRef(false); // Track if initial bounds have been set
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -459,6 +458,14 @@ const DroneHubPage = () => {
     });
     destinationMarkersRef.current = {};
 
+    // Clear existing start location markers (restaurants)
+    Object.values(startLocationMarkersRef.current).forEach((marker) => {
+      if (marker && map.hasLayer(marker)) {
+        map.removeLayer(marker);
+      }
+    });
+    startLocationMarkersRef.current = {};
+
     // Clear existing path lines
     Object.values(pathLinesRef.current).forEach((line) => {
       if (line && map.hasLayer(line)) {
@@ -552,9 +559,7 @@ const DroneHubPage = () => {
         const finalDest =
           (drone.deliveryDestination &&
           typeof drone.deliveryDestination.latitude === "number" &&
-          typeof drone.deliveryDestination.longitude === "number" &&
-          !isNaN(drone.deliveryDestination.latitude) &&
-          !isNaN(drone.deliveryDestination.longitude)
+          typeof drone.deliveryDestination.longitude === "number"
             ? drone.deliveryDestination
             : null) ||
           (drone.destination &&
@@ -592,23 +597,31 @@ const DroneHubPage = () => {
 
             destinationMarkersRef.current[drone._id] = destMarker;
 
-            // Draw line from drone to destination
+            // Draw line: current -> (restaurant?) -> destination
             if (drone.currentLocation) {
-              const pathLine = window.L.polyline(
-                [
-                  [
-                    drone.currentLocation.latitude,
-                    drone.currentLocation.longitude,
-                  ],
-                  [finalDest.latitude, finalDest.longitude],
-                ],
-                {
-                  color: "#ef4444",
-                  weight: 2,
-                  opacity: 0.6,
-                  dashArray: "5, 10",
-                }
-              ).addTo(map);
+              const points = [];
+              points.push([
+                drone.currentLocation.latitude,
+                drone.currentLocation.longitude,
+              ]);
+              if (
+                drone.startLocation &&
+                typeof drone.startLocation.latitude === "number" &&
+                typeof drone.startLocation.longitude === "number"
+              ) {
+                points.push([
+                  drone.startLocation.latitude,
+                  drone.startLocation.longitude,
+                ]);
+              }
+              points.push([finalDest.latitude, finalDest.longitude]);
+
+              const pathLine = window.L.polyline(points, {
+                color: "#ef4444",
+                weight: 2,
+                opacity: 0.6,
+                dashArray: "5, 10",
+              }).addTo(map);
 
               pathLinesRef.current[drone._id] = pathLine;
             }
@@ -637,16 +650,16 @@ const DroneHubPage = () => {
           ]);
         });
 
-      // Add destination positions
+      // Add start (restaurant) positions
       drones
         .filter(
           (d) =>
-            d.destination &&
-            d.destination.latitude !== undefined &&
-            d.destination.longitude !== undefined
+            d.startLocation &&
+            typeof d.startLocation.latitude === "number" &&
+            typeof d.startLocation.longitude === "number"
         )
         .forEach((d) => {
-          bounds.push([d.destination.latitude, d.destination.longitude]);
+          bounds.push([d.startLocation.latitude, d.startLocation.longitude]);
         });
 
       // Add final destination positions (prefer deliveryDestination)
@@ -666,6 +679,7 @@ const DroneHubPage = () => {
           bounds.push([finalDest.latitude, finalDest.longitude]);
         }
       });
+
       // Only fitBounds on initial load, not on every update
       if (bounds.length > 0 && !initialBoundsSetRef.current) {
         map.fitBounds(bounds, { padding: [50, 50] });
@@ -754,18 +768,15 @@ const DroneHubPage = () => {
     {
       onSuccess: (response) => {
         toast.success("Tạo drone thành công!");
-
-        // Remove preview markers
-        if (previewMarker && map) {
-          map.removeLayer(previewMarker);
-        }
-        if (previewMarker && modalMap) {
-          modalMap.removeLayer(previewMarker);
-        }
-        setPreviewMarker(null);
-        if (modalPreviewMarkerRef.current && modalMapRef.current) {
-          modalMapRef.current.removeLayer(modalPreviewMarkerRef.current);
-          modalPreviewMarkerRef.current = null;
+        // Remove preview marker(s)
+        if (previewMarker) {
+          if (map) {
+            map.removeLayer(previewMarker);
+          }
+          if (modalMap) {
+            modalMap.removeLayer(previewMarker);
+          }
+          setPreviewMarker(null);
         }
         setClickToPlace(false);
 
@@ -857,140 +868,6 @@ const DroneHubPage = () => {
     });
   };
 
-  // Initialize modal map when modal opens and clickToPlace is enabled
-  useEffect(() => {
-    if (!showCreateModal || !clickToPlace) {
-      // Clean up modal map when modal closes
-      if (modalMapRef.current) {
-        try {
-          modalMapRef.current.remove();
-        } catch (error) {
-          console.error("Error removing modal map:", error);
-        }
-        modalMapRef.current = null;
-        setModalMap(null);
-      }
-      if (modalPreviewMarkerRef.current) {
-        modalPreviewMarkerRef.current = null;
-      }
-      return;
-    }
-
-    if (!window.L) {
-      // Wait for Leaflet to load
-      const checkLeaflet = setInterval(() => {
-        if (window.L) {
-          clearInterval(checkLeaflet);
-          initModalMap();
-        }
-      }, 100);
-      return () => clearInterval(checkLeaflet);
-    }
-
-    // Small delay to ensure DOM is ready
-    const timer = setTimeout(() => {
-      initModalMap();
-    }, 200);
-
-    return () => {
-      clearTimeout(timer);
-      if (modalMapRef.current) {
-        try {
-          modalMapRef.current.remove();
-        } catch (error) {
-          console.error("Error removing modal map:", error);
-        }
-        modalMapRef.current = null;
-        setModalMap(null);
-      }
-      if (modalPreviewMarkerRef.current) {
-        modalPreviewMarkerRef.current = null;
-      }
-    };
-  }, [showCreateModal, clickToPlace]);
-
-  const initModalMap = () => {
-    const modalMapContainer = document.getElementById("modal-drone-map");
-    if (!modalMapContainer) {
-      console.warn("Modal map container not found");
-      return;
-    }
-
-    if (modalMapRef.current) {
-      console.log("Modal map already initialized");
-      return;
-    }
-
-    if (!window.L) {
-      console.warn("Leaflet not loaded");
-      return;
-    }
-
-    try {
-      // Default location (Ho Chi Minh City)
-      const defaultLat = parseFloat(newDrone.latitude) || 10.7769;
-      const defaultLon = parseFloat(newDrone.longitude) || 106.7009;
-
-      const mapInstance = window.L.map("modal-drone-map", {
-        zoomControl: true,
-      }).setView([defaultLat, defaultLon], 13);
-
-      window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19,
-      }).addTo(mapInstance);
-
-      // Fix Leaflet default marker icon issue
-      delete window.L.Icon.Default.prototype._getIconUrl;
-      window.L.Icon.Default.mergeOptions({
-        iconRetinaUrl:
-          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-        iconUrl:
-          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-        shadowUrl:
-          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-      });
-
-      // Add click handler for placing drone
-      mapInstance.on("click", (e) => {
-        const { lat, lng } = e.latlng;
-        setNewDrone((prev) => ({
-          ...prev,
-          latitude: lat,
-          longitude: lng,
-        }));
-
-        // Remove existing preview marker
-        if (modalPreviewMarkerRef.current) {
-          mapInstance.removeLayer(modalPreviewMarkerRef.current);
-        }
-
-        // Add preview marker
-        const marker = window.L.marker([lat, lng], {
-          icon: window.L.divIcon({
-            className: "preview-drone-marker",
-            html: `<div style="background: #22c55e; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 20px; animation: pulse 2s infinite;">📍</div>`,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16],
-          }),
-        }).addTo(mapInstance);
-
-        marker.bindPopup("Vị trí drone mới").openPopup();
-        modalPreviewMarkerRef.current = marker;
-
-        toast.success(`Đã chọn vị trí: ${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-      });
-
-      modalMapRef.current = mapInstance;
-      setModalMap(mapInstance);
-      console.log("Modal map initialized successfully");
-    } catch (error) {
-      console.error("Error initializing modal map:", error);
-      toast.error("Không thể khởi tạo bản đồ trong modal");
-    }
-  };
-
   const handleOpenCreateModal = () => {
     setShowCreateModal(true);
     setClickToPlace(true);
@@ -1012,9 +889,6 @@ const DroneHubPage = () => {
       }
       modalMapRef.current = null;
       setModalMap(null);
-    }
-    if (modalPreviewMarkerRef.current) {
-      modalPreviewMarkerRef.current = null;
     }
   };
 
@@ -1841,22 +1715,14 @@ const DroneHubPage = () => {
                           duration: 2000,
                         });
                       } else {
-                        // Clean up markers
-                        if (previewMarker && map) {
-                          map.removeLayer(previewMarker);
-                        }
-                        if (previewMarker && modalMap) {
-                          modalMap.removeLayer(previewMarker);
-                        }
-                        setPreviewMarker(null);
-                        if (
-                          modalPreviewMarkerRef.current &&
-                          modalMapRef.current
-                        ) {
-                          modalMapRef.current.removeLayer(
-                            modalPreviewMarkerRef.current
-                          );
-                          modalPreviewMarkerRef.current = null;
+                        if (previewMarker) {
+                          if (map) {
+                            map.removeLayer(previewMarker);
+                          }
+                          if (modalMap) {
+                            modalMap.removeLayer(previewMarker);
+                          }
+                          setPreviewMarker(null);
                         }
                       }
                     }}

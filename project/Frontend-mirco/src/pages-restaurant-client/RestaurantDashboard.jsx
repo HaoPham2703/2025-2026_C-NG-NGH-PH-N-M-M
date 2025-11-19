@@ -82,10 +82,10 @@ const RestaurantDashboard = () => {
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-in-out ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:translate-x-0`}
+        } lg:translate-x-0 flex flex-col`}
       >
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
+        <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200 flex-shrink-0">
           <Link to="/restaurant/dashboard" className="flex items-center space-x-3">
             <div className="bg-orange-100 p-2 rounded-lg">
               <Store className="h-6 w-6 text-orange-600" />
@@ -101,7 +101,7 @@ const RestaurantDashboard = () => {
         </div>
 
         {/* Restaurant Info */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-6 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="bg-orange-100 p-3 rounded-full">
               <Store className="h-6 w-6 text-orange-600" />
@@ -118,7 +118,7 @@ const RestaurantDashboard = () => {
         </div>
 
         {/* Navigation */}
-        <nav className="p-4 space-y-2">
+        <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
           {menuItems.map((item) => (
             <Link
               key={item.path}
@@ -137,7 +137,7 @@ const RestaurantDashboard = () => {
         </nav>
 
         {/* Logout */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-gray-200 flex-shrink-0">
           <button
             onClick={handleLogout}
             className="flex items-center space-x-3 px-4 py-3 w-full text-red-600 hover:bg-red-50 rounded-lg transition-colors"

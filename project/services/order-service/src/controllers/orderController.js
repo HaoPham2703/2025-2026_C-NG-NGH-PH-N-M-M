@@ -152,15 +152,38 @@ exports.createOrder = catchAsync(async (req, res, next) => {
   // Extract restaurant ID from cart products (first product's restaurant)
   // Cart structure: [{ product: { restaurant, restaurantId, ... }, quantity }]
   let restaurantId = req.body.restaurant;
+  let restaurantAddress = req.body.restaurantAddress;
+  let restaurantName = req.body.restaurantName;
+  
   if (!restaurantId && req.body.cart && req.body.cart.length > 0) {
     const firstProduct = req.body.cart[0].product;
     restaurantId = firstProduct?.restaurant || firstProduct?.restaurantId;
+    
+    // Try to extract restaurant info from product if available
+    if (firstProduct?.restaurantInfo) {
+      restaurantName = firstProduct.restaurantInfo.restaurantName || firstProduct.restaurantInfo.name;
+      // Handle structured address
+      if (firstProduct.restaurantInfo.address) {
+        if (typeof firstProduct.restaurantInfo.address === 'string') {
+          restaurantAddress = firstProduct.restaurantInfo.address;
+        } else {
+          restaurantAddress = [
+            firstProduct.restaurantInfo.address.detail,
+            firstProduct.restaurantInfo.address.ward,
+            firstProduct.restaurantInfo.address.district,
+            firstProduct.restaurantInfo.address.city
+          ].filter(Boolean).join(', ');
+        }
+      }
+    }
   }
 
-  // Create order with restaurant ID
+  // Create order with restaurant ID and info
   const orderData = {
     ...req.body,
     restaurant: restaurantId,
+    restaurantAddress,
+    restaurantName,
   };
   const newOrder = await Order.create(orderData);
 

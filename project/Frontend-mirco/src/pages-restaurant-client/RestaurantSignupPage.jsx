@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axios from "axios";
+import AddressAutocomplete from "../components/AddressAutocomplete";
 
 // Restaurant API client
 const restaurantClient = axios.create({
@@ -128,6 +129,40 @@ const RestaurantSignupPage = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  // Handlers cho AddressAutocomplete
+  const handleProvinceChange = (value) => {
+    setFormData({
+      ...formData,
+      city: value,
+      district: "",
+      ward: "",
+    });
+    if (errors.city) {
+      setErrors((prev) => ({ ...prev, city: "" }));
+    }
+  };
+
+  const handleDistrictChange = (value) => {
+    setFormData({
+      ...formData,
+      district: value,
+      ward: "",
+    });
+    if (errors.district) {
+      setErrors((prev) => ({ ...prev, district: "" }));
+    }
+  };
+
+  const handleWardChange = (value) => {
+    setFormData({
+      ...formData,
+      ward: value,
+    });
+    if (errors.ward) {
+      setErrors((prev) => ({ ...prev, ward: "" }));
     }
   };
 
@@ -364,23 +399,14 @@ const RestaurantSignupPage = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Thành phố *
+                    Tỉnh/Thành phố *
                   </label>
-                  <select
-                    name="city"
+                  <AddressAutocomplete
+                    type="province"
                     value={formData.city}
-                    onChange={handleChange}
-                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-500 ${
-                      errors.city ? "border-red-500" : "border-gray-300"
-                    }`}
-                  >
-                    <option value="">Chọn thành phố</option>
-                    {cities.map((city) => (
-                      <option key={city} value={city}>
-                        {city}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={handleProvinceChange}
+                    placeholder="Tỉnh/Thành phố"
+                  />
                   {errors.city && (
                     <p className="mt-1 text-sm text-red-600 flex items-center">
                       <AlertCircle className="h-4 w-4 mr-1" />
@@ -394,15 +420,13 @@ const RestaurantSignupPage = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Quận/Huyện *
                     </label>
-                    <input
-                      type="text"
-                      name="district"
+                    <AddressAutocomplete
+                      type="district"
                       value={formData.district}
-                      onChange={handleChange}
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-500 ${
-                        errors.district ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder="Quận 1"
+                      onChange={handleDistrictChange}
+                      placeholder="Quận/Huyện"
+                      selectedProvince={formData.city}
+                      disabled={!formData.city}
                     />
                     {errors.district && (
                       <p className="mt-1 text-sm text-red-600 flex items-center">
@@ -416,15 +440,14 @@ const RestaurantSignupPage = () => {
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Phường/Xã *
                     </label>
-                    <input
-                      type="text"
-                      name="ward"
+                    <AddressAutocomplete
+                      type="ward"
                       value={formData.ward}
-                      onChange={handleChange}
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-orange-500 ${
-                        errors.ward ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder="Phường Bến Nghé"
+                      onChange={handleWardChange}
+                      placeholder="Phường/Xã"
+                      selectedProvince={formData.city}
+                      selectedDistrict={formData.district}
+                      disabled={!formData.district}
                     />
                     {errors.ward && (
                       <p className="mt-1 text-sm text-red-600 flex items-center">

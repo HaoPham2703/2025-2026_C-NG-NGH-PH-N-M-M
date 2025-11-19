@@ -56,6 +56,13 @@ const orderSchema = new mongoose.Schema(
       ref: "Restaurant",
       index: true,
     },
+    restaurantAddress: {
+      type: String,
+      // Địa chỉ nhà hàng để drone có thể lấy món
+    },
+    restaurantName: {
+      type: String,
+    },
     invoicePayment: Object,
   },
   {

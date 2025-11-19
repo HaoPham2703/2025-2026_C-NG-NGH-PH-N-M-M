@@ -13,6 +13,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Breadcrumb from "../components/Breadcrumb";
+import AddressAutocomplete from "../components/AddressAutocomplete";
 import toast from "react-hot-toast";
 
 const CheckoutPage_2 = () => {
@@ -32,6 +33,31 @@ const CheckoutPage_2 = () => {
     detail: "",
     setDefault: false,
   });
+
+  // Handlers cho autocomplete
+  const handleProvinceChange = (value) => {
+    setNewAddress({
+      ...newAddress,
+      province: value,
+      district: "",
+      ward: "",
+    });
+  };
+
+  const handleDistrictChange = (value) => {
+    setNewAddress({
+      ...newAddress,
+      district: value,
+      ward: "",
+    });
+  };
+
+  const handleWardChange = (value) => {
+    setNewAddress({
+      ...newAddress,
+      ward: value,
+    });
+  };
 
   const {
     register,
@@ -912,71 +938,64 @@ const CheckoutPage_2 = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Tỉnh/TP
+                      Tỉnh/Thành phố
                     </label>
-                    <input
-                      type="text"
-                      className="input-field"
+                    <AddressAutocomplete
+                      type="province"
                       value={newAddress.province}
-                      onChange={(e) =>
-                        setNewAddress((s) => ({
-                          ...s,
-                          province: e.target.value,
-                        }))
-                      }
-                      placeholder="TP. Hồ Chí Minh"
+                      onChange={handleProvinceChange}
+                      placeholder="Tỉnh/Thành phố"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Quận/Huyện
                     </label>
-                    <input
-                      type="text"
-                      className="input-field"
+                    <AddressAutocomplete
+                      type="district"
                       value={newAddress.district}
-                      onChange={(e) =>
-                        setNewAddress((s) => ({
-                          ...s,
-                          district: e.target.value,
-                        }))
-                      }
-                      placeholder="Quận 1"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Phường/Xã
-                    </label>
-                    <input
-                      type="text"
-                      className="input-field"
-                      value={newAddress.ward}
-                      onChange={(e) =>
-                        setNewAddress((s) => ({ ...s, ward: e.target.value }))
-                      }
-                      placeholder="Phường Bến Nghé"
+                      onChange={handleDistrictChange}
+                      placeholder="Quận/Huyện"
+                      selectedProvince={newAddress.province}
+                      disabled={!newAddress.province}
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Địa chỉ chi tiết
-                  </label>
-                  <textarea
-                    rows={3}
-                    className="input-field"
-                    value={newAddress.detail}
-                    onChange={(e) =>
-                      setNewAddress((s) => ({ ...s, detail: e.target.value }))
-                    }
-                    placeholder="Số nhà, đường, khu phố..."
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Phường/Xã
+                    </label>
+                    <AddressAutocomplete
+                      type="ward"
+                      value={newAddress.ward}
+                      onChange={handleWardChange}
+                      placeholder="Phường/Xã"
+                      selectedProvince={newAddress.province}
+                      selectedDistrict={newAddress.district}
+                      disabled={!newAddress.district}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Địa chỉ chi tiết
+                    </label>
+                    <textarea
+                      rows={3}
+                      className="input-field"
+                      value={newAddress.detail}
+                      onChange={(e) =>
+                        setNewAddress((s) => ({ ...s, detail: e.target.value }))
+                      }
+                      placeholder="Số nhà, đường, khu phố..."
+                    />
+                  </div>
                 </div>
+
 
                 <label className="inline-flex items-center space-x-2">
                   <input

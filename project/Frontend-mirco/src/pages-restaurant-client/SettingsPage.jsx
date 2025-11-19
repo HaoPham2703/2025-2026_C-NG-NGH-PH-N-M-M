@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
+import AddressAutocomplete from "../components/AddressAutocomplete";
 import {
   User,
   Store,
@@ -34,11 +35,36 @@ const SettingsPage = () => {
 
   // Address form state
   const [addressForm, setAddressForm] = useState({
-    address: restaurantData.address || "",
-    ward: restaurantData.ward || "",
-    district: restaurantData.district || "",
-    city: restaurantData.city || "",
+    address: restaurantData.address?.detail || "",
+    ward: restaurantData.address?.ward || "",
+    district: restaurantData.address?.district || "",
+    city: restaurantData.address?.city || "",
   });
+
+  // Handlers cho AddressAutocomplete
+  const handleCityChange = (value) => {
+    setAddressForm({
+      ...addressForm,
+      city: value,
+      district: "",
+      ward: "",
+    });
+  };
+
+  const handleDistrictChange = (value) => {
+    setAddressForm({
+      ...addressForm,
+      district: value,
+      ward: "",
+    });
+  };
+
+  const handleWardChange = (value) => {
+    setAddressForm({
+      ...addressForm,
+      ward: value,
+    });
+  };
 
   // Business hours state
   const [businessHours, setBusinessHours] = useState({
@@ -70,9 +96,8 @@ const SettingsPage = () => {
   // Update profile mutation
   const updateProfileMutation = useMutation(
     async (data) => {
-      // TODO: Replace with actual API call
       const response = await fetch(
-        "http://localhost:3001/api/restaurant/profile",
+        "http://localhost:4006/api/restaurant/profile",
         {
           method: "PUT",
           headers: {
@@ -82,20 +107,35 @@ const SettingsPage = () => {
           body: JSON.stringify(data),
         }
       );
-      if (!response.ok) throw new Error("Cập nhật thất bại");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Cập nhật thất bại");
+      }
       return response.json();
     },
     {
       onSuccess: (data) => {
         toast.success("Cập nhật thông tin thành công!");
+        // Cập nhật localStorage với dữ liệu mới từ server
         localStorage.setItem(
           "restaurant_data",
-          JSON.stringify(data.restaurant)
+          JSON.stringify(data.data.restaurant)
         );
+        // Cập nhật state để UI hiển thị dữ liệu mới ngay lập tức
+        setRestaurantData(data.data.restaurant);
+        // Cập nhật form với dữ liệu mới
+        if (data.data.restaurant.address) {
+          setAddressForm({
+            address: data.data.restaurant.address.detail || "",
+            ward: data.data.restaurant.address.ward || "",
+            district: data.data.restaurant.address.district || "",
+            city: data.data.restaurant.address.city || "",
+          });
+        }
         queryClient.invalidateQueries("restaurantProfile");
       },
-      onError: () => {
-        toast.error("Cập nhật thất bại!");
+      onError: (error) => {
+        toast.error(error.message || "Cập nhật thất bại!");
       },
     }
   );
@@ -103,9 +143,8 @@ const SettingsPage = () => {
   // Change password mutation
   const changePasswordMutation = useMutation(
     async (data) => {
-      // TODO: Replace with actual API call
       const response = await fetch(
-        "http://localhost:3001/api/restaurant/change-password",
+        "http://localhost:4006/api/restaurant/change-password",
         {
           method: "POST",
           headers: {
@@ -115,7 +154,10 @@ const SettingsPage = () => {
           body: JSON.stringify(data),
         }
       );
-      if (!response.ok) throw new Error("Đổi mật khẩu thất bại");
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Đổi mật khẩu thất bại");
+      }
       return response.json();
     },
     {
@@ -127,8 +169,8 @@ const SettingsPage = () => {
           confirmPassword: "",
         });
       },
-      onError: () => {
-        toast.error("Đổi mật khẩu thất bại!");
+      onError: (error) => {
+        toast.error(error.message || "Đổi mật khẩu thất bại!");
       },
     }
   );
@@ -140,7 +182,13 @@ const SettingsPage = () => {
 
   const handleAddressSubmit = (e) => {
     e.preventDefault();
-    updateProfileMutation.mutate(addressForm);
+    // Gửi dữ liệu địa chỉ theo format API mong đợi
+    updateProfileMutation.mutate({
+      address: addressForm.address,
+      ward: addressForm.ward,
+      district: addressForm.district,
+      city: addressForm.city,
+    });
   };
 
   const handlePasswordSubmit = (e) => {
@@ -416,19 +464,13 @@ const SettingsPage = () => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Phường/Xã *
+                          Tỉnh/Thành phố *
                         </label>
-                        <input
-                          type="text"
-                          value={addressForm.ward}
-                          onChange={(e) =>
-                            setAddressForm({
-                              ...addressForm,
-                              ward: e.target.value,
-                            })
-                          }
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                          required
+                        <AddressAutocomplete
+                          type="province"
+                          value={addressForm.city}
+                          onChange={handleCityChange}
+                          placeholder="Tỉnh/Thành phố"
                         />
                       </div>
 
@@ -436,42 +478,29 @@ const SettingsPage = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Quận/Huyện *
                         </label>
-                        <input
-                          type="text"
+                        <AddressAutocomplete
+                          type="district"
                           value={addressForm.district}
-                          onChange={(e) =>
-                            setAddressForm({
-                              ...addressForm,
-                              district: e.target.value,
-                            })
-                          }
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                          required
+                          onChange={handleDistrictChange}
+                          placeholder="Quận/Huyện"
+                          selectedProvince={addressForm.city}
+                          disabled={!addressForm.city}
                         />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Thành phố *
+                          Phường/Xã *
                         </label>
-                        <select
-                          value={addressForm.city}
-                          onChange={(e) =>
-                            setAddressForm({
-                              ...addressForm,
-                              city: e.target.value,
-                            })
-                          }
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 cursor-pointer"
-                          required
-                        >
-                          <option value="">Chọn thành phố</option>
-                          <option value="Hồ Chí Minh">Hồ Chí Minh</option>
-                          <option value="Hà Nội">Hà Nội</option>
-                          <option value="Đà Nẵng">Đà Nẵng</option>
-                          <option value="Cần Thơ">Cần Thơ</option>
-                          <option value="Hải Phòng">Hải Phòng</option>
-                        </select>
+                        <AddressAutocomplete
+                          type="ward"
+                          value={addressForm.ward}
+                          onChange={handleWardChange}
+                          placeholder="Phường/Xã"
+                          selectedProvince={addressForm.city}
+                          selectedDistrict={addressForm.district}
+                          disabled={!addressForm.district}
+                        />
                       </div>
                     </div>
                   </div>

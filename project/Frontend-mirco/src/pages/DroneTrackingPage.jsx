@@ -20,6 +20,7 @@ const DroneTrackingPage = () => {
   const [map, setMap] = useState(null);
   const [droneMarker, setDroneMarker] = useState(null);
   const [destinationMarker, setDestinationMarker] = useState(null);
+  const [startMarker, setStartMarker] = useState(null);
   const [path, setPath] = useState(null);
   const mapRef = useRef(null);
   const socketRef = useRef(null);
@@ -197,16 +198,38 @@ const DroneTrackingPage = () => {
       return;
     }
 
-    // Fit bounds to show both drone and destination (only on initial load, not on every update)
-    // Don't reset zoom on every update (especially battery updates) - same as DroneHubPage
-    if (drone.destination && drone.currentLocation) {
+    // Determine final destination (prefer deliveryDestination)
+    const finalDest =
+      (drone.deliveryDestination &&
+        typeof drone.deliveryDestination.latitude === "number" &&
+        typeof drone.deliveryDestination.longitude === "number"
+        ? drone.deliveryDestination
+        : null) ||
+      (drone.destination &&
+        typeof drone.destination.latitude === "number" &&
+        typeof drone.destination.longitude === "number"
+        ? drone.destination
+        : null);
+
+    // Fit bounds to show drone, restaurant, and final destination (only on initial load)
+    if (finalDest && drone.currentLocation) {
       try {
         // Only fitBounds on initial load, not on every update (same approach as DroneHubPage)
         if (!initialBoundsSetRef.current) {
           const bounds = [
             [drone.currentLocation.latitude, drone.currentLocation.longitude],
-            [drone.destination.latitude, drone.destination.longitude],
+            [finalDest.latitude, finalDest.longitude],
           ];
+          if (
+            drone.startLocation &&
+            typeof drone.startLocation.latitude === "number" &&
+            typeof drone.startLocation.longitude === "number"
+          ) {
+            bounds.push([
+              drone.startLocation.latitude,
+              drone.startLocation.longitude,
+            ]);
+          }
           map.fitBounds(bounds, { padding: [50, 50] });
           initialBoundsSetRef.current = true;
         }
@@ -243,6 +266,21 @@ const DroneTrackingPage = () => {
     }
     setDestinationMarker(null);
 
+    // Clear existing start marker (restaurant)
+    if (startMarker) {
+      try {
+        if (map.hasLayer(startMarker)) {
+          map.removeLayer(startMarker);
+        }
+      } catch (error) {
+        console.error(
+          "[DroneTrackingPage] Error removing start marker:",
+          error
+        );
+      }
+    }
+    setStartMarker(null);
+
     // Clear existing path
     if (path) {
       try {
@@ -255,23 +293,17 @@ const DroneTrackingPage = () => {
     }
     setPath(null);
 
-    // Add destination marker (check for both destination object and coordinates)
-    if (
-      drone.destination &&
-      drone.destination.latitude !== undefined &&
-      drone.destination.longitude !== undefined &&
-      !isNaN(drone.destination.latitude) &&
-      !isNaN(drone.destination.longitude)
-    ) {
+    // Add destination marker (prefer deliveryDestination)
+    if (finalDest) {
       try {
         console.log("[DroneTrackingPage] Adding destination marker:", {
-          lat: drone.destination.latitude,
-          lng: drone.destination.longitude,
-          address: drone.destination.address,
+          lat: finalDest.latitude,
+          lng: finalDest.longitude,
+          address: finalDest.address,
         });
 
         const destMarker = window.L.marker(
-          [drone.destination.latitude, drone.destination.longitude],
+          [finalDest.latitude, finalDest.longitude],
           {
             icon: window.L.divIcon({
               className: "destination-marker",
@@ -284,10 +316,10 @@ const DroneTrackingPage = () => {
 
         destMarker.bindPopup(
           `<b>📍 Điểm đến</b><br/>${
-            drone.destination.address || "Địa chỉ giao hàng"
-          }<br/><small>${drone.destination.latitude.toFixed(
+            finalDest.address || "Địa chỉ giao hàng"
+          }<br/><small>${finalDest.latitude.toFixed(
             6
-          )}, ${drone.destination.longitude.toFixed(6)}</small>`
+          )}, ${finalDest.longitude.toFixed(6)}</small>`
         );
 
         setDestinationMarker(destMarker);
@@ -299,9 +331,45 @@ const DroneTrackingPage = () => {
       }
     } else {
       console.warn("[DroneTrackingPage] No valid destination found:", {
+        hasDeliveryDestination: !!drone.deliveryDestination,
         hasDestination: !!drone.destination,
-        destination: drone.destination,
+        destination: finalDest,
       });
+    }
+
+    // Add start marker (restaurant) if present
+    if (
+      drone.startLocation &&
+      typeof drone.startLocation.latitude === "number" &&
+      typeof drone.startLocation.longitude === "number"
+    ) {
+      try {
+        const sMarker = window.L.marker(
+          [drone.startLocation.latitude, drone.startLocation.longitude],
+          {
+            icon: window.L.divIcon({
+              className: "start-marker",
+              html: `<div style=\"background: #10b981; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 12px;\">🏪</div>`,
+              iconSize: [20, 20],
+              iconAnchor: [10, 10],
+            }),
+          }
+        ).addTo(map);
+
+        sMarker.bindPopup(
+          `<b>🏪 Nhà hàng</b><br/>${
+            drone.startLocation.restaurantName || "Nhà hàng"
+          }<br/><small>${
+            drone.startLocation.address || "Địa chỉ nhà hàng"
+          }</small><br/><small>${drone.startLocation.latitude.toFixed(6)}, ${
+            drone.startLocation.longitude.toFixed(6)
+          }</small>`
+        );
+
+        setStartMarker(sMarker);
+      } catch (error) {
+        console.error("[DroneTrackingPage] Error adding start marker:", error);
+      }
     }
 
     // Add or update drone marker with smooth animation
@@ -340,13 +408,23 @@ const DroneTrackingPage = () => {
         );
       }
 
-      // Draw or update path line from drone to destination
-      if (drone.destination && drone.currentLocation) {
+      // Draw or update path line from drone -> (restaurant?) -> final destination
+      if (finalDest && drone.currentLocation) {
         try {
           const directPath = [
             [drone.currentLocation.latitude, drone.currentLocation.longitude],
-            [drone.destination.latitude, drone.destination.longitude],
           ];
+          if (
+            drone.startLocation &&
+            typeof drone.startLocation.latitude === "number" &&
+            typeof drone.startLocation.longitude === "number"
+          ) {
+            directPath.push([
+              drone.startLocation.latitude,
+              drone.startLocation.longitude,
+            ]);
+          }
+          directPath.push([finalDest.latitude, finalDest.longitude]);
 
           // Create new path (same approach as DroneHubPage - recreate on each update)
           const polyline = window.L.polyline(directPath, {
@@ -482,14 +560,27 @@ const DroneTrackingPage = () => {
                 "drone",
                 orderId,
               ])?.data;
-              if (currentDrone?.destination) {
+              const finalDestSocket =
+                currentDrone?.deliveryDestination ||
+                currentDrone?.destination;
+              if (finalDestSocket) {
                 const newPath = [
                   [data.location.latitude, data.location.longitude],
-                  [
-                    currentDrone.destination.latitude,
-                    currentDrone.destination.longitude,
-                  ],
                 ];
+                if (
+                  currentDrone?.startLocation &&
+                  typeof currentDrone.startLocation.latitude === "number" &&
+                  typeof currentDrone.startLocation.longitude === "number"
+                ) {
+                  newPath.push([
+                    currentDrone.startLocation.latitude,
+                    currentDrone.startLocation.longitude,
+                  ]);
+                }
+                newPath.push([
+                  finalDestSocket.latitude,
+                  finalDestSocket.longitude,
+                ]);
 
                 if (currentMap.hasLayer(currentPath)) {
                   // Update existing path smoothly
@@ -676,14 +767,26 @@ const DroneTrackingPage = () => {
     );
   }
 
-  // Calculate distance and ETA safely with null checks
+  // Calculate distance and ETA safely with null checks (prefer deliveryDestination)
+  const finalDestForInfo =
+    (drone?.deliveryDestination &&
+      typeof drone.deliveryDestination.latitude === "number" &&
+      typeof drone.deliveryDestination.longitude === "number"
+      ? drone.deliveryDestination
+      : null) ||
+    (drone?.destination &&
+      typeof drone.destination.latitude === "number" &&
+      typeof drone.destination.longitude === "number"
+      ? drone.destination
+      : null);
+
   const distanceToDestination =
-    drone?.currentLocation && drone?.destination
+    drone?.currentLocation && finalDestForInfo
       ? calculateDistance(
           drone.currentLocation.latitude || 0,
           drone.currentLocation.longitude || 0,
-          drone.destination.latitude || 0,
-          drone.destination.longitude || 0
+          finalDestForInfo.latitude || 0,
+          finalDestForInfo.longitude || 0
         )
       : 0;
 
@@ -879,15 +982,26 @@ const DroneTrackingPage = () => {
                     </p>
                   </div>
                 )}
-                {drone?.destination && (
+                {finalDestForInfo && (
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Điểm đến</p>
                     <p className="font-semibold text-gray-900 text-sm">
-                      {drone.destination.address || "Địa chỉ giao hàng"}
+                      {finalDestForInfo.address || "Địa chỉ giao hàng"}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
-                      {drone.destination.latitude?.toFixed(6) || "N/A"},
-                      {drone.destination.longitude?.toFixed(6) || "N/A"}
+                      {finalDestForInfo.latitude?.toFixed(6) || "N/A"},
+                      {finalDestForInfo.longitude?.toFixed(6) || "N/A"}
+                    </p>
+                  </div>
+                )}
+                {drone?.startLocation && (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Nhà hàng</p>
+                    <p className="font-semibold text-gray-900 text-sm">
+                      {drone.startLocation.restaurantName || "Nhà hàng"}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {drone.startLocation.address || "Địa chỉ nhà hàng"}
                     </p>
                   </div>
                 )}
