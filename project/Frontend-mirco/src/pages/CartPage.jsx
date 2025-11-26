@@ -1,8 +1,19 @@
 import { Link } from "react-router-dom";
-import { Minus, Plus, Trash2, ShoppingCart, AlertCircle, AlertTriangle } from "lucide-react";
+import {
+  Minus,
+  Plus,
+  Trash2,
+  ShoppingCart,
+  AlertCircle,
+  AlertTriangle,
+} from "lucide-react";
 import { useCart } from "../contexts/CartContext";
 import Breadcrumb from "../components/Breadcrumb";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useAuth } from "../hooks/useAuth";
+import { orderApi } from "../api/orderApi";
+import { restaurantApi } from "../api/restaurantApi";
+import toast from "react-hot-toast";
 
 const CartPage = () => {
   const {
@@ -12,6 +23,7 @@ const CartPage = () => {
     getTotalPrice,
     getTotalItems,
   } = useCart();
+  const { user } = useAuth();
 
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
@@ -19,6 +31,288 @@ const CartPage = () => {
     productId: null,
     productName: null,
   });
+
+  // Group cart items by restaurant to calculate shipping fee
+  const restaurantGroups = useMemo(() => {
+    const grouped = {};
+
+    cartItems.forEach((item) => {
+      const restaurantId =
+        item.product?.restaurant?._id ||
+        item.product?.restaurant ||
+        item.product?.restaurantId ||
+        "unknown";
+
+      // Get restaurant name
+      const restaurantName =
+        item.product?.restaurantName ||
+        item.product?.restaurant?.restaurantName ||
+        item.product?.restaurant?.name ||
+        item.product?.restaurantInfo?.restaurantName ||
+        `Nhà hàng ${restaurantId}`;
+
+      if (!grouped[restaurantId]) {
+        grouped[restaurantId] = {
+          restaurantId,
+          restaurantName,
+          items: [],
+        };
+      }
+      grouped[restaurantId].items.push(item);
+    });
+
+    return Object.values(grouped);
+  }, [cartItems]);
+
+  // State for shipping fees calculation
+  const [shippingFees, setShippingFees] = useState({});
+  const [shippingDetails, setShippingDetails] = useState({}); // Store detailed info: distance, addresses
+  const [isCalculatingShipping, setIsCalculatingShipping] = useState(false);
+
+  // Calculate actual shipping fee based on user's default address
+  useEffect(() => {
+    const calculateShippingFees = async () => {
+      // If user doesn't have a default address, use estimated fee
+      if (!user?.address || user.address.length === 0) {
+        setShippingFees({});
+        return;
+      }
+
+      // Find default address or use first address
+      const defaultAddressIndex = user.address.findIndex(
+        (addr) => addr.isDefault
+      );
+      const selectedAddressIndex =
+        defaultAddressIndex >= 0 ? defaultAddressIndex : 0;
+      const selectedAddress = user.address[selectedAddressIndex];
+
+      if (!selectedAddress) {
+        setShippingFees({});
+        return;
+      }
+
+      // Build full address string
+      const userFullAddress = `${selectedAddress.detail}, ${selectedAddress.ward}, ${selectedAddress.district}, ${selectedAddress.province}`;
+
+      setIsCalculatingShipping(true);
+
+      // Calculate shipping fee for each restaurant group
+      const feePromises = restaurantGroups.map(async (group) => {
+        // Try to get restaurant address from product info first
+        let restaurantFullAddress =
+          group.items[0]?.product?.restaurantInfo?.address;
+
+        // Handle different address formats
+        if (
+          typeof restaurantFullAddress === "object" &&
+          restaurantFullAddress !== null
+        ) {
+          restaurantFullAddress = [
+            restaurantFullAddress.detail,
+            restaurantFullAddress.ward,
+            restaurantFullAddress.district,
+            restaurantFullAddress.city || restaurantFullAddress.province,
+          ]
+            .filter(Boolean)
+            .join(", ");
+        } else if (typeof restaurantFullAddress !== "string") {
+          // Try alternative paths for restaurant address
+          const restaurantObj = group.items[0]?.product?.restaurant;
+          if (restaurantObj && typeof restaurantObj === "object") {
+            const addr = restaurantObj.address;
+            if (addr) {
+              if (typeof addr === "string") {
+                restaurantFullAddress = addr;
+              } else if (typeof addr === "object") {
+                restaurantFullAddress = [
+                  addr.detail,
+                  addr.ward,
+                  addr.district,
+                  addr.city || addr.province,
+                ]
+                  .filter(Boolean)
+                  .join(", ");
+              }
+            }
+          }
+        }
+
+        // If restaurant address not found in product, try to fetch from Restaurant Service
+        if (!restaurantFullAddress || restaurantFullAddress.trim() === "") {
+          // Try to fetch restaurant info from Restaurant Service if restaurantId is valid ObjectId
+          const isValidObjectId = (str) => {
+            if (!str || typeof str !== "string") return false;
+            return /^[0-9a-fA-F]{24}$/.test(str);
+          };
+
+          if (group.restaurantId && group.restaurantId !== "unknown" && isValidObjectId(group.restaurantId)) {
+            try {
+              const restaurantResponse = await restaurantApi.getRestaurant(group.restaurantId);
+              const restaurant = restaurantResponse?.data?.restaurant;
+              
+              if (restaurant?.address) {
+                const addr = restaurant.address;
+                if (typeof addr === 'object' && addr !== null) {
+                  restaurantFullAddress = [
+                    addr.detail,
+                    addr.ward,
+                    addr.district,
+                    addr.city || addr.province
+                  ].filter(Boolean).join(', ');
+                  
+                  // Note: restaurantName will be saved in shippingDetails below
+                  // Don't mutate group object directly
+                } else if (typeof addr === 'string') {
+                  restaurantFullAddress = addr;
+                }
+              }
+            } catch (fetchError) {
+              console.warn(`Could not fetch restaurant ${group.restaurantId}:`, fetchError.message);
+            }
+          }
+        }
+
+        if (!restaurantFullAddress || restaurantFullAddress.trim() === "") {
+          // Use default fee if restaurant address still not available
+          console.warn(
+            `Restaurant address not found for group ${group.restaurantId}. Using default shipping fee.`
+          );
+          return {
+            restaurantId: group.restaurantId,
+            restaurantName:
+              group.restaurantName || `Nhà hàng ${group.restaurantId}`,
+            fee: 20000,
+            distance: null,
+            restaurantAddress: null,
+            deliveryAddress: userFullAddress,
+          };
+        }
+
+        try {
+          const response = await orderApi.calculateShippingFee({
+            restaurantAddress: restaurantFullAddress,
+            userAddress: userFullAddress,
+          });
+
+          console.log(
+            `[CartPage] Shipping fee response for ${group.restaurantId}:`,
+            response
+          );
+
+          // Use restaurantName from group (already set when grouping)
+          // Try multiple sources for restaurant name
+          const restaurantName =
+            group.restaurantName ||
+            group.items[0]?.product?.restaurantName ||
+            group.items[0]?.product?.restaurant?.restaurantName ||
+            group.items[0]?.product?.restaurantInfo?.restaurantName ||
+            `Nhà hàng ${group.restaurantId}`;
+
+          // Response interceptor returns response.data directly
+          // Backend returns: { status: "success", data: { shippingFee, distance, ... } }
+          // After interceptor, response = { status: "success", data: { shippingFee, distance, ... } }
+          // So we need response.data to get the actual shipping data
+          const shippingData = response?.data || {};
+
+          console.log(
+            `[CartPage] Shipping data for ${group.restaurantId}:`,
+            shippingData
+          );
+
+          return {
+            restaurantId: group.restaurantId,
+            restaurantName,
+            fee: shippingData?.shippingFee || 20000,
+            distance:
+              shippingData?.distance !== undefined &&
+              shippingData?.distance !== null
+                ? parseFloat(shippingData.distance)
+                : null,
+            restaurantAddress:
+              shippingData?.restaurantAddress || restaurantFullAddress,
+            deliveryAddress: shippingData?.deliveryAddress || userFullAddress,
+          };
+        } catch (error) {
+          console.error(
+            `Error calculating shipping for restaurant ${group.restaurantId}:`,
+            error
+          );
+          console.error(
+            "Error details:",
+            error.response?.data || error.message
+          );
+          // Use default fee if calculation fails
+          const fallbackRestaurantName =
+            group.restaurantName ||
+            group.items[0]?.product?.restaurantName ||
+            group.items[0]?.product?.restaurant?.restaurantName ||
+            group.items[0]?.product?.restaurantInfo?.restaurantName ||
+            `Nhà hàng ${group.restaurantId}`;
+          
+          return {
+            restaurantId: group.restaurantId,
+            restaurantName: fallbackRestaurantName,
+            fee: 20000,
+            distance: null,
+            restaurantAddress: restaurantFullAddress || null,
+            deliveryAddress: userFullAddress,
+          };
+        }
+      });
+
+      try {
+        const results = await Promise.all(feePromises);
+        const feesMap = results.reduce((acc, curr) => {
+          acc[curr.restaurantId] = curr.fee;
+          return acc;
+        }, {});
+
+        const detailsMap = results.reduce((acc, curr) => {
+          acc[curr.restaurantId] = {
+            restaurantName:
+              curr.restaurantName || `Nhà hàng ${curr.restaurantId}`,
+            distance: curr.distance,
+            restaurantAddress: curr.restaurantAddress,
+            deliveryAddress: curr.deliveryAddress,
+          };
+          return acc;
+        }, {});
+
+        setShippingFees(feesMap);
+        setShippingDetails(detailsMap);
+      } catch (error) {
+        console.error("Error calculating shipping fees:", error);
+        setShippingFees({});
+        setShippingDetails({});
+      } finally {
+        setIsCalculatingShipping(false);
+      }
+    };
+
+    calculateShippingFees();
+  }, [user?.address, restaurantGroups, user]);
+
+  // Calculate total shipping fee
+  const totalShippingFee = useMemo(() => {
+    if (Object.keys(shippingFees).length === 0) {
+      // Fallback to estimated fee if calculation not available
+      return restaurantGroups.length * 20000;
+    }
+
+    // Sum up all shipping fees
+    return Object.values(shippingFees).reduce((sum, fee) => sum + fee, 0);
+  }, [shippingFees, restaurantGroups.length]);
+
+  // Calculate estimated shipping fee (fallback)
+  const estimatedShippingFee = useMemo(() => {
+    return restaurantGroups.length * 20000;
+  }, [restaurantGroups.length]);
+
+  // Calculate total with shipping
+  const totalWithShipping = useMemo(() => {
+    const subtotal = getTotalPrice();
+    return subtotal + totalShippingFee;
+  }, [cartItems, totalShippingFee]);
 
   const handleUpdateQuantity = (productId, newQuantity) => {
     if (newQuantity === 0) {
@@ -54,11 +348,21 @@ const CartPage = () => {
     if (confirmModal.productId) {
       removeFromCart(confirmModal.productId);
     }
-    setConfirmModal({ isOpen: false, type: null, productId: null, productName: null });
+    setConfirmModal({
+      isOpen: false,
+      type: null,
+      productId: null,
+      productName: null,
+    });
   };
 
   const handleCloseModal = () => {
-    setConfirmModal({ isOpen: false, type: null, productId: null, productName: null });
+    setConfirmModal({
+      isOpen: false,
+      type: null,
+      productId: null,
+      productName: null,
+    });
   };
 
   const breadcrumbItems = [
@@ -221,8 +525,136 @@ const CartPage = () => {
                 </div>
                 <div className="flex justify-between">
                   <span>Phí vận chuyển:</span>
-                  <span className="text-green-600">Miễn phí</span>
+                  <span>
+                    {isCalculatingShipping ? (
+                      <span className="text-gray-500 flex items-center">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-gray-500 mr-1"></div>
+                        Đang tính...
+                      </span>
+                    ) : totalShippingFee > 0 ? (
+                      <span>
+                        {new Intl.NumberFormat("vi-VN", {
+                          style: "currency",
+                          currency: "VND",
+                        }).format(totalShippingFee)}
+                      </span>
+                    ) : (
+                      <span className="text-green-600">Miễn phí</span>
+                    )}
+                  </span>
                 </div>
+                {restaurantGroups.length > 1 && (
+                  <div className="text-xs text-gray-500 italic mb-2">
+                    * Phí ship được tính theo từng nhà hàng (
+                    {restaurantGroups.length} nhà hàng)
+                  </div>
+                )}
+
+                {/* Detailed shipping information */}
+                {Object.keys(shippingDetails).length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <div className="text-xs font-medium text-gray-700 mb-2">
+                      Chi tiết phí vận chuyển:
+                    </div>
+                    {restaurantGroups.map((group) => {
+                      const detail = shippingDetails[group.restaurantId];
+                      const restaurantName = detail?.restaurantName || group.restaurantName || `Nhà hàng ${group.restaurantId}`;
+                      
+                      if (!detail) {
+                        return null;
+                      }
+
+                      return (
+                        <div
+                          key={group.restaurantId}
+                          className="mb-3 last:mb-0 p-2 bg-gray-50 rounded text-xs"
+                        >
+                          <div className="font-medium text-gray-800 mb-1">
+                            {restaurantName}
+                          </div>
+                          {detail.distance !== null &&
+                          detail.distance !== undefined &&
+                          detail.distance > 0 ? (
+                            <>
+                              <div className="text-gray-600 mb-1">
+                                <span className="font-medium">
+                                  Địa chỉ nhà hàng:
+                                </span>{" "}
+                                {detail.restaurantAddress || 'Chưa có thông tin'}
+                              </div>
+                              <div className="text-gray-600 mb-1">
+                                <span className="font-medium">
+                                  Địa chỉ giao hàng:
+                                </span>{" "}
+                                {detail.deliveryAddress || 'Chưa có thông tin'}
+                              </div>
+                              <div className="text-gray-700 mt-1">
+                                <span className="font-medium">
+                                  Khoảng cách:
+                                </span>{" "}
+                                {parseFloat(detail.distance).toFixed(2)} km
+                                <span className="ml-2 text-primary-600">
+                                  • Phí ship:{" "}
+                                  {new Intl.NumberFormat("vi-VN", {
+                                    style: "currency",
+                                    currency: "VND",
+                                  }).format(
+                                    shippingFees[group.restaurantId] || 20000
+                                  )}
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {detail.restaurantAddress && (
+                                <div className="text-gray-600 mb-1">
+                                  <span className="font-medium">
+                                    Địa chỉ nhà hàng:
+                                  </span>{" "}
+                                  {detail.restaurantAddress}
+                                </div>
+                              )}
+                              {detail.deliveryAddress && (
+                                <div className="text-gray-600 mb-1">
+                                  <span className="font-medium">
+                                    Địa chỉ giao hàng:
+                                  </span>{" "}
+                                  {detail.deliveryAddress}
+                                </div>
+                              )}
+                              <div className="text-gray-600">
+                                Phí ship ước tính:{" "}
+                                {new Intl.NumberFormat("vi-VN", {
+                                  style: "currency",
+                                  currency: "VND",
+                                }).format(
+                                  shippingFees[group.restaurantId] || 20000
+                                )}
+                                {detail.distance === null && (
+                                  <span className="ml-1 text-gray-500">
+                                    (Không thể tính khoảng cách)
+                                  </span>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {user?.address &&
+                  user.address.length > 0 &&
+                  Object.keys(shippingDetails).length === 0 && (
+                    <div className="text-xs text-gray-500 italic mt-2">
+                      * Tính dựa trên địa chỉ mặc định của bạn (
+                      {user.address.find((addr) => addr.isDefault)?.detail ||
+                        user.address[0]?.detail ||
+                        "địa chỉ hiện tại"}
+                      )
+                    </div>
+                  )}
                 <div className="flex justify-between">
                   <span>Giảm giá:</span>
                   <span className="text-red-600">-0đ</span>
@@ -234,9 +666,14 @@ const CartPage = () => {
                       {new Intl.NumberFormat("vi-VN", {
                         style: "currency",
                         currency: "VND",
-                      }).format(getTotalPrice())}
+                      }).format(totalWithShipping)}
                     </span>
                   </div>
+                  <p className="text-xs text-gray-500 mt-1 italic">
+                    {user?.address && user.address.length > 0
+                      ? "* Phí ship đã được tính dựa trên địa chỉ mặc định (20k/km). Bạn có thể thay đổi địa chỉ tại trang thanh toán."
+                      : "* Phí ship sẽ được tính tại trang thanh toán dựa trên địa chỉ giao hàng (20k/km)"}
+                  </p>
                 </div>
               </div>
 
@@ -265,7 +702,7 @@ const CartPage = () => {
               <div className="mt-6 p-4 bg-gray-50 rounded-lg">
                 <h3 className="font-medium mb-2">Lợi ích khi mua hàng:</h3>
                 <ul className="text-sm text-gray-600 space-y-1">
-                  <li>• Giao hàng miễn phí</li>
+                  <li>• Giao hàng nhanh bằng drone</li>
                   <li>• Đổi trả trong 7 ngày</li>
                   <li>• Hỗ trợ 24/7</li>
                   <li>• Bảo hành chính hãng</li>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
@@ -125,6 +125,22 @@ const CheckoutPage_2 = () => {
   };
 
   const restaurantGroups = groupCartByRestaurant();
+
+  // Calculate estimated shipping fee per restaurant group
+  // Default: 20,000 VND per restaurant
+  // Backend will calculate accurate fee when order is created
+  const estimatedShippingFeePerRestaurant = 20000;
+
+  // Calculate total shipping fee (estimated)
+  const totalShippingFee = useMemo(() => {
+    return restaurantGroups.length * estimatedShippingFeePerRestaurant;
+  }, [restaurantGroups.length]);
+
+  // Calculate total with shipping
+  const totalWithShipping = useMemo(() => {
+    const subtotal = getTotalPrice();
+    return subtotal + totalShippingFee;
+  }, [cartItems, totalShippingFee]);
 
   const handleCreateAddress = async (e) => {
     e.preventDefault();
@@ -820,9 +836,14 @@ const CheckoutPage_2 = () => {
                             }).format(group.totalPrice)}
                           </span>
                         </div>
-                        <div className="flex justify-between text-xs text-gray-500 mt-1">
-                          <span>Phí vận chuyển:</span>
-                          <span className="text-green-600">Miễn phí</span>
+                        <div className="flex justify-between text-xs mt-1">
+                          <span className="text-gray-500">Phí vận chuyển:</span>
+                          <span className="text-gray-700 font-medium">
+                            {new Intl.NumberFormat("vi-VN", {
+                              style: "currency",
+                              currency: "VND",
+                            }).format(estimatedShippingFeePerRestaurant)}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -846,15 +867,27 @@ const CheckoutPage_2 = () => {
                         sản phẩm
                       </span>
                     </div>
+                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                      <span>Tổng phí vận chuyển:</span>
+                      <span className="font-medium">
+                        {new Intl.NumberFormat("vi-VN", {
+                          style: "currency",
+                          currency: "VND",
+                        }).format(totalShippingFee)}
+                      </span>
+                    </div>
                     <div className="flex justify-between text-lg font-bold border-t pt-3 mt-3">
                       <span>Tổng cộng:</span>
                       <span className="text-primary-600">
                         {new Intl.NumberFormat("vi-VN", {
                           style: "currency",
                           currency: "VND",
-                        }).format(getTotalPrice())}
+                        }).format(totalWithShipping)}
                       </span>
                     </div>
+                    <p className="text-xs text-gray-500 mt-2 italic">
+                      * Phí ship được tính dựa trên khoảng cách từ nhà hàng đến địa chỉ giao hàng
+                    </p>
                     {restaurantGroups.length > 1 && (
                       <p className="text-xs text-gray-500 mt-2 text-center">
                         ⚠️ Bạn sẽ thanh toán {restaurantGroups.length} đơn hàng

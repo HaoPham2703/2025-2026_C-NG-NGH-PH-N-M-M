@@ -30,6 +30,10 @@ const orderSchema = new mongoose.Schema(
       default: Date.now,
     },
     totalPrice: Number,
+    shippingFee: {
+      type: Number,
+      default: 0,
+    },
     payments: {
       type: String,
       required: [true, "Phải có phương thức thanh toán"],

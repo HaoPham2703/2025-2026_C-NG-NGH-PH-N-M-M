@@ -3,6 +3,9 @@ const orderController = require("../controllers/orderController");
 
 const router = express.Router();
 
+// Shipping fee calculation
+router.route("/shipping-fee").post(orderController.calculateShippingFee);
+
 // Analytics routes
 router.route("/count").get(orderController.countStatus);
 router.route("/countOption").post(orderController.countStatusOption);

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import AddressAutocomplete from "../components/AddressAutocomplete";
+import { restaurantClient } from "../api/axiosClients";
 import {
   User,
   Store,
@@ -96,22 +97,8 @@ const SettingsPage = () => {
   // Update profile mutation
   const updateProfileMutation = useMutation(
     async (data) => {
-      const response = await fetch(
-        "http://localhost:4006/api/restaurant/profile",
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("restaurant_token")}`,
-          },
-          body: JSON.stringify(data),
-        }
-      );
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Cập nhật thất bại");
-      }
-      return response.json();
+      const response = await restaurantClient.put("/restaurant/profile", data);
+      return response;
     },
     {
       onSuccess: (data) => {
@@ -143,22 +130,8 @@ const SettingsPage = () => {
   // Change password mutation
   const changePasswordMutation = useMutation(
     async (data) => {
-      const response = await fetch(
-        "http://localhost:4006/api/restaurant/change-password",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("restaurant_token")}`,
-          },
-          body: JSON.stringify(data),
-        }
-      );
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Đổi mật khẩu thất bại");
-      }
-      return response.json();
+      const response = await restaurantClient.post("/restaurant/change-password", data);
+      return response;
     },
     {
       onSuccess: () => {

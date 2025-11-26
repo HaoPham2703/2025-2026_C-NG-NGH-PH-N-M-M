@@ -19,6 +19,10 @@ export const orderApi = {
   getActiveOrdersCountByRestaurant: (restaurantId) =>
     orderClient.get(`/orders/restaurant/${restaurantId}/active-count`),
 
+  // Calculate shipping fee
+  calculateShippingFee: (data) =>
+    orderClient.post("/orders/shipping-fee", data),
+
   // Analytics
   getOrderStats: () => orderClient.get("/orders/count"),
   getRevenueStats: () => orderClient.get("/orders/sum"),

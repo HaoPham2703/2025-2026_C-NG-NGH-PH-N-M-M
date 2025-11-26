@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "react-query";
 import { restaurantApi } from "../../api/restaurantApi";
 import toast from "react-hot-toast";
+import AddressAutocomplete from "../../components/AddressAutocomplete";
 
 const RestaurantModal = ({ isOpen, onClose, restaurant, mode = "view" }) => {
   const queryClient = useQueryClient();
@@ -56,6 +57,14 @@ const RestaurantModal = ({ isOpen, onClose, restaurant, mode = "view" }) => {
   // Reset form when restaurant changes
   React.useEffect(() => {
     if (restaurant) {
+      const newAddressData = {
+        address: restaurant.address?.detail || "",
+        city: restaurant.address?.city || "",
+        district: restaurant.address?.district || "",
+        ward: restaurant.address?.ward || "",
+      };
+      setAddressData(newAddressData);
+      
       reset({
         ...defaultFormValues,
         restaurantName: restaurant.restaurantName || "",
@@ -72,9 +81,15 @@ const RestaurantModal = ({ isOpen, onClose, restaurant, mode = "view" }) => {
         verified: restaurant.verified || false,
       });
     } else {
+      setAddressData({
+        address: "",
+        city: "",
+        district: "",
+        ward: "",
+      });
       reset(defaultFormValues);
     }
-  }, [restaurant]);
+  }, [restaurant, reset]);
 
   if (!isOpen) return null;
 
@@ -341,29 +356,56 @@ const RestaurantModal = ({ isOpen, onClose, restaurant, mode = "view" }) => {
                   </div>
                 )}
 
-                {/* Address */}
-                <div>
+                {/* Address Section */}
+                <div className="md:col-span-2">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 border-b pb-2">
+                    Địa chỉ nhà hàng
+                  </h4>
+                </div>
+
+                {/* Address Detail */}
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Địa chỉ chi tiết
                   </label>
-                  <input
-                    type="text"
+                  <textarea
                     {...register("address")}
+                    value={addressData.address}
+                    onChange={(e) => {
+                      setAddressData({ ...addressData, address: e.target.value });
+                      setValue("address", e.target.value);
+                    }}
                     disabled={isViewMode}
+                    rows={2}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100"
+                    placeholder="Số nhà, tên đường..."
                   />
                 </div>
 
                 {/* City */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Thành phố/Tỉnh
+                    Tỉnh/Thành phố
                   </label>
+                  {isViewMode ? (
+                    <input
+                      type="text"
+                      value={addressData.city || ""}
+                      disabled
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                    />
+                  ) : (
+                    <AddressAutocomplete
+                      type="province"
+                      value={addressData.city || ""}
+                      onChange={handleProvinceChange}
+                      placeholder="Tỉnh/Thành phố"
+                    />
+                  )}
                   <input
-                    type="text"
+                    type="hidden"
                     {...register("city")}
-                    disabled={isViewMode}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100"
+                    value={addressData.city || ""}
                   />
                 </div>
 
@@ -372,11 +414,27 @@ const RestaurantModal = ({ isOpen, onClose, restaurant, mode = "view" }) => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Quận/Huyện
                   </label>
+                  {isViewMode ? (
+                    <input
+                      type="text"
+                      value={addressData.district || ""}
+                      disabled
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                    />
+                  ) : (
+                    <AddressAutocomplete
+                      type="district"
+                      value={addressData.district || ""}
+                      onChange={handleDistrictChange}
+                      placeholder="Quận/Huyện"
+                      selectedProvince={addressData.city}
+                      disabled={!addressData.city || isViewMode}
+                    />
+                  )}
                   <input
-                    type="text"
+                    type="hidden"
                     {...register("district")}
-                    disabled={isViewMode}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100"
+                    value={addressData.district || ""}
                   />
                 </div>
 
@@ -385,11 +443,28 @@ const RestaurantModal = ({ isOpen, onClose, restaurant, mode = "view" }) => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Phường/Xã
                   </label>
+                  {isViewMode ? (
+                    <input
+                      type="text"
+                      value={addressData.ward || ""}
+                      disabled
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
+                    />
+                  ) : (
+                    <AddressAutocomplete
+                      type="ward"
+                      value={addressData.ward || ""}
+                      onChange={handleWardChange}
+                      placeholder="Phường/Xã"
+                      selectedProvince={addressData.city}
+                      selectedDistrict={addressData.district}
+                      disabled={!addressData.district || isViewMode}
+                    />
+                  )}
                   <input
-                    type="text"
+                    type="hidden"
                     {...register("ward")}
-                    disabled={isViewMode}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100"
+                    value={addressData.ward || ""}
                   />
                 </div>
 

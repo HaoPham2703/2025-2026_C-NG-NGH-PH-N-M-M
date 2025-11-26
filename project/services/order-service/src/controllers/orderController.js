@@ -249,12 +249,34 @@ exports.createOrder = catchAsync(async (req, res, next) => {
     }
   }
 
-  // Create order with restaurant ID and info
+  // Calculate shipping fee based on addresses
+  let shippingFee = 0;
+  if (restaurantAddress && req.body.address) {
+    try {
+      const { calculateShippingFeeByAddress } = require("../utils/shippingFee");
+      shippingFee = await calculateShippingFeeByAddress(
+        restaurantAddress,
+        req.body.address
+      );
+    } catch (error) {
+      console.error("[Order Controller] Error calculating shipping fee:", error.message);
+      // Use default fee if calculation fails
+      shippingFee = 20000;
+    }
+  } else {
+    // Default fee if addresses are not available
+    shippingFee = 20000;
+  }
+
+  // Create order with restaurant ID and info, including shipping fee
   const orderData = {
     ...req.body,
     restaurant: restaurantId,
     restaurantAddress,
     restaurantName,
+    shippingFee,
+    // Update totalPrice to include shipping fee
+    totalPrice: (req.body.totalPrice || 0) + shippingFee,
   };
   const newOrder = await Order.create(orderData);
 
@@ -1212,6 +1234,62 @@ exports.getActiveOrdersCountByRestaurantId = catchAsync(async (req, res, next) =
       hasActiveOrders: activeOrdersCount > 0,
     },
   });
+});
+
+// Calculate shipping fee based on addresses
+exports.calculateShippingFee = catchAsync(async (req, res, next) => {
+  const { restaurantAddress, deliveryAddress } = req.body;
+
+  if (!restaurantAddress || !deliveryAddress) {
+    return next(new AppError("Cần cung cấp địa chỉ nhà hàng và địa chỉ người dùng để tính phí ship", 400));
+  }
+
+  try {
+    const { calculateShippingFeeByAddress, calculateDistance, geocodeAddress } = require("../utils/shippingFee");
+    
+    // Convert delivery address to string if needed
+    let deliveryAddressStr = deliveryAddress;
+    if (typeof deliveryAddress === "object" && deliveryAddress !== null) {
+      if (deliveryAddress.detail && deliveryAddress.ward && deliveryAddress.district && deliveryAddress.province) {
+        deliveryAddressStr = `${deliveryAddress.detail}, ${deliveryAddress.ward}, ${deliveryAddress.district}, ${deliveryAddress.province}`;
+      } else if (deliveryAddress.address) {
+        deliveryAddressStr = deliveryAddress.address;
+      }
+    }
+
+    // Geocode both addresses to get coordinates and calculate distance
+    const [restaurantCoords, deliveryCoords] = await Promise.all([
+      geocodeAddress(restaurantAddress),
+      geocodeAddress(deliveryAddressStr),
+    ]);
+
+    // Calculate distance
+    const distance = calculateDistance(
+      restaurantCoords.latitude,
+      restaurantCoords.longitude,
+      deliveryCoords.latitude,
+      deliveryCoords.longitude
+    );
+
+    // Calculate shipping fee
+    const shippingFee = await calculateShippingFeeByAddress(
+      restaurantAddress,
+      deliveryAddress
+    );
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        shippingFee,
+        distance: parseFloat(distance.toFixed(2)),
+        restaurantAddress: restaurantAddress,
+        deliveryAddress: deliveryAddressStr,
+      },
+    });
+  } catch (error) {
+    console.error("[Order Controller] Error calculating shipping fee:", error.message);
+    return next(new AppError("Không thể tính phí ship. Vui lòng thử lại sau.", 500));
+  }
 });
 
 // Get orders by delivery person ID
