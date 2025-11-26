@@ -145,29 +145,105 @@ const CartPage = () => {
             return /^[0-9a-fA-F]{24}$/.test(str);
           };
 
-          if (group.restaurantId && group.restaurantId !== "unknown" && isValidObjectId(group.restaurantId)) {
+          // Try to fetch restaurant info from public endpoint if restaurantId is valid ObjectId
+          if (
+            group.restaurantId &&
+            group.restaurantId !== "unknown" &&
+            isValidObjectId(group.restaurantId)
+          ) {
             try {
-              const restaurantResponse = await restaurantApi.getRestaurant(group.restaurantId);
-              const restaurant = restaurantResponse?.data?.restaurant;
-              
-              if (restaurant?.address) {
-                const addr = restaurant.address;
-                if (typeof addr === 'object' && addr !== null) {
-                  restaurantFullAddress = [
-                    addr.detail,
-                    addr.ward,
-                    addr.district,
-                    addr.city || addr.province
-                  ].filter(Boolean).join(', ');
-                  
-                  // Note: restaurantName will be saved in shippingDetails below
-                  // Don't mutate group object directly
-                } else if (typeof addr === 'string') {
-                  restaurantFullAddress = addr;
+              // Use public endpoint to get restaurant info (no admin required)
+              const restaurantServiceUrl =
+                process.env.RESTAURANT_SERVICE_URL || "http://localhost:4006";
+              const apiGatewayUrl =
+                process.env.API_GATEWAY_URL || "http://localhost:5001";
+
+              // Try API Gateway first (recommended)
+              let restaurantResponse;
+              try {
+                restaurantResponse = await fetch(
+                  `${apiGatewayUrl}/api/v1/restaurants/${group.restaurantId}/public`,
+                  {
+                    method: "GET",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                  }
+                );
+
+                if (!restaurantResponse.ok) {
+                  throw new Error(`HTTP ${restaurantResponse.status}`);
+                }
+
+                const data = await restaurantResponse.json();
+                const restaurant = data?.data?.restaurant;
+
+                if (restaurant?.address) {
+                  const addr = restaurant.address;
+                  if (typeof addr === "object" && addr !== null) {
+                    restaurantFullAddress = [
+                      addr.detail,
+                      addr.ward,
+                      addr.district,
+                      addr.city || addr.province,
+                    ]
+                      .filter(Boolean)
+                      .join(", ");
+
+                    // Update restaurantName in group for later use
+                    if (restaurant.restaurantName) {
+                      group.restaurantName = restaurant.restaurantName;
+                    }
+                  } else if (typeof addr === "string") {
+                    restaurantFullAddress = addr;
+                  }
+                }
+              } catch (gatewayError) {
+                // Fallback to direct service call
+                console.warn(
+                  `API Gateway failed, trying direct service call:`,
+                  gatewayError.message
+                );
+                restaurantResponse = await fetch(
+                  `${restaurantServiceUrl}/api/v1/restaurant/${group.restaurantId}/public`,
+                  {
+                    method: "GET",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                  }
+                );
+
+                if (restaurantResponse.ok) {
+                  const data = await restaurantResponse.json();
+                  const restaurant = data?.data?.restaurant;
+
+                  if (restaurant?.address) {
+                    const addr = restaurant.address;
+                    if (typeof addr === "object" && addr !== null) {
+                      restaurantFullAddress = [
+                        addr.detail,
+                        addr.ward,
+                        addr.district,
+                        addr.city || addr.province,
+                      ]
+                        .filter(Boolean)
+                        .join(", ");
+
+                      if (restaurant.restaurantName) {
+                        group.restaurantName = restaurant.restaurantName;
+                      }
+                    } else if (typeof addr === "string") {
+                      restaurantFullAddress = addr;
+                    }
+                  }
                 }
               }
             } catch (fetchError) {
-              console.warn(`Could not fetch restaurant ${group.restaurantId}:`, fetchError.message);
+              console.warn(
+                `Could not fetch restaurant ${group.restaurantId}:`,
+                fetchError.message
+              );
             }
           }
         }
@@ -248,7 +324,7 @@ const CartPage = () => {
             group.items[0]?.product?.restaurant?.restaurantName ||
             group.items[0]?.product?.restaurantInfo?.restaurantName ||
             `Nhà hàng ${group.restaurantId}`;
-          
+
           return {
             restaurantId: group.restaurantId,
             restaurantName: fallbackRestaurantName,
@@ -558,8 +634,11 @@ const CartPage = () => {
                     </div>
                     {restaurantGroups.map((group) => {
                       const detail = shippingDetails[group.restaurantId];
-                      const restaurantName = detail?.restaurantName || group.restaurantName || `Nhà hàng ${group.restaurantId}`;
-                      
+                      const restaurantName =
+                        detail?.restaurantName ||
+                        group.restaurantName ||
+                        `Nhà hàng ${group.restaurantId}`;
+
                       if (!detail) {
                         return null;
                       }
@@ -580,13 +659,14 @@ const CartPage = () => {
                                 <span className="font-medium">
                                   Địa chỉ nhà hàng:
                                 </span>{" "}
-                                {detail.restaurantAddress || 'Chưa có thông tin'}
+                                {detail.restaurantAddress ||
+                                  "Chưa có thông tin"}
                               </div>
                               <div className="text-gray-600 mb-1">
                                 <span className="font-medium">
                                   Địa chỉ giao hàng:
                                 </span>{" "}
-                                {detail.deliveryAddress || 'Chưa có thông tin'}
+                                {detail.deliveryAddress || "Chưa có thông tin"}
                               </div>
                               <div className="text-gray-700 mt-1">
                                 <span className="font-medium">

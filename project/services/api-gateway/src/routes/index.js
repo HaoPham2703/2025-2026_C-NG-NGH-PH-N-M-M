@@ -48,6 +48,9 @@ router.use("/api/v1/transactions", verifyToken, proxies.paymentProxy);
 // Restaurant routes - public auth routes and protected routes
 router.use("/api/restaurant/signup", proxies.restaurantProxy);
 router.use("/api/restaurant/login", proxies.restaurantProxy);
+// Public route for getting restaurant info (for shipping calculation)
+router.use("/api/v1/restaurants", proxies.restaurantProxy);
+// Protected restaurant routes
 router.use("/api/restaurant", verifyRestaurantToken, proxies.restaurantProxy);
 
 // Drone routes (optional authentication - allow public access for tracking)

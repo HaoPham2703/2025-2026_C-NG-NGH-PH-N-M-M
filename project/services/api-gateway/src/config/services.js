@@ -29,6 +29,7 @@ const serviceRoutes = {
   "/api/v1/payments": services.payment,
   "/api/v1/transactions": services.payment,
   "/api/restaurant": services.restaurant,
+  "/api/v1/restaurants": services.restaurant, // Public restaurant info endpoint
   "/api/v1/admin/restaurants": services.restaurant,
   "/api/v1/drones": services.drone,
 };

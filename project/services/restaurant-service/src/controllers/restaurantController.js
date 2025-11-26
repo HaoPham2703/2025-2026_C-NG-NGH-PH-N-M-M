@@ -2,6 +2,28 @@ const Restaurant = require("../models/restaurantModel");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 
+// @desc    Get public restaurant info (for shipping fee calculation)
+// @route   GET /api/v1/restaurants/:id/public
+// @access  Public
+exports.getPublicRestaurantInfo = catchAsync(async (req, res, next) => {
+  const restaurant = await Restaurant.findById(req.params.id).select("restaurantName address");
+
+  if (!restaurant) {
+    return next(new AppError("Restaurant not found", 404));
+  }
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      restaurant: {
+        _id: restaurant._id,
+        restaurantName: restaurant.restaurantName,
+        address: restaurant.address,
+      },
+    },
+  });
+});
+
 // @desc    Get restaurant profile
 // @route   GET /api/restaurant/profile
 // @access  Private
