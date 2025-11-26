@@ -10,6 +10,7 @@ const rateLimit = require("express-rate-limit");
 const authRoutes = require("./routes/authRoutes");
 const restaurantRoutes = require("./routes/restaurantRoutes");
 const menuRoutes = require("./routes/menuRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 const AppError = require("./utils/appError");
 
 const app = express();
@@ -85,6 +86,9 @@ app.get("/health", (req, res) => {
 app.use("/api/v1/restaurant", authRoutes);
 app.use("/api/v1/restaurant", restaurantRoutes);
 app.use("/api/v1/restaurant/menu", menuRoutes);
+
+// Admin routes
+app.use("/api/v1/admin", adminRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

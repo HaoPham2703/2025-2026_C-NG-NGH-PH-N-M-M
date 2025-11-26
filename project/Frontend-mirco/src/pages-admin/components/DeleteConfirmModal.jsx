@@ -7,6 +7,7 @@ const DeleteConfirmModal = ({
   itemName,
   itemType = "sản phẩm",
   isLoading = false,
+  warningMessage,
 }) => {
   if (!isOpen) return null;
 
@@ -42,6 +43,11 @@ const DeleteConfirmModal = ({
                   <p className="text-sm text-gray-500 mt-2">
                     Hành động này không thể hoàn tác.
                   </p>
+                  {warningMessage && (
+                    <p className="text-sm text-orange-600 mt-2 bg-orange-50 p-2 rounded">
+                      {warningMessage}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

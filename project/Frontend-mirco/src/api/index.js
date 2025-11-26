@@ -4,6 +4,7 @@ export { productApi } from "./productApi";
 export { orderApi } from "./orderApi";
 export { paymentApi } from "./paymentApi";
 export { droneApi } from "./droneApi";
+export { restaurantApi } from "./restaurantApi";
 export {
   userClient,
   productClient,

@@ -63,3 +63,87 @@ exports.protect = catchAsync(async (req, res, next) => {
   req.restaurant = restaurant;
   next();
 });
+
+// Admin authentication middleware
+// This is used when API Gateway forwards admin requests with x-user header
+exports.requireAdmin = catchAsync(async (req, res, next) => {
+  // Check if user info is passed from API Gateway
+  let user = null;
+
+  // Try to get user from x-user header (from API Gateway)
+  if (req.headers["x-user"]) {
+    try {
+      const userJson = Buffer.from(req.headers["x-user"], "base64").toString(
+        "utf-8"
+      );
+      user = JSON.parse(userJson);
+    } catch (error) {
+      console.error("[Admin Auth] Error parsing x-user header:", error);
+    }
+  }
+
+  // If no user from header, try to verify token directly (fallback)
+  if (!user) {
+    let token;
+    if (
+      req.headers.authorization &&
+      req.headers.authorization.startsWith("Bearer")
+    ) {
+      token = req.headers.authorization.split(" ")[1];
+    }
+
+    if (!token) {
+      return next(
+        new AppError("You are not logged in! Please log in to get access.", 401)
+      );
+    }
+
+    try {
+      const jwt = require("jsonwebtoken");
+      const axios = require("axios");
+
+      // Verify token with User Service
+      const userServiceUrl =
+        process.env.USER_SERVICE_URL || "http://localhost:4001";
+      
+      try {
+        const response = await axios.get(`${userServiceUrl}/verify`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          timeout: 5000,
+        });
+
+        if (response.data.status === "success") {
+          user = response.data.data.user;
+        }
+      } catch (error) {
+        console.error("[Admin Auth] Error verifying token:", error.message);
+        return next(new AppError("Token verification failed.", 401));
+      }
+    } catch (error) {
+      return next(new AppError("Authentication error.", 401));
+    }
+  }
+
+  // Check if user exists and is admin
+  if (!user) {
+    return next(
+      new AppError("You are not logged in! Please log in to get access.", 401)
+    );
+  }
+
+  if (user.role !== "admin") {
+    return next(
+      new AppError(
+        "You do not have permission to perform this action. Admin access required.",
+        403
+      )
+    );
+  }
+
+  // Grant access to protected route
+  req.user = user;
+  req.admin = user;
+  next();
+});

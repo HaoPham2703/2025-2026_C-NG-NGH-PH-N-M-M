@@ -410,3 +410,8 @@ services/*/pids/
 
 # Docker volumes
 docker-volumes/
+project/TEST-ADMIN-FLOW.md
+project/TEST-CASES-EXTENDED.md
+project/TEST-CASES.md
+project/TEST-EXECUTION-CHECKLIST.md
+project/TEST-RESTAURANT-FLOW.md

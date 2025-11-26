@@ -13,6 +13,77 @@ const {
 const moment = require("moment");
 const axios = require("axios");
 
+// Call Payment Service to refund when order is cancelled
+const processRefundOnOrderCancel = async (order) => {
+  try {
+    // Chỉ refund nếu đã thanh toán (không phải COD)
+    if (order.payments === "tiền mặt" || !order.payments) {
+      console.log(
+        `[Order Service] Order ${order._id} is COD, no refund needed`
+      );
+      return { success: true, message: "COD order, no refund needed" };
+    }
+
+    const paymentServiceUrl =
+      process.env.PAYMENT_SERVICE_URL || "http://localhost:4005";
+    const apiGatewayUrl =
+      process.env.API_GATEWAY_URL || "http://localhost:5001";
+
+    // Gọi qua API Gateway hoặc trực tiếp Payment Service
+    const paymentUrl = apiGatewayUrl
+      ? `${apiGatewayUrl}/api/v1/payments/refund/order-cancel`
+      : `${paymentServiceUrl}/api/v1/payments/refund/order-cancel`;
+
+    console.log(
+      `[Order Service] Processing refund for order ${order._id}, payment method: ${order.payments}`
+    );
+
+    const response = await axios.post(
+      paymentUrl,
+      {
+        orderId: order._id.toString(),
+        userId: order.user?.toString() || order.user,
+      },
+      {
+        timeout: 5000,
+      }
+    );
+
+    if (response.data?.status === "success" && response.data?.refunded) {
+      console.log(
+        `[Order Service] Refund processed successfully for order ${order._id}`
+      );
+      return {
+        success: true,
+        refunded: true,
+        refundId: response.data.refundId,
+        amount: response.data.amount,
+      };
+    } else {
+      console.log(
+        `[Order Service] No refund needed for order ${order._id}: ${response.data?.message}`
+      );
+      return {
+        success: true,
+        refunded: false,
+        message: response.data?.message || "No payment found",
+      };
+    }
+  } catch (error) {
+    // Không throw error để không block việc hủy đơn
+    // Chỉ log và tiếp tục
+    console.error(
+      `[Order Service] Error processing refund for order ${order._id}:`,
+      error.message
+    );
+    return {
+      success: false,
+      refunded: false,
+      error: error.message,
+    };
+  }
+};
+
 // Auto-assign available drone to order
 // Uses API Gateway for consistent routing and authentication
 const autoAssignDroneToOrder = async (orderId) => {
@@ -373,8 +444,15 @@ exports.updateOrder = catchAsync(async (req, res, next) => {
     return next(new AppError("Không tìm thấy đơn hàng với ID này", 404));
   }
 
-  // Send appropriate events
+  // Process refund if order is cancelled and already paid
   if (newStatus === "Cancelled") {
+    // Process refund asynchronously (don't block order cancellation)
+    processRefundOnOrderCancel(updatedOrder).catch((error) => {
+      console.error(
+        `[Order Service] Failed to process refund for order ${updatedOrder._id}:`,
+        error
+      );
+    });
     await sendOrderCancelled(updatedOrder);
   } else if (newStatus === "Success") {
     await sendOrderCompleted(updatedOrder);
@@ -670,8 +748,15 @@ exports.updateOrderStatus = catchAsync(async (req, res, next) => {
     }
   }
 
-  // Send appropriate events
+  // Process refund if order is cancelled and already paid
   if (status === "Cancelled") {
+    // Process refund asynchronously (don't block order cancellation)
+    processRefundOnOrderCancel(order).catch((error) => {
+      console.error(
+        `[Order Service] Failed to process refund for order ${order._id}:`,
+        error
+      );
+    });
     await sendOrderCancelled(order);
   } else if (status === "Success") {
     await sendOrderCompleted(order);

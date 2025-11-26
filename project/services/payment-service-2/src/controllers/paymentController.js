@@ -891,6 +891,105 @@ exports.getTransactionsByOrderIds = catchAsync(async (req, res, next) => {
   });
 });
 
+// Refund khi hủy đơn hàng
+exports.refundOnOrderCancel = catchAsync(async (req, res, next) => {
+  try {
+    const { orderId, userId } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({
+        status: "error",
+        message: "orderId is required",
+      });
+    }
+
+    console.log(
+      "[Payment Service 2] refundOnOrderCancel - orderId:",
+      orderId,
+      "userId:",
+      userId
+    );
+
+    // Tìm transaction đã thanh toán cho order này
+    const transaction = await Transaction.findOne({
+      order: orderId,
+      status: "completed", // Chỉ refund các transaction đã thanh toán
+    })
+      .setOptions({ skipPopulate: true })
+      .lean();
+
+    if (!transaction) {
+      console.log(
+        "[Payment Service 2] No completed transaction found for order:",
+        orderId
+      );
+      return res.status(200).json({
+        status: "success",
+        message: "No payment found for this order or order not paid yet",
+        refunded: false,
+      });
+    }
+
+    // Kiểm tra xem đã refund chưa
+    const existingRefund = await Transaction.findOne({
+      order: orderId,
+      payments: "refund",
+      status: "completed",
+    })
+      .setOptions({ skipPopulate: true })
+      .lean();
+
+    if (existingRefund) {
+      console.log(
+        "[Payment Service 2] Refund already exists for order:",
+        orderId
+      );
+      return res.status(200).json({
+        status: "success",
+        message: "Refund already processed",
+        refunded: true,
+        refundId: existingRefund._id,
+      });
+    }
+
+    // Tạo refund record
+    const refundRecord = {
+      user: userId || transaction.user,
+      amount: -transaction.amount, // Negative for refund
+      payments: "refund",
+      order: orderId,
+      invoicePayment: {
+        originalTransactionId: transaction._id,
+        refundDate: new Date().toISOString(),
+        reason: "Order cancelled",
+      },
+      status: "completed",
+    };
+
+    const refundTransaction = await Transaction.create(refundRecord);
+    await sendRefundCreated(refundTransaction);
+
+    console.log(
+      "[Payment Service 2] Refund created successfully:",
+      refundTransaction._id
+    );
+
+    res.status(200).json({
+      status: "success",
+      message: "Refund processed successfully",
+      refunded: true,
+      refundId: refundTransaction._id,
+      amount: transaction.amount,
+    });
+  } catch (error) {
+    console.error("[Payment Service 2] Error in refundOnOrderCancel:", error);
+    return res.status(500).json({
+      status: "error",
+      message: error.message || "Failed to process refund",
+    });
+  }
+});
+
 // Tạo transaction cho tất cả payment methods (COD, VNPay, MoMo, etc.)
 exports.createTransaction = catchAsync(async (req, res, next) => {
   try {

@@ -115,16 +115,40 @@ const CheckoutPage = () => {
       });
 
       // Create all orders in parallel
-      const orderResponses = await Promise.all(orderPromises);
+      const orderResponses = await Promise.allSettled(orderPromises);
       console.log("All order responses:", orderResponses);
 
       // Check if all orders were created successfully
-      const successfulOrders = orderResponses.filter(
-        (response) => response.status === "success" && response.data?.order
+      const successfulOrders = orderResponses
+        .filter((response) => {
+          if (response.status === "fulfilled") {
+            return (
+              response.value?.status === "success" &&
+              response.value?.data?.order
+            );
+          }
+          return false;
+        })
+        .map((response) => response.value);
+
+      const failedOrders = orderResponses.filter(
+        (response) => response.status === "rejected"
       );
 
+      // Show detailed error messages for failed orders
+      if (failedOrders.length > 0) {
+        failedOrders.forEach((failed) => {
+          const error = failed.reason;
+          const errorMessage =
+            error?.response?.data?.message ||
+            error?.message ||
+            "Không thể tạo đơn hàng";
+          toast.error(errorMessage, { duration: 5000 });
+        });
+      }
+
       if (successfulOrders.length === 0) {
-        toast.error("Không thể tạo đơn hàng. Vui lòng thử lại.");
+        toast.error("Không thể tạo đơn hàng. Vui lòng kiểm tra lại giỏ hàng.");
         setIsSubmitting(false);
         return;
       }

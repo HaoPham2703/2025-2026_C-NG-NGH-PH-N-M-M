@@ -73,6 +73,12 @@ router.use(
   requireAdmin,
   proxies.paymentProxy
 );
+router.use(
+  "/api/v1/admin/restaurants",
+  verifyToken,
+  requireAdmin,
+  proxies.restaurantProxy
+);
 
 // Catch all for undefined routes
 router.all("*", (req, res) => {

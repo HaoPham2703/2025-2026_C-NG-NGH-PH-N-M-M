@@ -24,6 +24,7 @@ router
 
 // Refund routes
 router.route("/refund").post(paymentController.createRefund);
+router.route("/refund/order-cancel").post(paymentController.refundOnOrderCancel);
 
 // Transaction routes
 router

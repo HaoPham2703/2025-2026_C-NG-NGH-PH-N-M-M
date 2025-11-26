@@ -1,7 +1,8 @@
 import React from "react";
-import { useParams } from "react-router-dom";
-import { useQuery } from "react-query";
+import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "react-query";
 import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
 import { orderApi } from "../api/orderApi";
 import { paymentApi2 } from "../api/paymentApi2";
 import {
@@ -19,6 +20,8 @@ import Breadcrumb from "../components/Breadcrumb";
 
 const OrderDetailPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const {
     data: order,
@@ -41,6 +44,40 @@ const OrderDetailPage = () => {
       enabled: !!id, // Luôn query khi có orderId
     }
   );
+
+  // Mutation để hủy đơn hàng
+  const cancelOrderMutation = useMutation(
+    ({ orderId, status }) => orderApi.updateOrder(orderId, { status }),
+    {
+      onSuccess: (data, variables) => {
+        toast.success(
+          "Đã hủy đơn hàng thành công. Nếu đã thanh toán, tiền sẽ được hoàn lại trong vòng 3-5 ngày làm việc."
+        );
+        // Refetch orders để cập nhật danh sách
+        queryClient.invalidateQueries("orders");
+        queryClient.invalidateQueries(["order", id]);
+        // Navigate về trang đơn hàng sau 2 giây
+        setTimeout(() => {
+          navigate("/orders");
+        }, 2000);
+      },
+      onError: (error) => {
+        toast.error(
+          error?.response?.data?.message || "Có lỗi xảy ra khi hủy đơn hàng"
+        );
+      },
+    }
+  );
+
+  const handleCancelOrder = (orderId) => {
+    if (
+      window.confirm(
+        "Bạn có chắc chắn muốn hủy đơn hàng này? Nếu đã thanh toán, tiền sẽ được hoàn lại. Hành động này không thể hoàn tác."
+      )
+    ) {
+      cancelOrderMutation.mutate({ orderId, status: "Cancelled" });
+    }
+  };
 
   // Debug logging - chỉ log khi có data
   React.useEffect(() => {
@@ -499,9 +536,22 @@ const OrderDetailPage = () => {
                   )}
 
                   {orderData.status === "Processed" && (
-                    <button className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors duration-200 shadow-md flex items-center justify-center gap-2">
-                      <XCircle className="w-5 h-5" />
-                      Hủy đơn hàng
+                    <button
+                      onClick={() => handleCancelOrder(orderData._id)}
+                      disabled={cancelOrderMutation.isLoading}
+                      className="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors duration-200 shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {cancelOrderMutation.isLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          Đang xử lý...
+                        </>
+                      ) : (
+                        <>
+                          <XCircle className="w-5 h-5" />
+                          Hủy đơn hàng
+                        </>
+                      )}
                     </button>
                   )}
 

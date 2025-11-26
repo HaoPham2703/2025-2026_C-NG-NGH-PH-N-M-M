@@ -413,12 +413,45 @@ exports.checkInventory = catchAsync(async (req, res, next) => {
     }
   }
 
+  // Build detailed error message for products with insufficient inventory
+  const failedProducts = results.filter((r) => !r.success);
+  let errorMessage = "Some products have insufficient inventory";
+  
+  if (failedProducts.length > 0) {
+    // Get product names for failed products
+    const productInfo = [];
+    for (const item of failedProducts) {
+      const product = await Product.findById(item.id);
+      if (product) {
+        productInfo.push({
+          name: product.title,
+          available: item.available,
+          requested: item.requested,
+        });
+      }
+    }
+    
+    if (productInfo.length > 0) {
+      const productNames = productInfo.map((p) => p.name).join(", ");
+      errorMessage = `Sản phẩm không đủ tồn kho: ${productNames}. `;
+      productInfo.forEach((info) => {
+        errorMessage += `${info.name}: Còn ${info.available}, Yêu cầu ${info.requested}. `;
+      });
+    }
+  }
+
   res.status(200).json({
     success: allAvailable,
     message: allAvailable
       ? "All products have sufficient inventory"
-      : "Some products have insufficient inventory",
+      : errorMessage,
     results,
+    failedProducts: failedProducts.map((item) => ({
+      id: item.id,
+      message: item.message,
+      available: item.available,
+      requested: item.requested,
+    })),
   });
 });
 

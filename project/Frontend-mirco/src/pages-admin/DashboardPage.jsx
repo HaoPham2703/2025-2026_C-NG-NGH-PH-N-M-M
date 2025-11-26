@@ -14,6 +14,7 @@ import {
   User as UserIcon,
   ChevronDown,
   CreditCard,
+  Store,
 } from "lucide-react";
 
 // Import các sub-pages
@@ -24,6 +25,7 @@ import CustomersManagementPage from "./CustomersManagementPage";
 import PaymentsManagementPage from "./PaymentsManagementPage";
 import AnalyticsPage from "./AnalyticsPage";
 import SettingsPage from "./SettingsPage";
+import RestaurantsManagementPage from "./RestaurantsManagementPage";
 
 const DashboardPage = () => {
   const { user, logout } = useAuth();
@@ -53,6 +55,8 @@ const DashboardPage = () => {
         return <AnalyticsPage />;
       case "settings":
         return <SettingsPage />;
+      case "restaurants":
+        return <RestaurantsManagementPage />;
       default:
         return <DashboardContent />;
     }
@@ -67,6 +71,7 @@ const DashboardPage = () => {
       payments: "Quản lý thanh toán",
       analytics: "Thống kê & Báo cáo",
       settings: "Cài đặt hệ thống",
+      restaurants: "Quản lý nhà hàng",
     };
     return titles[activeNav] || "Dashboard";
   };
@@ -75,6 +80,7 @@ const DashboardPage = () => {
     { id: "dashboard", name: "Tổng quan", icon: BarChart3 },
     { id: "orders", name: "Đơn hàng", icon: ShoppingBag },
     { id: "menu", name: "Sản phẩm", icon: Package },
+    { id: "restaurants", name: "Nhà hàng", icon: Store },
     { id: "customers", name: "Khách hàng", icon: Users },
     { id: "payments", name: "Thanh toán", icon: CreditCard },
     { id: "analytics", name: "Thống kê", icon: TrendingUp },
