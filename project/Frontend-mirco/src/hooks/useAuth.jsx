@@ -219,6 +219,28 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const deleteAccount = async () => {
+    try {
+      const response = await authApi.deleteAccount();
+      if (response.status === "success") {
+        // Clear local storage and logout
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        setUser(null);
+        toast.success("Tài khoản đã được xóa thành công!");
+        return { success: true, data: response.data };
+      }
+    } catch (error) {
+      console.error("Delete account failed:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        "Không thể xóa tài khoản";
+      toast.error(errorMessage);
+      return { success: false, error: errorMessage };
+    }
+  };
+
   const value = {
     user,
     loading,
@@ -231,6 +253,7 @@ export const AuthProvider = ({ children }) => {
     updateAddress,
     deleteAddress,
     setDefaultAddress,
+    deleteAccount,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

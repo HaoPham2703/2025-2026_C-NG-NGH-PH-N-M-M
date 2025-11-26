@@ -10,7 +10,8 @@ export const restaurantApi = {
   getRestaurant: (id) => userClient.get(`/api/v1/admin/restaurants/${id}`),
 
   // Create restaurant
-  createRestaurant: (data) => userClient.post("/api/v1/admin/restaurants", data),
+  createRestaurant: (data) =>
+    userClient.post("/api/v1/admin/restaurants", data),
 
   // Update restaurant
   updateRestaurant: (id, data) =>
@@ -29,6 +30,9 @@ export const restaurantApi = {
     userClient.patch(`/api/v1/admin/restaurants/${id}/verify`),
 
   // Get restaurant statistics
-  getRestaurantStats: () =>
-    userClient.get("/api/v1/admin/restaurants/stats"),
+  getRestaurantStats: () => userClient.get("/api/v1/admin/restaurants/stats"),
+
+  // Check active orders for restaurant
+  checkActiveOrders: (id) =>
+    userClient.get(`/api/v1/admin/restaurants/${id}/check-orders`),
 };

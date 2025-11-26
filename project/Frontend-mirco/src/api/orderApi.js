@@ -15,6 +15,10 @@ export const orderApi = {
   getOrdersByRestaurant: (restaurantId) =>
     orderClient.get(`/orders/restaurant/${restaurantId}`),
 
+  // Get active orders count by restaurant ID (optimized for status checking)
+  getActiveOrdersCountByRestaurant: (restaurantId) =>
+    orderClient.get(`/orders/restaurant/${restaurantId}/active-count`),
+
   // Analytics
   getOrderStats: () => orderClient.get("/orders/count"),
   getRevenueStats: () => orderClient.get("/orders/sum"),

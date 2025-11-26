@@ -1182,6 +1182,38 @@ exports.getOrdersByRestaurantId = catchAsync(async (req, res, next) => {
   });
 });
 
+// Get active orders count by restaurant ID (optimized for status checking)
+exports.getActiveOrdersCountByRestaurantId = catchAsync(async (req, res, next) => {
+  const { restaurantId } = req.params;
+
+  const mongoose = require("mongoose");
+  let restaurantQuery;
+
+  // Build restaurant query
+  if (mongoose.Types.ObjectId.isValid(restaurantId)) {
+    restaurantQuery = { restaurant: new mongoose.Types.ObjectId(restaurantId) };
+  } else {
+    restaurantQuery = { restaurant: restaurantId };
+  }
+
+  // Active order statuses
+  const activeOrderStatuses = ["Processed", "Waiting Goods", "Delivery"];
+
+  // Count only active orders - much faster than fetching all
+  const activeOrdersCount = await Order.countDocuments({
+    ...restaurantQuery,
+    status: { $in: activeOrderStatuses }
+  }).maxTimeMS(5000); // 5 second timeout for count query
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      activeOrdersCount,
+      hasActiveOrders: activeOrdersCount > 0,
+    },
+  });
+});
+
 // Get orders by delivery person ID
 exports.getOrdersByDeliveryPersonId = catchAsync(async (req, res, next) => {
   const { deliveryPersonId } = req.params;

@@ -37,7 +37,11 @@ router.route("/:id/status").patch(orderController.updateOrderStatus);
 router.route("/:id/delivery").patch(orderController.assignDeliveryPerson);
 
 // Order queries by user/restaurant/delivery
+// IMPORTANT: More specific routes must come before less specific ones
 router.route("/user/:userId").get(orderController.getOrdersByUserId);
+router
+  .route("/restaurant/:restaurantId/active-count")
+  .get(orderController.getActiveOrdersCountByRestaurantId);
 router
   .route("/restaurant/:restaurantId")
   .get(orderController.getOrdersByRestaurantId);

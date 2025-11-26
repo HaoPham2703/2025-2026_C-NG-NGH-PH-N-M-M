@@ -15,8 +15,10 @@ import {
 } from "lucide-react";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
 import RestaurantModal from "./components/RestaurantModal";
+import WarningModal from "./components/WarningModal";
 import Pagination from "./components/Pagination";
 import toast from "react-hot-toast";
+import { orderApi } from "../api";
 
 const RestaurantsManagementPage = () => {
   const queryClient = useQueryClient();
@@ -26,6 +28,9 @@ const RestaurantsManagementPage = () => {
   const [modalMode, setModalMode] = useState(null); // 'view', 'edit', 'create'
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [restaurantToDelete, setRestaurantToDelete] = useState(null);
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [warningData, setWarningData] = useState(null);
+  const [pendingStatusChange, setPendingStatusChange] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
@@ -76,27 +81,27 @@ const RestaurantsManagementPage = () => {
     {
       onSuccess: (data) => {
         toast.success("Xóa nhà hàng thành công!");
-        
+
         // Show info about order handling if available
         if (data?.data?.orderHandling) {
           const handling = data.data.orderHandling;
           if (handling.totalOrders > 0) {
             toast.success(
-              `Đã xử lý ${handling.ordersProcessed || 0} đơn hàng và hoàn tiền ${handling.refundsProcessed || 0} đơn.`,
+              `Đã xử lý ${
+                handling.ordersProcessed || 0
+              } đơn hàng và hoàn tiền ${handling.refundsProcessed || 0} đơn.`,
               { duration: 5000 }
             );
           }
         }
-        
+
         queryClient.invalidateQueries("restaurants");
         queryClient.invalidateQueries("restaurantStats");
         setShowDeleteModal(false);
         setRestaurantToDelete(null);
       },
       onError: (error) => {
-        toast.error(
-          error.response?.data?.message || "Xóa nhà hàng thất bại!"
-        );
+        toast.error(error.response?.data?.message || "Xóa nhà hàng thất bại!");
       },
     }
   );
@@ -140,7 +145,59 @@ const RestaurantsManagementPage = () => {
     }
   );
 
-  const handleStatusChange = (restaurant, newStatus) => {
+  // Check active orders before changing status
+  // Tối ưu: Chỉ check count thay vì lấy tất cả orders
+  const checkActiveOrders = async (restaurantId) => {
+    try {
+      // Use optimized endpoint that only counts active orders (much faster)
+      const countResponse = await orderApi.getActiveOrdersCountByRestaurant(
+        restaurantId
+      );
+
+      const activeOrdersCount = countResponse?.data?.activeOrdersCount || 0;
+      const hasActiveOrders = countResponse?.data?.hasActiveOrders || false;
+
+      return {
+        hasActiveOrders: hasActiveOrders,
+        activeOrdersCount: activeOrdersCount,
+        activeOrders: [],
+      };
+    } catch (error) {
+      console.error("Error checking active orders:", error);
+      // If we can't check, allow the operation (backend will validate)
+      // Show error to user but don't block the action
+      toast.error("Không thể kiểm tra đơn hàng. Vui lòng thử lại.");
+      return {
+        hasActiveOrders: false,
+        activeOrdersCount: 0,
+        activeOrders: [],
+      };
+    }
+  };
+
+  const handleStatusChange = async (restaurant, newStatus) => {
+    // Only check for active orders if trying to lock or suspend
+    if (newStatus === "inactive" || newStatus === "suspended") {
+      // Only check if current status is active
+      if (restaurant.status === "active") {
+        const activeOrdersCheck = await checkActiveOrders(restaurant._id);
+
+        if (activeOrdersCheck.hasActiveOrders) {
+          setWarningData({
+            title: `Không thể ${
+              newStatus === "inactive" ? "ngừng hoạt động" : "khóa"
+            } nhà hàng`,
+            message: `Nhà hàng "${restaurant.restaurantName}" đang có đơn hàng đang xử lý.`,
+            ordersCount: activeOrdersCheck.activeOrdersCount,
+          });
+          setPendingStatusChange({ restaurant, newStatus });
+          setShowWarningModal(true);
+          return;
+        }
+      }
+    }
+
+    // No active orders, proceed with status change
     statusMutation.mutate({ id: restaurant._id, status: newStatus });
   };
 
@@ -391,7 +448,9 @@ const RestaurantsManagementPage = () => {
 
               {/* Status Actions */}
               <div className="mt-3 pt-3 border-t border-gray-200">
-                <div className="text-xs text-gray-600 mb-2">Thay đổi trạng thái:</div>
+                <div className="text-xs text-gray-600 mb-2">
+                  Thay đổi trạng thái:
+                </div>
                 <div className="flex gap-2 flex-wrap">
                   {restaurant.status !== "active" && (
                     <button
@@ -411,7 +470,9 @@ const RestaurantsManagementPage = () => {
                   )}
                   {restaurant.status !== "suspended" && (
                     <button
-                      onClick={() => handleStatusChange(restaurant, "suspended")}
+                      onClick={() =>
+                        handleStatusChange(restaurant, "suspended")
+                      }
                       className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 rounded text-xs"
                     >
                       Khóa
@@ -467,6 +528,18 @@ const RestaurantsManagementPage = () => {
         itemType="nhà hàng"
         isLoading={deleteMutation.isLoading}
         warningMessage="Việc xóa nhà hàng sẽ tự động hủy các đơn hàng chưa hoàn thành và hoàn tiền cho khách hàng nếu đã thanh toán."
+      />
+
+      <WarningModal
+        isOpen={showWarningModal}
+        onClose={() => {
+          setShowWarningModal(false);
+          setWarningData(null);
+          setPendingStatusChange(null);
+        }}
+        title={warningData?.title || "Cảnh báo"}
+        message={warningData?.message || ""}
+        ordersCount={warningData?.ordersCount || 0}
       />
     </div>
   );

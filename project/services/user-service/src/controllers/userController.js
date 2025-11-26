@@ -51,12 +51,223 @@ exports.updateMe = catchAsync(async (req, res, next) => {
   });
 });
 
-exports.deleteMe = catchAsync(async (req, res, next) => {
-  await User.findByIdAndUpdate(req.user.id, { active: "ban" });
+// Helper function to check and handle orders when deleting user account
+const handleUserOrdersOnDelete = async (userId, authHeader = null) => {
+  try {
+    const axios = require("axios");
+    const orderServiceUrl =
+      process.env.ORDER_SERVICE_URL || "http://localhost:4003";
+    const apiGatewayUrl =
+      process.env.API_GATEWAY_URL || "http://localhost:5001";
 
-  res.status(204).json({
+    // Get all orders for this user
+    const orderUrl = `${orderServiceUrl}/api/v1/orders/user/${userId}`;
+
+    let orders = [];
+    try {
+      const orderResponse = await axios.get(orderUrl, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: authHeader || "",
+          "x-user": Buffer.from(
+            JSON.stringify({
+              id: userId,
+              role: "user",
+            })
+          ).toString("base64"),
+        },
+        timeout: 15000,
+      });
+
+      orders = orderResponse.data?.data?.orders || [];
+    } catch (error) {
+      console.error(
+        `[User Controller] Error fetching orders for user ${userId}:`,
+        error.message
+      );
+      return {
+        success: false,
+        error: "Failed to fetch orders",
+        orders: [],
+      };
+    }
+
+    if (!Array.isArray(orders) || orders.length === 0) {
+      return {
+        success: true,
+        ordersProcessed: 0,
+        refundsProcessed: 0,
+        orders: [],
+      };
+    }
+
+    // Process each order
+    const results = {
+      ordersProcessed: 0,
+      refundsProcessed: 0,
+      cancelledOrders: [],
+      failedRefunds: [],
+    };
+
+    for (const order of orders) {
+      // Skip if order is already completed or cancelled
+      if (order.status === "Success" || order.status === "Cancelled") {
+        continue;
+      }
+
+      try {
+        // Cancel the order by updating status to "Cancelled"
+        const cancelUrl = `${orderServiceUrl}/api/v1/orders/${order._id}/status`;
+
+        await axios.patch(
+          cancelUrl,
+          {
+            status: "Cancelled",
+          },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              "x-user": Buffer.from(
+                JSON.stringify({
+                  id: userId,
+                  role: "user",
+                })
+              ).toString("base64"),
+            },
+            timeout: 15000,
+          }
+        );
+
+        results.cancelledOrders.push(order._id);
+        results.ordersProcessed++;
+
+        // Process refund if payment was made (not COD)
+        if (
+          order.payments &&
+          order.payments !== "tiền mặt" &&
+          order.totalPrice > 0
+        ) {
+          try {
+            const paymentServiceUrl =
+              process.env.PAYMENT_SERVICE_URL || "http://localhost:4004";
+            const paymentService2Url =
+              process.env.PAYMENT_SERVICE_2_URL || "http://localhost:3005";
+
+            // Try payment service 2 first (VNPay/MoMo)
+            let refundUrl = `${paymentService2Url}/api/v1/payments/refund`;
+
+            try {
+              const refundResponse = await axios.post(
+                refundUrl,
+                {
+                  orderId: order._id.toString(),
+                  userId: userId.toString(),
+                  amount: order.totalPrice,
+                  reason: "Tài khoản người dùng đã bị xóa",
+                },
+                {
+                  timeout: 10000,
+                }
+              );
+
+              if (refundResponse.data?.status === "success") {
+                results.refundsProcessed++;
+              }
+            } catch (refundError) {
+              // Try payment service 1
+              refundUrl = `${paymentServiceUrl}/api/v1/payments/refund`;
+
+              try {
+                const refundResponse = await axios.post(
+                  refundUrl,
+                  {
+                    orderId: order._id.toString(),
+                    userId: userId.toString(),
+                    amount: order.totalPrice,
+                    reason: "Tài khoản người dùng đã bị xóa",
+                  },
+                  {
+                    timeout: 10000,
+                  }
+                );
+
+                if (refundResponse.data?.status === "success") {
+                  results.refundsProcessed++;
+                }
+              } catch (error2) {
+                console.error(
+                  `[User Controller] Failed to refund order ${order._id}:`,
+                  error2.message
+                );
+                results.failedRefunds.push({
+                  orderId: order._id,
+                  error: error2.message,
+                });
+              }
+            }
+          } catch (refundError) {
+            console.error(
+              `[User Controller] Refund error for order ${order._id}:`,
+              refundError.message
+            );
+            results.failedRefunds.push({
+              orderId: order._id,
+              error: refundError.message,
+            });
+          }
+        }
+      } catch (cancelError) {
+        console.error(
+          `[User Controller] Failed to cancel order ${order._id}:`,
+          cancelError.message
+        );
+      }
+    }
+
+    return {
+      success: true,
+      ...results,
+      totalOrders: orders.length,
+    };
+  } catch (error) {
+    console.error(
+      `[User Controller] Error handling orders for user ${userId}:`,
+      error.message
+    );
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
+exports.deleteMe = catchAsync(async (req, res, next) => {
+  const userId = req.user.id;
+
+  // Handle orders and payments before deleting account
+  const authHeader = req.headers.authorization || null;
+  const orderHandlingResult = await handleUserOrdersOnDelete(
+    userId,
+    authHeader
+  );
+
+  // Delete user account (set active to "ban" or actually delete)
+  // Option 1: Soft delete (set active = "ban") - keeps data for records
+  await User.findByIdAndUpdate(userId, { active: "ban" });
+
+  // Option 2: Hard delete (uncomment if you want to actually delete)
+  // await User.findByIdAndDelete(userId);
+
+  res.status(200).json({
     status: "success",
-    data: null,
+    message: "Tài khoản đã được xóa thành công",
+    data: {
+      deletedUser: {
+        id: userId,
+        email: req.user.email,
+      },
+      orderHandling: orderHandlingResult,
+    },
   });
 });
 

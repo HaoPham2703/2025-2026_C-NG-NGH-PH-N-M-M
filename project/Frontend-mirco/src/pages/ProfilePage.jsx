@@ -15,10 +15,17 @@ import {
   Trash2,
   Star,
   Plus,
+  LogOut,
+  AlertTriangle,
 } from "lucide-react";
 import Breadcrumb from "../components/Breadcrumb";
+import { useNavigate } from "react-router-dom";
+import DeleteConfirmModal from "../pages-admin/components/DeleteConfirmModal";
+import toast from "react-hot-toast";
+import { orderApi } from "../api/orderApi";
 
 const ProfilePage = () => {
+  const navigate = useNavigate();
   const {
     user,
     updateProfile,
@@ -26,6 +33,8 @@ const ProfilePage = () => {
     updateAddress,
     deleteAddress,
     setDefaultAddress,
+    logout,
+    deleteAccount,
   } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isEditingAddress, setIsEditingAddress] = useState(false);
@@ -46,6 +55,8 @@ const ProfilePage = () => {
     ward: "",
     detail: "",
   });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const {
     register,
     handleSubmit,
@@ -231,6 +242,67 @@ const ProfilePage = () => {
       ward: "",
       detail: "",
     });
+  };
+
+  // Check active orders before deleting account
+  const checkActiveOrders = async () => {
+    try {
+      // Get user orders (already filtered by user in backend)
+      const ordersResponse = await orderApi.getOrders();
+      const orders = ordersResponse?.data?.orders || [];
+      
+      // Filter active orders (not Success or Cancelled)
+      const activeOrderStatuses = ["Processed", "Waiting Goods", "Delivery"];
+      const activeOrders = orders.filter((order) =>
+        activeOrderStatuses.includes(order.status)
+      );
+
+      return {
+        hasActiveOrders: activeOrders.length > 0,
+        activeOrdersCount: activeOrders.length,
+      };
+    } catch (error) {
+      console.error("Error checking active orders:", error);
+      // If we can't check, allow deletion (backend will also validate)
+      return {
+        hasActiveOrders: false,
+        activeOrdersCount: 0,
+      };
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    // Check for active orders first
+    const activeOrdersCheck = await checkActiveOrders();
+    
+    if (activeOrdersCheck.hasActiveOrders) {
+      toast.error(
+        `Không thể xóa tài khoản vì đang có ${activeOrdersCheck.activeOrdersCount} đơn hàng đang xử lý. Vui lòng hoàn tất hoặc hủy các đơn hàng trước.`
+      );
+      setShowDeleteModal(false);
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      const result = await deleteAccount();
+      if (result.success) {
+        // Navigate to home page after account deletion
+        setTimeout(() => {
+          navigate("/");
+        }, 2000);
+      }
+    } catch (error) {
+      console.error("Delete account error:", error);
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/");
   };
 
   const breadcrumbItems = [
@@ -770,7 +842,44 @@ const ProfilePage = () => {
             </div>
           </div>
         </div>
+
+        {/* Account Actions Section */}
+        <div className="mt-6 bg-white rounded-xl shadow-lg border border-gray-100 p-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Tài khoản
+          </h2>
+          <div className="space-y-4">
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center px-6 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200"
+            >
+              <LogOut className="w-5 h-5 mr-2" />
+              Đăng xuất
+            </button>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="w-full flex items-center justify-center px-6 py-3 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors duration-200"
+            >
+              <Trash2 className="w-5 h-5 mr-2" />
+              Xóa tài khoản
+            </button>
+            <p className="text-xs text-gray-500 text-center">
+              Khi xóa tài khoản, tất cả đơn hàng đang xử lý sẽ được hủy và hoàn tiền (nếu đã thanh toán).
+            </p>
+          </div>
+        </div>
       </div>
+
+      {/* Delete Account Confirmation Modal */}
+      <DeleteConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteAccount}
+        itemName={user?.name || user?.email || "tài khoản"}
+        itemType="tài khoản"
+        isLoading={isDeleting}
+        warningMessage="Tất cả đơn hàng đang xử lý sẽ được hủy và hoàn tiền. Hành động này không thể hoàn tác!"
+      />
     </div>
   );
 };

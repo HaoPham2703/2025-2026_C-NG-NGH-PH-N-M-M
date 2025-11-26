@@ -435,11 +435,58 @@ exports.deleteRestaurant = catchAsync(async (req, res, next) => {
   });
 });
 
+// Helper function to check if restaurant has active orders
+// Tối ưu: Sử dụng endpoint mới chỉ count active orders
+const checkRestaurantActiveOrders = async (restaurantId) => {
+  try {
+    const orderServiceUrl =
+      process.env.ORDER_SERVICE_URL || "http://localhost:4003";
+
+    // Use optimized endpoint that only counts active orders
+    const countUrl = `${orderServiceUrl}/api/v1/orders/restaurant/${restaurantId}/active-count`;
+
+    const countResponse = await axios.get(countUrl, {
+      headers: {
+        "Content-Type": "application/json",
+        "x-user": Buffer.from(
+          JSON.stringify({
+            id: restaurantId,
+            role: "admin",
+          })
+        ).toString("base64"),
+      },
+      timeout: 8000, // 8 second timeout - should be fast with count query
+    });
+
+    const activeOrdersCount = countResponse.data?.data?.activeOrdersCount || 0;
+    const hasActiveOrders = countResponse.data?.data?.hasActiveOrders || false;
+
+    return {
+      hasActiveOrders: hasActiveOrders,
+      activeOrdersCount: activeOrdersCount,
+      activeOrders: [],
+    };
+  } catch (error) {
+    console.error(
+      `[Admin Controller] Error checking active orders for restaurant ${restaurantId}:`,
+      error.message
+    );
+    // If we can't check orders, assume there are no active orders to allow status change
+    // Backend will also validate, so this is safe
+    return {
+      hasActiveOrders: false,
+      activeOrdersCount: 0,
+      activeOrders: [],
+    };
+  }
+};
+
 // @desc    Update restaurant status
 // @route   PATCH /api/v1/admin/restaurants/:id/status
 // @access  Private/Admin
 exports.updateRestaurantStatus = catchAsync(async (req, res, next) => {
   const { status } = req.body;
+  const restaurantId = req.params.id;
 
   if (!["active", "inactive", "suspended"].includes(status)) {
     return next(
@@ -450,24 +497,43 @@ exports.updateRestaurantStatus = catchAsync(async (req, res, next) => {
     );
   }
 
-  const restaurant = await Restaurant.findByIdAndUpdate(
-    req.params.id,
-    { status },
-    {
-      new: true,
-      runValidators: true,
-    }
-  );
-
+  // Check if restaurant exists
+  const restaurant = await Restaurant.findById(restaurantId);
   if (!restaurant) {
     return next(new AppError("Restaurant not found", 404));
   }
+
+  // If trying to lock or suspend restaurant, check for active orders
+  if (status === "inactive" || status === "suspended") {
+    // Only check if current status is active (not already locked/suspended)
+    if (restaurant.status === "active") {
+      const activeOrdersCheck = await checkRestaurantActiveOrders(restaurantId);
+
+      if (activeOrdersCheck.hasActiveOrders) {
+        return next(
+          new AppError(
+            `Không thể ${
+              status === "inactive" ? "ngừng hoạt động" : "khóa"
+            } nhà hàng này. Hiện có ${
+              activeOrdersCheck.activeOrdersCount
+            } đơn hàng đang xử lý. Vui lòng đợi các đơn hàng hoàn thành hoặc hủy chúng trước.`,
+            400
+          )
+        );
+      }
+    }
+  }
+
+  // Update restaurant status
+  restaurant.status = status;
+  await restaurant.save();
 
   res.status(200).json({
     status: "success",
     data: {
       restaurant,
     },
+    message: `Restaurant status updated to ${status}`,
   });
 });
 

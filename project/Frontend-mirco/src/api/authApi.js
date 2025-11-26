@@ -21,4 +21,7 @@ export const authApi = {
   updateAddress: (data) => userClient.patch("/api/v1/users/updateAddress", data),
   deleteAddress: (data) => userClient.patch("/api/v1/users/deleteAddress", data),
   setDefaultAddress: (data) => userClient.patch("/api/v1/users/setDefaultAddress", data),
+
+  // Delete account
+  deleteAccount: () => userClient.delete("/api/v1/users/deleteMe"),
 };
