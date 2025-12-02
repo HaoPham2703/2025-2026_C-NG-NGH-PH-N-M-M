@@ -1,107 +1,49 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link, useLocation } from "react-router-dom";
+import { useNavigate, Link, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import {
-  BarChart3,
   Package,
-  Users,
-  TrendingUp,
-  ShoppingBag,
   Bell,
   Menu,
   LogOut,
-  Settings,
   User as UserIcon,
   ChevronDown,
+  Navigation,
+  ArrowLeft,
+  BarChart3,
+  Users,
+  TrendingUp,
+  ShoppingBag,
   CreditCard,
   Store,
-  Navigation,
+  Settings,
 } from "lucide-react";
-
-// Import các sub-pages
-import DashboardContent from "./DashboardContent";
-import OrdersManagementPage from "./OrdersManagementPage";
-import ProductsManagementPage from "./ProductsManagementPage";
-import CustomersManagementPage from "./CustomersManagementPage";
-import PaymentsManagementPage from "./PaymentsManagementPage";
-import AnalyticsPage from "./AnalyticsPage";
-import SettingsPage from "./SettingsPage";
-import RestaurantsManagementPage from "./RestaurantsManagementPage";
-import DroneHubPage from "../pages/DroneHubPage";
 import DroneTrackingPage from "../pages/DroneTrackingPage";
-import { useParams } from "react-router-dom";
 
-const DashboardPage = () => {
+const AdminDroneTrackingPage = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const [activeNav, setActiveNav] = useState("dashboard");
+  const { orderId } = useParams();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
-  // Check location state để set activeNav khi navigate từ trang khác
+  // Redirect if not admin
   useEffect(() => {
-    if (location.state?.activeNav) {
-      setActiveNav(location.state.activeNav);
+    if (user && user.role !== "admin") {
+      navigate("/");
+    } else if (!user) {
+      navigate("/admin/login");
     }
-  }, [location.state]);
+  }, [user, navigate]);
 
   const handleLogout = () => {
     logout();
     navigate("/admin/login");
   };
 
-  const renderContent = () => {
-    switch (activeNav) {
-      case "dashboard":
-        return <DashboardContent />;
-      case "orders":
-        return <OrdersManagementPage />;
-      case "menu":
-        return <ProductsManagementPage />;
-      case "customers":
-        return <CustomersManagementPage />;
-      case "payments":
-        return <PaymentsManagementPage />;
-      case "analytics":
-        return <AnalyticsPage />;
-      case "drone-hub":
-        return <DroneHubPage hideHeader={true} />;
-      case "settings":
-        return <SettingsPage />;
-      case "restaurants":
-        return <RestaurantsManagementPage />;
-      default:
-        return <DashboardContent />;
-    }
-  };
-
-  const getPageTitle = () => {
-    const titles = {
-      dashboard: "Tổng quan Dashboard",
-      orders: "Quản lý đơn hàng",
-      menu: "Quản lý sản phẩm",
-      customers: "Quản lý khách hàng",
-      payments: "Quản lý thanh toán",
-      analytics: "Thống kê & Báo cáo",
-      "drone-hub": "Drone Hub - Điều Khiển",
-      settings: "Cài đặt hệ thống",
-      restaurants: "Quản lý nhà hàng",
-    };
-    return titles[activeNav] || "Dashboard";
-  };
-
-  const navItems = [
-    { id: "dashboard", name: "Tổng quan", icon: BarChart3 },
-    { id: "orders", name: "Đơn hàng", icon: ShoppingBag },
-    { id: "menu", name: "Sản phẩm", icon: Package },
-    { id: "restaurants", name: "Nhà hàng", icon: Store },
-    { id: "customers", name: "Khách hàng", icon: Users },
-    { id: "payments", name: "Thanh toán", icon: CreditCard },
-    { id: "analytics", name: "Thống kê", icon: TrendingUp },
-    { id: "drone-hub", name: "Drone Hub", icon: Navigation },
-    { id: "settings", name: "Cài đặt", icon: Settings },
-  ];
+  if (!user || user.role !== "admin") {
+    return null;
+  }
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -113,33 +55,81 @@ const DashboardPage = () => {
       >
         {/* Logo */}
         <div className="p-5 border-b border-gray-200">
-          <h1 className="text-2xl font-bold text-primary-600 flex items-center">
+          <Link
+            to="/admin"
+            className="text-2xl font-bold text-primary-600 flex items-center"
+          >
             <Package className="mr-2" size={28} />
             FoodFast Admin
-          </h1>
+          </Link>
         </div>
 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto py-4">
           <nav className="px-2 space-y-1">
-            {navItems.map((item) => {
+            {[
+              {
+                id: "dashboard",
+                name: "Tổng quan",
+                icon: BarChart3,
+                path: "/admin",
+              },
+              {
+                id: "orders",
+                name: "Đơn hàng",
+                icon: ShoppingBag,
+                path: "/admin",
+              },
+              { id: "menu", name: "Sản phẩm", icon: Package, path: "/admin" },
+              {
+                id: "restaurants",
+                name: "Nhà hàng",
+                icon: Store,
+                path: "/admin",
+              },
+              {
+                id: "customers",
+                name: "Khách hàng",
+                icon: Users,
+                path: "/admin",
+              },
+              {
+                id: "payments",
+                name: "Thanh toán",
+                icon: CreditCard,
+                path: "/admin",
+              },
+              {
+                id: "analytics",
+                name: "Thống kê",
+                icon: TrendingUp,
+                path: "/admin",
+              },
+              {
+                id: "drone-hub",
+                name: "Drone Hub",
+                icon: Navigation,
+                path: "/admin",
+                state: { activeNav: "drone-hub" },
+              },
+              {
+                id: "settings",
+                name: "Cài đặt",
+                icon: Settings,
+                path: "/admin",
+              },
+            ].map((item) => {
               const Icon = item.icon;
               return (
-                <button
+                <Link
                   key={item.id}
-                  onClick={() => {
-                    setActiveNav(item.id);
-                    setShowMobileMenu(false); // Close mobile menu on navigation
-                  }}
-                  className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors ${
-                    activeNav === item.id
-                      ? "text-primary-600 bg-primary-50"
-                      : "text-gray-600 hover:bg-gray-100"
-                  }`}
+                  to={item.path}
+                  state={item.state}
+                  className="w-full flex items-center px-4 py-3 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
                 >
                   <Icon className="mr-3" size={20} />
                   {item.name}
-                </button>
+                </Link>
               );
             })}
           </nav>
@@ -190,10 +180,18 @@ const DashboardPage = () => {
             </div>
             <div className="flex-1 md:ml-4">
               <h2 className="text-lg font-semibold text-gray-800">
-                {getPageTitle()}
+                Theo dõi Drone Giao Hàng
               </h2>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
+              <Link
+                to="/admin"
+                state={{ activeNav: "drone-hub" }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-100 hover:bg-primary-200 text-primary-700 rounded-lg transition-colors font-medium"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Quay lại Drone Hub
+              </Link>
               <button className="relative p-2 rounded-full hover:bg-gray-100 transition-colors">
                 <Bell size={20} />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
@@ -214,17 +212,10 @@ const DashboardPage = () => {
                 {showUserMenu && (
                   <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg py-1 z-10">
                     <Link
-                      to="/profile"
-                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      Trang cá nhân
-                    </Link>
-                    <Link
                       to="/admin"
-                      onClick={() => setActiveNav("settings")}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
-                      Cài đặt
+                      Quay lại Dashboard
                     </Link>
                     <button
                       onClick={handleLogout}
@@ -240,12 +231,12 @@ const DashboardPage = () => {
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto p-6 bg-gray-100">
-          {renderContent()}
+        <main className="flex-1 overflow-y-auto bg-gray-100">
+          <DroneTrackingPage hideHeader={true} />
         </main>
       </div>
     </div>
   );
 };
 
-export default DashboardPage;
+export default AdminDroneTrackingPage;

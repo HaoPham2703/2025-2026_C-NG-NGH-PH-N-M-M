@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { droneApi } from "../api/droneApi";
 import { orderApi } from "../api/orderApi";
+import { useAuth } from "../hooks/useAuth";
 import {
   Navigation,
   Battery,
@@ -16,11 +17,15 @@ import {
   Play,
   Pause,
   RotateCcw,
+  LogOut,
+  Shield,
+  Zap,
 } from "lucide-react";
-import Breadcrumb from "../components/Breadcrumb";
 import toast from "react-hot-toast";
 
-const DroneHubPage = () => {
+const DroneHubPage = ({ hideHeader = false }) => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [map, setMap] = useState(null);
   const mapRef = useRef(null);
   const [modalMap, setModalMap] = useState(null);
@@ -39,27 +44,106 @@ const DroneHubPage = () => {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [assignOrderId, setAssignOrderId] = useState("");
   const [assignMode, setAssignMode] = useState("list"); // "list" or "manual"
+  const [autoAssignEnabled, setAutoAssignEnabled] = useState(false); // Toggle auto-assign
+  const assignedOrdersRef = useRef(new Set()); // Track orders that have been auto-assigned
+  const isAutoAssigningRef = useRef(false); // Track if auto-assign is currently processing
+  const failedOrdersRef = useRef(new Map()); // Track failed orders with timestamp: Map<orderId, timestamp>
+  const lastAssignTimeRef = useRef(0); // Track last assignment time to prevent too frequent attempts
 
-  // Fetch orders that need drone delivery (Delivery or Waiting Goods status)
-  const { data: pendingOrders, isLoading: ordersLoading } = useQuery(
-    "pendingOrdersForDrone",
-    () => orderApi.getOrders(),
+  const queryClient = useQueryClient();
+
+  // Check admin role - redirect if not admin (only when not used in dashboard)
+  useEffect(() => {
+    if (!hideHeader) {
+      if (user && user.role !== "admin") {
+        toast.error("Bạn không có quyền truy cập trang này!");
+        navigate("/");
+      } else if (!user) {
+        navigate("/login");
+      }
+    }
+  }, [user, navigate, hideHeader]);
+
+  // Fetch orders that need drone delivery (only "Đang giao" - Delivery status)
+  // QUAN TRỌNG: Luôn fetch từ database, không dùng cache để đảm bảo dữ liệu mới nhất
+  const {
+    data: pendingOrders,
+    isLoading: ordersLoading,
+    error: ordersError,
+    refetch: refetchOrders,
+  } = useQuery(
+    ["pendingOrdersForDrone", showAssignModal], // Thêm showAssignModal vào query key để force refetch
+    () => {
+      console.log(
+        "[DroneHubPage] 🔄 Fetching orders from DATABASE (no cache)..."
+      );
+      return orderApi.getOrders();
+    },
     {
       enabled: showAssignModal, // Only fetch when modal is open
+      // Disable cache để luôn fetch từ database
+      staleTime: 0, // Dữ liệu luôn được coi là cũ, phải fetch mới
+      cacheTime: 0, // Không cache dữ liệu
+      refetchOnMount: true, // Luôn refetch khi component mount
+      refetchOnWindowFocus: false, // Không refetch khi focus window
+      refetchOnReconnect: false, // Không refetch khi reconnect
       select: (data) => {
-        const orders = data?.data?.orders || [];
-        // Filter orders that need drone: Delivery, Waiting Goods, or Processed
-        const filtered = orders.filter(
-          (order) =>
-            (order.status === "Delivery" ||
-              order.status === "Waiting Goods" ||
-              order.status === "Processed") &&
-            order.status !== "Success" &&
-            order.status !== "Cancelled"
+        console.log("[DroneHubPage] Raw orders data:", data);
+
+        // Handle different response structures
+        const orders =
+          data?.data?.orders || data?.data || data?.orders || data || [];
+        console.log("[DroneHubPage] Total orders fetched:", orders.length);
+
+        if (!Array.isArray(orders)) {
+          console.error(
+            "[DroneHubPage] Orders is not an array:",
+            typeof orders,
+            orders
+          );
+          return [];
+        }
+
+        // Filter orders that are in "Đang giao" status (Delivery) only
+        const filtered = orders.filter((order) => {
+          if (!order || !order.status) {
+            console.warn("[DroneHubPage] Order missing status:", order);
+            return false;
+          }
+          const isDelivery = order.status === "Delivery";
+          return isDelivery;
+        });
+
+        console.log(
+          "[DroneHubPage] Filtered orders (Delivery only):",
+          filtered.length,
+          "out of",
+          orders.length
         );
+        if (filtered.length === 0 && orders.length > 0) {
+          const availableStatuses = [...new Set(orders.map((o) => o.status))];
+          console.log(
+            "[DroneHubPage] Available statuses in fetched orders:",
+            availableStatuses
+          );
+          console.warn(
+            "[DroneHubPage] No orders with 'Delivery' status found. Please check if:"
+          );
+          console.warn("  1. User has admin role to see all orders");
+          console.warn(
+            "  2. There are any orders with 'Delivery' status in the system"
+          );
+        }
+        if (orders.length === 0) {
+          console.warn(
+            "[DroneHubPage] No orders fetched at all. This might mean:"
+          );
+          console.warn("  1. User is not admin and has no orders");
+          console.warn("  2. API endpoint returned empty result");
+        }
 
         // Sort by createdAt descending (newest first) or by _id if createdAt is not available
-        return filtered.sort((a, b) => {
+        const sorted = filtered.sort((a, b) => {
           // Try createdAt first (newest first)
           if (a.createdAt && b.createdAt) {
             return new Date(b.createdAt) - new Date(a.createdAt);
@@ -70,9 +154,35 @@ const DroneHubPage = () => {
           }
           return 0;
         });
+
+        console.log("[DroneHubPage] Final sorted orders:", sorted.length);
+        return sorted;
+      },
+      onError: (error) => {
+        console.error("[DroneHubPage] Error fetching orders:", error);
+        console.error("[DroneHubPage] Error details:", {
+          message: error?.message,
+          response: error?.response?.data,
+          status: error?.response?.status,
+        });
       },
     }
   );
+
+  // Force refetch orders từ database khi mở modal gán đơn
+  // Đảm bảo luôn lấy dữ liệu mới nhất, không dùng cache
+  useEffect(() => {
+    if (showAssignModal) {
+      console.log(
+        "[DroneHubPage] 🔄 Modal opened - Invalidating cache and refetching orders from DATABASE..."
+      );
+      // Invalidate cache để đảm bảo fetch từ database
+      queryClient.invalidateQueries(["pendingOrdersForDrone"]);
+      // Force refetch ngay lập tức
+      refetchOrders();
+    }
+  }, [showAssignModal, queryClient, refetchOrders]);
+
   // check newDrone
   const [newDrone, setNewDrone] = useState({
     droneId: "",
@@ -83,8 +193,6 @@ const DroneHubPage = () => {
     speed: 40,
     batteryLevel: 100,
   });
-
-  const queryClient = useQueryClient();
 
   // Fetch all drones
   const {
@@ -100,6 +208,35 @@ const DroneHubPage = () => {
   // Handle different response structures
   const drones =
     dronesData?.data?.drones || dronesData?.data || dronesData || [];
+
+  // Fetch orders for auto-assign (chạy định kỳ khi auto-assign bật)
+  const { data: ordersForAutoAssign, refetch: refetchOrdersForAutoAssign } =
+    useQuery(
+      ["ordersForAutoAssign", autoAssignEnabled],
+      () => {
+        console.log("[DroneHubPage] 🔄 Fetching orders for auto-assign...");
+        return orderApi.getOrders();
+      },
+      {
+        enabled: autoAssignEnabled, // Chỉ chạy khi auto-assign bật
+        refetchInterval: autoAssignEnabled ? 10000 : false, // Poll mỗi 10 giây khi bật
+        staleTime: 0,
+        cacheTime: 0,
+        select: (data) => {
+          const orders =
+            data?.data?.orders || data?.data || data?.orders || data || [];
+          // Filter orders với status "Delivery" và chưa có drone được gán
+          return orders.filter((order) => {
+            if (!order || order.status !== "Delivery") return false;
+            // Kiểm tra xem order đã có drone được gán chưa (kiểm tra trong danh sách drones)
+            const hasDrone = drones.some(
+              (drone) => drone.orderId === order._id
+            );
+            return !hasDrone;
+          });
+        },
+      }
+    );
 
   // Initialize map
   useEffect(() => {
@@ -849,6 +986,157 @@ const DroneHubPage = () => {
     }
   );
 
+  // Auto-assign mutation (không hiện toast, chỉ log)
+  const autoAssignMutation = useMutation(
+    (data) => droneApi.assignDroneToOrder(data),
+    {
+      onSuccess: (response, variables) => {
+        console.log(
+          `[Auto-Assign] ✅ Tự động gán drone ${variables.droneId} cho đơn hàng ${variables.orderId}`
+        );
+        // Đánh dấu order đã được gán thành công
+        assignedOrdersRef.current.add(variables.orderId);
+        // Reset flag để có thể gán tiếp
+        isAutoAssigningRef.current = false;
+        queryClient.invalidateQueries("drones");
+        queryClient.invalidateQueries("ordersForAutoAssign");
+        // Hiện toast nhẹ nhàng
+        toast.success(
+          `✨ Đã tự động gán drone cho đơn hàng ${variables.orderId.slice(-8)}`,
+          { duration: 3000 }
+        );
+      },
+      onError: (error, variables) => {
+        const errorMessage =
+          error?.response?.data?.message || error.message || "Đã xảy ra lỗi";
+        console.error(
+          `[Auto-Assign] ❌ Lỗi khi tự động gán drone cho đơn hàng ${variables.orderId}:`,
+          errorMessage
+        );
+
+        // Nếu lỗi do drone không available (flying, etc.), đánh dấu order để không thử lại ngay
+        if (
+          errorMessage.includes("trạng thái") ||
+          errorMessage.includes("flying")
+        ) {
+          // Đánh dấu order này đã fail, đợi 30 giây trước khi thử lại
+          failedOrdersRef.current.set(variables.orderId, Date.now());
+          console.log(
+            `[Auto-Assign] ⏸️ Đánh dấu order ${variables.orderId} để thử lại sau 30 giây`
+          );
+          // Không hiện toast để tránh spam
+        } else {
+          // Xóa order khỏi danh sách đã gán để có thể thử lại sau (lỗi khác)
+          assignedOrdersRef.current.delete(variables.orderId);
+        }
+
+        // Reset flag để có thể thử lại
+        isAutoAssigningRef.current = false;
+        // Refresh drones để có dữ liệu mới nhất
+        queryClient.invalidateQueries("drones");
+      },
+    }
+  );
+
+  // Logic tự động gán drone cho đơn hàng mới
+  useEffect(() => {
+    if (
+      !autoAssignEnabled ||
+      !ordersForAutoAssign ||
+      ordersForAutoAssign.length === 0
+    ) {
+      return;
+    }
+
+    // Nếu đang xử lý auto-assign, không làm gì cả
+    if (isAutoAssigningRef.current) {
+      return;
+    }
+
+    // Chặn quá nhiều lần gán trong thời gian ngắn (ít nhất 2 giây giữa các lần)
+    const now = Date.now();
+    if (now - lastAssignTimeRef.current < 2000) {
+      return;
+    }
+
+    // Lọc các đơn hàng chưa được gán và không bị fail gần đây
+    const unassignedOrders = ordersForAutoAssign.filter((order) => {
+      // Bỏ qua order đã được gán
+      if (assignedOrdersRef.current.has(order._id)) {
+        return false;
+      }
+
+      // Kiểm tra order có bị fail không (nếu có, đợi 30 giây trước khi thử lại)
+      const failedTime = failedOrdersRef.current.get(order._id);
+      if (failedTime) {
+        const timeSinceFailed = now - failedTime;
+        if (timeSinceFailed < 30000) {
+          // Chưa đủ 30 giây, bỏ qua
+          return false;
+        } else {
+          // Đã đủ 30 giây, xóa khỏi danh sách failed và thử lại
+          failedOrdersRef.current.delete(order._id);
+          console.log(
+            `[Auto-Assign] 🔄 Thử lại order ${order._id} sau khi đợi 30 giây`
+          );
+        }
+      }
+
+      return true;
+    });
+
+    if (unassignedOrders.length === 0) {
+      return;
+    }
+
+    // Lấy danh sách drone available (double-check)
+    const availableDrones = drones.filter(
+      (drone) => drone.status === "available"
+    );
+
+    if (availableDrones.length === 0) {
+      console.log("[Auto-Assign] ⚠️ Không có drone available để gán");
+      return;
+    }
+
+    // Chỉ gán một đơn hàng tại một thời điểm (lấy đơn hàng đầu tiên)
+    const orderToAssign = unassignedOrders[0];
+    const selectedDrone = availableDrones[0];
+
+    // Double-check: Kiểm tra lại drone có còn available không
+    if (selectedDrone.status !== "available") {
+      console.log(
+        `[Auto-Assign] ⚠️ Drone ${selectedDrone.droneId} không còn available (status: ${selectedDrone.status}), bỏ qua`
+      );
+      // Refresh drones để có dữ liệu mới
+      queryClient.invalidateQueries("drones");
+      return;
+    }
+
+    console.log(
+      `[Auto-Assign] 🔄 Đang tự động gán drone ${selectedDrone.droneId} cho đơn hàng ${orderToAssign._id}...`
+    );
+
+    // Đánh dấu đang xử lý auto-assign
+    isAutoAssigningRef.current = true;
+    lastAssignTimeRef.current = now;
+
+    // Đánh dấu order đang được xử lý (tránh gán trùng)
+    assignedOrdersRef.current.add(orderToAssign._id);
+
+    // Gán drone
+    autoAssignMutation.mutate({
+      droneId: selectedDrone.droneId,
+      orderId: orderToAssign._id,
+    });
+  }, [
+    autoAssignEnabled,
+    ordersForAutoAssign,
+    drones,
+    autoAssignMutation,
+    queryClient,
+  ]);
+
   const handleAssignDrone = (e) => {
     e.preventDefault();
     if (!assignOrderId.trim()) {
@@ -893,10 +1181,17 @@ const DroneHubPage = () => {
     }
   };
 
-  const breadcrumbItems = [
-    { label: "Trang Chủ", path: "/" },
-    { label: "Drone Hub", path: "/drone-hub" },
-  ];
+  // Show loading if checking auth or not admin (only when not used in dashboard)
+  if (!hideHeader && (!user || user.role !== "admin")) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
+          <p className="text-gray-600">Đang kiểm tra quyền truy cập...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -928,21 +1223,109 @@ const DroneHubPage = () => {
     );
   }
 
+  const handleLogout = async () => {
+    await logout();
+    navigate("/admin/login");
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Breadcrumb items={breadcrumbItems} />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              🚁 Drone Hub - Điều Khiển
-            </h1>
-            <p className="text-gray-600">
-              Quản lý và theo dõi tất cả drones của hệ thống
-            </p>
+    <div className={hideHeader ? "" : "min-h-screen bg-gray-50"}>
+      {/* Simple Admin Header - No User Account Info (only show when not in dashboard) */}
+      {!hideHeader && (
+        <header className="bg-white border-b border-gray-200 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-6 h-6 text-primary-600" />
+                  <h1 className="text-xl font-bold text-gray-900">
+                    🚁 Drone Hub - Điều Khiển
+                  </h1>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Link
+                  to="/admin"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Quay lại Admin
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Đăng xuất
+                </button>
+              </div>
+            </div>
           </div>
-          <div className="flex gap-2">
+        </header>
+      )}
+
+      <div
+        className={
+          hideHeader ? "" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+        }
+      >
+        {/* Header Actions */}
+        <div
+          className={`mb-6 flex items-center ${
+            hideHeader ? "justify-end" : "justify-between"
+          }`}
+        >
+          {!hideHeader && (
+            <div>
+              <p className="text-gray-600">
+                Quản lý và theo dõi tất cả drones của hệ thống
+              </p>
+            </div>
+          )}
+          <div className="flex items-center gap-3">
+            {/* Auto-Assign Toggle */}
+            <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-gray-200 shadow-sm">
+              <Zap
+                className={`w-4 h-4 ${
+                  autoAssignEnabled ? "text-yellow-500" : "text-gray-400"
+                }`}
+              />
+              <span className="text-sm font-medium text-gray-700">
+                Tự động gán
+              </span>
+              <button
+                onClick={() => {
+                  const newValue = !autoAssignEnabled;
+                  setAutoAssignEnabled(newValue);
+                  if (newValue) {
+                    toast.success("🔄 Bật tự động gán drone cho đơn hàng mới", {
+                      duration: 3000,
+                    });
+                    // Clear tất cả tracking refs khi bật lại
+                    assignedOrdersRef.current.clear();
+                    failedOrdersRef.current.clear();
+                    isAutoAssigningRef.current = false;
+                    lastAssignTimeRef.current = 0;
+                  } else {
+                    toast.info("⏸️ Tắt tự động gán drone", { duration: 2000 });
+                    // Clear tất cả tracking refs khi tắt
+                    assignedOrdersRef.current.clear();
+                    failedOrdersRef.current.clear();
+                    isAutoAssigningRef.current = false;
+                  }
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+                  autoAssignEnabled ? "bg-green-600" : "bg-gray-300"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    autoAssignEnabled ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+
             <button
               onClick={() => refetch()}
               className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
@@ -957,13 +1340,6 @@ const DroneHubPage = () => {
               <Plus className="w-4 h-4" />
               Tạo Drone Mới
             </button>
-            <Link
-              to="/orders"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Đơn Hàng
-            </Link>
           </div>
         </div>
 
@@ -1340,14 +1716,39 @@ const DroneHubPage = () => {
                           Đang tải danh sách đơn hàng...
                         </p>
                       </div>
+                    ) : ordersError ? (
+                      <div className="text-center py-8 text-red-500 border border-red-200 rounded-lg bg-red-50">
+                        <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm font-medium">
+                          Lỗi khi tải danh sách đơn hàng
+                        </p>
+                        <p className="text-xs mt-1 text-gray-600">
+                          {ordersError?.message ||
+                            "Vui lòng thử lại hoặc chuyển sang chế độ nhập thủ công"}
+                        </p>
+                        <button
+                          onClick={() => {
+                            queryClient.invalidateQueries(
+                              "pendingOrdersForDrone"
+                            );
+                          }}
+                          className="mt-3 px-4 py-2 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                        >
+                          Thử lại
+                        </button>
+                      </div>
                     ) : !pendingOrders || pendingOrders.length === 0 ? (
                       <div className="text-center py-8 text-gray-500 border border-gray-200 rounded-lg">
                         <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">
-                          Không có đơn hàng đang chờ giao
+                        <p className="text-sm font-medium">
+                          Không có đơn hàng đang ở trạng thái "Đang giao"
                         </p>
-                        <p className="text-xs mt-1">
-                          Hoặc chuyển sang chế độ nhập thủ công
+                        <p className="text-xs mt-1 text-gray-600">
+                          Vui lòng chuyển sang chế độ nhập thủ công để gán đơn
+                          hàng
+                        </p>
+                        <p className="text-xs mt-2 text-gray-500">
+                          (Chỉ hiển thị đơn hàng có trạng thái "Delivery")
                         </p>
                       </div>
                     ) : (

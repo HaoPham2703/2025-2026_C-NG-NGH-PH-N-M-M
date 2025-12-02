@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "react-query";
 import { droneApi } from "../api/droneApi";
 import { orderApi } from "../api/orderApi";
+import { useAuth } from "../hooks/useAuth";
 import {
   MapPin,
   Navigation,
@@ -14,9 +15,10 @@ import {
 } from "lucide-react";
 import Breadcrumb from "../components/Breadcrumb";
 
-const DroneTrackingPage = () => {
+const DroneTrackingPage = ({ hideHeader = false }) => {
   const { orderId } = useParams();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [map, setMap] = useState(null);
   const [droneMarker, setDroneMarker] = useState(null);
   const [destinationMarker, setDestinationMarker] = useState(null);
@@ -201,13 +203,13 @@ const DroneTrackingPage = () => {
     // Determine final destination (prefer deliveryDestination)
     const finalDest =
       (drone.deliveryDestination &&
-        typeof drone.deliveryDestination.latitude === "number" &&
-        typeof drone.deliveryDestination.longitude === "number"
+      typeof drone.deliveryDestination.latitude === "number" &&
+      typeof drone.deliveryDestination.longitude === "number"
         ? drone.deliveryDestination
         : null) ||
       (drone.destination &&
-        typeof drone.destination.latitude === "number" &&
-        typeof drone.destination.longitude === "number"
+      typeof drone.destination.latitude === "number" &&
+      typeof drone.destination.longitude === "number"
         ? drone.destination
         : null);
 
@@ -361,9 +363,9 @@ const DroneTrackingPage = () => {
             drone.startLocation.restaurantName || "Nhà hàng"
           }<br/><small>${
             drone.startLocation.address || "Địa chỉ nhà hàng"
-          }</small><br/><small>${drone.startLocation.latitude.toFixed(6)}, ${
-            drone.startLocation.longitude.toFixed(6)
-          }</small>`
+          }</small><br/><small>${drone.startLocation.latitude.toFixed(
+            6
+          )}, ${drone.startLocation.longitude.toFixed(6)}</small>`
         );
 
         setStartMarker(sMarker);
@@ -561,8 +563,7 @@ const DroneTrackingPage = () => {
                 orderId,
               ])?.data;
               const finalDestSocket =
-                currentDrone?.deliveryDestination ||
-                currentDrone?.destination;
+                currentDrone?.deliveryDestination || currentDrone?.destination;
               if (finalDestSocket) {
                 const newPath = [
                   [data.location.latitude, data.location.longitude],
@@ -770,13 +771,13 @@ const DroneTrackingPage = () => {
   // Calculate distance and ETA safely with null checks (prefer deliveryDestination)
   const finalDestForInfo =
     (drone?.deliveryDestination &&
-      typeof drone.deliveryDestination.latitude === "number" &&
-      typeof drone.deliveryDestination.longitude === "number"
+    typeof drone.deliveryDestination.latitude === "number" &&
+    typeof drone.deliveryDestination.longitude === "number"
       ? drone.deliveryDestination
       : null) ||
     (drone?.destination &&
-      typeof drone.destination.latitude === "number" &&
-      typeof drone.destination.longitude === "number"
+    typeof drone.destination.latitude === "number" &&
+    typeof drone.destination.longitude === "number"
       ? drone.destination
       : null);
 
@@ -859,32 +860,38 @@ const DroneTrackingPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Breadcrumb items={breadcrumbItems} />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className={hideHeader ? "" : "min-h-screen bg-gray-50"}>
+      {!hideHeader && <Breadcrumb items={breadcrumbItems} />}
+      <div
+        className={
+          hideHeader ? "p-6" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+        }
+      >
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Theo dõi Drone Giao Hàng
-            </h1>
-            <p className="text-gray-600">
-              Đơn hàng #{orderId?.slice(-8).toUpperCase()}
-              {droneFetching && (
-                <span className="ml-2 text-xs text-gray-500">
-                  (Đang cập nhật...)
-                </span>
-              )}
-            </p>
+        {!hideHeader && (
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Theo dõi Drone Giao Hàng
+              </h1>
+              <p className="text-gray-600">
+                Đơn hàng #{orderId?.slice(-8).toUpperCase()}
+                {droneFetching && (
+                  <span className="ml-2 text-xs text-gray-500">
+                    (Đang cập nhật...)
+                  </span>
+                )}
+              </p>
+            </div>
+            <Link
+              to={`/orders/${orderId}`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Quay lại
+            </Link>
           </div>
-          <Link
-            to={`/orders/${orderId}`}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Quay lại
-          </Link>
-        </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Map */}

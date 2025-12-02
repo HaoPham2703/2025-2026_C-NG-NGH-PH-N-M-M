@@ -256,22 +256,46 @@ const OrdersManagementPage = () => {
 
   const updateOrderStatusMutation = useMutation(
     async ({ orderId, status }) => {
-      // Use Order Service status directly
-      return orderApi.updateOrder(orderId, { status });
+      // Use restaurant-specific API for updating order status
+      return orderApi.updateOrderForRestaurant(orderId, { status });
     },
     {
       onSuccess: () => {
         toast.success("Cập nhật trạng thái thành công!");
+        
+        // Clear cache for all restaurant orders pages
+        const keys = Object.keys(localStorage);
+        keys.forEach((key) => {
+          if (key.startsWith(`restaurant_orders_cache_${restaurantId}_`)) {
+            localStorage.removeItem(key);
+          }
+        });
+        
+        // Invalidate all restaurantOrders queries (not just current page)
+        queryClient.invalidateQueries("restaurantOrders");
+        
+        // Also invalidate specific queries
         queryClient.invalidateQueries([
           "restaurantOrders",
           currentPage,
           statusFilter,
         ]);
+        
         // Invalidate transactions để cập nhật trạng thái thanh toán
         queryClient.invalidateQueries(["restaurantTransactions"]);
+        
+        // Force refetch current page
+        queryClient.refetchQueries([
+          "restaurantOrders",
+          currentPage,
+          statusFilter,
+        ]);
       },
-      onError: () => {
-        toast.error("Cập nhật thất bại!");
+      onError: (error) => {
+        console.error("[OrdersManagementPage] Update status error:", error);
+        toast.error(
+          error.response?.data?.message || "Cập nhật thất bại!"
+        );
       },
     }
   );

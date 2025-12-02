@@ -24,6 +24,7 @@ import MoMoMockPage from "./pages/MoMoMockPage";
 
 // Admin pages
 import { DashboardPage, AdminLoginPage, AdminSignupPage } from "./pages-admin";
+import AdminDroneTrackingPage from "./pages-admin/AdminDroneTrackingPage";
 
 // Restaurant pages
 import {
@@ -74,6 +75,32 @@ function AppContent() {
               <DashboardPage />
             ) : (
               <Navigate to="/admin/login" replace />
+            )
+          }
+        />
+
+        {/* Drone Hub - Admin only, NO Layout (no header/footer) */}
+        <Route
+          path="/drone-hub"
+          element={
+            user?.role === "admin" ? (
+              <DroneHubPage />
+            ) : user ? (
+              <Navigate to="/" replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/drone-tracking/:orderId"
+          element={
+            user?.role === "admin" ? (
+              <AdminDroneTrackingPage />
+            ) : user ? (
+              <DroneTrackingPage />
+            ) : (
+              <Navigate to="/login" />
             )
           }
         />
@@ -129,10 +156,6 @@ function AppContent() {
             element={user ? <OrderDetailPage /> : <Navigate to="/login" />}
           />
           <Route
-            path="drone-hub"
-            element={user ? <DroneHubPage /> : <Navigate to="/login" />}
-          />
-          <Route
             path="drone-tracking"
             element={
               user ? (
@@ -141,10 +164,6 @@ function AppContent() {
                 <Navigate to="/login" />
               )
             }
-          />
-          <Route
-            path="drone-tracking/:orderId"
-            element={user ? <DroneTrackingPage /> : <Navigate to="/login" />}
           />
           <Route
             path="profile"

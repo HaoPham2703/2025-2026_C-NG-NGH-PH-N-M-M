@@ -20,35 +20,67 @@ const OrdersManagementPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
-  const { data: orders, isLoading } = useQuery("adminAllOrders", () =>
-    orderApi.getOrders()
+  // Fetch orders với pagination từ backend
+  const {
+    data: ordersData,
+    isLoading,
+    error: ordersError,
+  } = useQuery(
+    ["adminAllOrders", currentPage, statusFilter, searchTerm],
+    () =>
+      orderApi.getOrders({
+        page: currentPage,
+        limit: itemsPerPage,
+        // Gửi status filter lên backend nếu có
+        ...(statusFilter !== "all" && { status: statusFilter }),
+      }),
+    {
+      keepPreviousData: true, // Giữ data cũ khi đang load trang mới
+      refetchOnWindowFocus: false,
+      retry: (failureCount, error) => {
+        // Không retry nếu request bị abort (ECONNABORTED)
+        if (
+          error?.code === "ECONNABORTED" ||
+          error?.message?.includes("aborted")
+        ) {
+          return false;
+        }
+        // Retry tối đa 2 lần cho các lỗi khác
+        return failureCount < 2;
+      },
+      retryDelay: 1000,
+    }
   );
 
-  // Filter orders
-  const filteredOrders = orders?.data?.orders?.filter((order) => {
-    const matchesSearch =
-      order._id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.receiver?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.phone?.includes(searchTerm);
+  // Lấy orders và pagination từ response
+  const orders = ordersData?.data?.orders || [];
+  const pagination = ordersData?.data?.pagination || {
+    page: currentPage,
+    limit: itemsPerPage,
+    total: 0,
+    totalPages: 0,
+  };
 
-    const matchesStatus =
-      statusFilter === "all" || order.status === statusFilter;
+  // Filter orders ở client-side cho search (vì search có thể cần filter nhiều field)
+  // Backend sẽ xử lý pagination và status filter
+  const filteredOrders = useMemo(() => {
+    if (!searchTerm) return orders;
+    return orders.filter((order) => {
+      const matchesSearch =
+        order._id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.receiver?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.phone?.includes(searchTerm);
+      return matchesSearch;
+    });
+  }, [orders, searchTerm]);
 
-    return matchesSearch && matchesStatus;
-  });
-
-  // Pagination
-  const totalPages = Math.ceil((filteredOrders?.length || 0) / itemsPerPage);
-  const paginatedOrders = useMemo(() => {
-    const start = (currentPage - 1) * itemsPerPage;
-    const end = start + itemsPerPage;
-    return filteredOrders?.slice(start, end);
-  }, [filteredOrders, currentPage, itemsPerPage]);
-
-  // Reset to page 1 when filter changes
+  // Reset to page 1 when filter or search changes
   useMemo(() => {
     setCurrentPage(1);
-  }, [searchTerm, statusFilter]);
+  }, [statusFilter, searchTerm]);
+
+  const totalPages = pagination.totalPages || 0;
+  const paginatedOrders = filteredOrders;
 
   const getStatusBadge = (status) => {
     const badges = {
@@ -72,7 +104,38 @@ const OrdersManagementPage = () => {
     return texts[status] || status;
   };
 
-  if (isLoading) {
+  // Hiển thị lỗi nếu có (trừ lỗi request aborted)
+  if (ordersError) {
+    const isAborted =
+      ordersError?.code === "ECONNABORTED" ||
+      ordersError?.message?.includes("aborted");
+
+    // Nếu là lỗi aborted nhưng đã có data, không hiển thị lỗi
+    if (isAborted && ordersData) {
+      console.warn(
+        "[OrdersManagementPage] Request aborted but data available, continuing..."
+      );
+    } else if (!isAborted) {
+      // Chỉ hiển thị lỗi nếu không phải aborted
+      return (
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center">
+            <p className="text-red-600 mb-4">
+              Lỗi khi tải đơn hàng: {ordersError?.message || "Đã xảy ra lỗi"}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            >
+              Thử lại
+            </button>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  if (isLoading && !ordersData) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -97,8 +160,22 @@ const OrdersManagementPage = () => {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Quản lý đơn hàng</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Hiển thị {filteredOrders?.length || 0} /{" "}
-            {orders?.data?.orders?.length || 0} đơn hàng
+            {searchTerm ? (
+              <>
+                Tìm kiếm: {filteredOrders.length} kết quả trên trang này
+                {filteredOrders.length === 0 && orders.length > 0 && (
+                  <span className="text-gray-500 ml-2">
+                    (không tìm thấy trên trang {currentPage})
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                Hiển thị {(currentPage - 1) * itemsPerPage + 1} đến{" "}
+                {Math.min(currentPage * itemsPerPage, pagination.total || 0)}{" "}
+                trong tổng số {pagination.total || 0} kết quả
+              </>
+            )}
           </p>
         </div>
         <div className="flex gap-3 w-full sm:w-auto">
@@ -230,7 +307,7 @@ const OrdersManagementPage = () => {
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
-            totalItems={filteredOrders?.length || 0}
+            totalItems={pagination.total || 0}
             itemsPerPage={itemsPerPage}
           />
         </div>

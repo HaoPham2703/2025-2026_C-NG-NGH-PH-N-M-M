@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useMutation, useQueryClient } from "react-query";
@@ -12,6 +12,14 @@ const RestaurantModal = ({ isOpen, onClose, restaurant, mode = "view" }) => {
   const isViewMode = mode === "view";
   const isEditMode = mode === "edit";
   const isCreateMode = mode === "create";
+
+  // State cho address data
+  const [addressData, setAddressData] = useState({
+    address: "",
+    city: "",
+    district: "",
+    ward: "",
+  });
 
   const defaultFormValues = {
     restaurantName: "",
@@ -34,6 +42,7 @@ const RestaurantModal = ({ isOpen, onClose, restaurant, mode = "view" }) => {
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
+    setValue,
   } = useForm({
     defaultValues: restaurant
       ? {
@@ -54,8 +63,10 @@ const RestaurantModal = ({ isOpen, onClose, restaurant, mode = "view" }) => {
       : defaultFormValues,
   });
 
-  // Reset form when restaurant changes
+  // Reset form when restaurant changes or modal opens
   React.useEffect(() => {
+    if (!isOpen) return;
+
     if (restaurant) {
       const newAddressData = {
         address: restaurant.address?.detail || "",
@@ -64,7 +75,7 @@ const RestaurantModal = ({ isOpen, onClose, restaurant, mode = "view" }) => {
         ward: restaurant.address?.ward || "",
       };
       setAddressData(newAddressData);
-      
+
       reset({
         ...defaultFormValues,
         restaurantName: restaurant.restaurantName || "",
@@ -89,7 +100,38 @@ const RestaurantModal = ({ isOpen, onClose, restaurant, mode = "view" }) => {
       });
       reset(defaultFormValues);
     }
-  }, [restaurant, reset]);
+  }, [restaurant, reset, isOpen]);
+
+  // Handlers cho address changes
+  const handleProvinceChange = (value) => {
+    setAddressData({
+      ...addressData,
+      city: value,
+      district: "",
+      ward: "",
+    });
+    setValue("city", value);
+    setValue("district", "");
+    setValue("ward", "");
+  };
+
+  const handleDistrictChange = (value) => {
+    setAddressData({
+      ...addressData,
+      district: value,
+      ward: "",
+    });
+    setValue("district", value);
+    setValue("ward", "");
+  };
+
+  const handleWardChange = (value) => {
+    setAddressData({
+      ...addressData,
+      ward: value,
+    });
+    setValue("ward", value);
+  };
 
   if (!isOpen) return null;
 
@@ -104,9 +146,7 @@ const RestaurantModal = ({ isOpen, onClose, restaurant, mode = "view" }) => {
         onClose();
       },
       onError: (error) => {
-        toast.error(
-          error.response?.data?.message || "Tạo nhà hàng thất bại!"
-        );
+        toast.error(error.response?.data?.message || "Tạo nhà hàng thất bại!");
       },
     }
   );
@@ -369,16 +409,23 @@ const RestaurantModal = ({ isOpen, onClose, restaurant, mode = "view" }) => {
                     Địa chỉ chi tiết
                   </label>
                   <textarea
-                    {...register("address")}
                     value={addressData.address}
                     onChange={(e) => {
-                      setAddressData({ ...addressData, address: e.target.value });
+                      setAddressData({
+                        ...addressData,
+                        address: e.target.value,
+                      });
                       setValue("address", e.target.value);
                     }}
                     disabled={isViewMode}
                     rows={2}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 disabled:bg-gray-100"
                     placeholder="Số nhà, tên đường..."
+                  />
+                  <input
+                    type="hidden"
+                    {...register("address")}
+                    value={addressData.address || ""}
                   />
                 </div>
 

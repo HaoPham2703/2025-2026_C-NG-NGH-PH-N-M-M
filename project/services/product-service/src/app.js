@@ -9,6 +9,7 @@ const rateLimit = require("express-rate-limit");
 
 const connectDB = require("./config/database");
 const productRoutes = require("./routes/productRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 4002;
@@ -71,6 +72,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// Extract user information from API Gateway (Base64 encoded)
+app.use((req, res, next) => {
+  const userHeader = req.headers["x-user"];
+  if (userHeader) {
+    try {
+      // Decode Base64 first, then parse JSON
+      const userJson = Buffer.from(userHeader, "base64").toString("utf-8");
+      req.user = JSON.parse(userJson);
+    } catch (error) {
+      console.error("Error parsing user header:", error);
+    }
+  }
+  next();
+});
+
 // Health check endpoint
 app.get("/health", (req, res) => {
   res.json({
@@ -84,6 +100,7 @@ app.get("/health", (req, res) => {
 
 // Routes
 app.use("/api/v1/products", productRoutes);
+app.use("/api/v1/reviews", reviewRoutes);
 
 // Global error handler
 app.use((err, req, res, next) => {

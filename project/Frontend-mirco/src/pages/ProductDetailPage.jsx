@@ -22,6 +22,7 @@ import { useCart } from "../contexts/CartContext";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import Breadcrumb from "../components/Breadcrumb";
+import ProductReviewsSection from "./components/ProductReviewsSection";
 import "../styles/ProductDetailPage.css";
 
 const ProductDetailPage = () => {
@@ -427,6 +428,11 @@ const ProductDetailPage = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Reviews Section */}
+        <div className="mt-8">
+          <ProductReviewsSection productId={id} />
         </div>
       </div>
     </div>

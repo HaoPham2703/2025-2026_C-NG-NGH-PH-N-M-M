@@ -1,4 +1,5 @@
 const Drone = require("../models/droneModel");
+const { updateOrderStatusToSuccess } = require("../utils/geocoding");
 
 class DroneSimulation {
   constructor(io) {
@@ -212,10 +213,16 @@ class DroneSimulation {
       drone.startLocation &&
       typeof drone.startLocation.latitude === "number" &&
       typeof drone.startLocation.longitude === "number" &&
-      Math.abs(drone.destination.latitude - drone.startLocation.latitude) < 1e-6 &&
-      Math.abs(drone.destination.longitude - drone.startLocation.longitude) < 1e-6;
+      Math.abs(drone.destination.latitude - drone.startLocation.latitude) <
+        1e-6 &&
+      Math.abs(drone.destination.longitude - drone.startLocation.longitude) <
+        1e-6;
 
-    if (drone.status === "flying" && atRestaurant && drone.deliveryDestination) {
+    if (
+      drone.status === "flying" &&
+      atRestaurant &&
+      drone.deliveryDestination
+    ) {
       drone.destination = {
         latitude: drone.deliveryDestination.latitude,
         longitude: drone.deliveryDestination.longitude,
@@ -256,6 +263,30 @@ class DroneSimulation {
           };
 
           await updatedDrone.save();
+
+          // Cập nhật trạng thái đơn hàng thành "Success" khi drone hoàn thành giao hàng
+          if (updatedDrone.orderId) {
+            try {
+              const result = await updateOrderStatusToSuccess(
+                updatedDrone.orderId
+              );
+              if (result.success) {
+                console.log(
+                  `[DroneSimulation] ✅ Order ${updatedDrone.orderId} status updated to Success after delivery completion`
+                );
+              } else {
+                console.error(
+                  `[DroneSimulation] ❌ Failed to update order ${updatedDrone.orderId} status: ${result.error}`
+                );
+              }
+            } catch (error) {
+              console.error(
+                `[DroneSimulation] ❌ Error updating order status for ${updatedDrone.orderId}:`,
+                error.message
+              );
+              // Không throw error để không ảnh hưởng đến flow của drone
+            }
+          }
 
           // Start simulation for returning trip
           this.startSimulation(updatedDrone.droneId);

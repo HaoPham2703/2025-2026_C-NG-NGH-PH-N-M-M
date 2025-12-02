@@ -225,25 +225,29 @@ exports.createOrder = catchAsync(async (req, res, next) => {
   let restaurantId = req.body.restaurant;
   let restaurantAddress = req.body.restaurantAddress;
   let restaurantName = req.body.restaurantName;
-  
+
   if (!restaurantId && req.body.cart && req.body.cart.length > 0) {
     const firstProduct = req.body.cart[0].product;
     restaurantId = firstProduct?.restaurant || firstProduct?.restaurantId;
-    
+
     // Try to extract restaurant info from product if available
     if (firstProduct?.restaurantInfo) {
-      restaurantName = firstProduct.restaurantInfo.restaurantName || firstProduct.restaurantInfo.name;
+      restaurantName =
+        firstProduct.restaurantInfo.restaurantName ||
+        firstProduct.restaurantInfo.name;
       // Handle structured address
       if (firstProduct.restaurantInfo.address) {
-        if (typeof firstProduct.restaurantInfo.address === 'string') {
+        if (typeof firstProduct.restaurantInfo.address === "string") {
           restaurantAddress = firstProduct.restaurantInfo.address;
         } else {
           restaurantAddress = [
             firstProduct.restaurantInfo.address.detail,
             firstProduct.restaurantInfo.address.ward,
             firstProduct.restaurantInfo.address.district,
-            firstProduct.restaurantInfo.address.city
-          ].filter(Boolean).join(', ');
+            firstProduct.restaurantInfo.address.city,
+          ]
+            .filter(Boolean)
+            .join(", ");
         }
       }
     }
@@ -259,7 +263,10 @@ exports.createOrder = catchAsync(async (req, res, next) => {
         req.body.address
       );
     } catch (error) {
-      console.error("[Order Controller] Error calculating shipping fee:", error.message);
+      console.error(
+        "[Order Controller] Error calculating shipping fee:",
+        error.message
+      );
       // Use default fee if calculation fails
       shippingFee = 20000;
     }
@@ -398,7 +405,7 @@ exports.getAllOrders = catchAsync(async (req, res, next) => {
 
   // Pagination
   const page = req.query.page * 1 || 1;
-  const limit = req.query.limit * 1 || 50; // Giảm limit mặc định từ 100 xuống 50
+  const limit = req.query.limit * 1 || 15; // Limit mặc định: 15 orders mỗi trang để tối ưu performance
   const skip = (page - 1) * limit;
 
   query = query.skip(skip).limit(limit);
@@ -510,18 +517,37 @@ exports.isOwner = catchAsync(async (req, res, next) => {
     return next(new AppError("Không tìm thấy đơn hàng với ID này", 404));
   }
 
-  // Check if user is owner or admin
+  // Check if user is owner, admin, or restaurant owner
   // Handle both _id and id fields from API Gateway user object
   const userId = req.user._id || req.user.id;
-  if (
-    order.user.toString() !== userId.toString() &&
-    req.user.role !== "admin"
-  ) {
+  const userRole = req.user.role;
+
+  // Admin can access any order
+  if (userRole === "admin") {
+    req.order = order;
+    return next();
+  }
+
+  // Restaurant can access orders that belong to their restaurant
+  if (userRole === "restaurant") {
+    const restaurantId = req.user.restaurantId || req.user._id || req.user.id;
+    if (
+      order.restaurant &&
+      order.restaurant.toString() === restaurantId.toString()
+    ) {
+      req.order = order;
+      return next();
+    }
     return next(new AppError("Bạn không có quyền truy cập đơn hàng này", 403));
   }
 
-  req.order = order;
-  next();
+  // User can only access their own orders
+  if (order.user && order.user.toString() === userId.toString()) {
+    req.order = order;
+    return next();
+  }
+
+  return next(new AppError("Bạn không có quyền truy cập đơn hàng này", 403));
 });
 
 exports.getTableOrder = catchAsync(async (req, res, next) => {
@@ -1205,52 +1231,70 @@ exports.getOrdersByRestaurantId = catchAsync(async (req, res, next) => {
 });
 
 // Get active orders count by restaurant ID (optimized for status checking)
-exports.getActiveOrdersCountByRestaurantId = catchAsync(async (req, res, next) => {
-  const { restaurantId } = req.params;
+exports.getActiveOrdersCountByRestaurantId = catchAsync(
+  async (req, res, next) => {
+    const { restaurantId } = req.params;
 
-  const mongoose = require("mongoose");
-  let restaurantQuery;
+    const mongoose = require("mongoose");
+    let restaurantQuery;
 
-  // Build restaurant query
-  if (mongoose.Types.ObjectId.isValid(restaurantId)) {
-    restaurantQuery = { restaurant: new mongoose.Types.ObjectId(restaurantId) };
-  } else {
-    restaurantQuery = { restaurant: restaurantId };
+    // Build restaurant query
+    if (mongoose.Types.ObjectId.isValid(restaurantId)) {
+      restaurantQuery = {
+        restaurant: new mongoose.Types.ObjectId(restaurantId),
+      };
+    } else {
+      restaurantQuery = { restaurant: restaurantId };
+    }
+
+    // Active order statuses
+    const activeOrderStatuses = ["Processed", "Waiting Goods", "Delivery"];
+
+    // Count only active orders - much faster than fetching all
+    const activeOrdersCount = await Order.countDocuments({
+      ...restaurantQuery,
+      status: { $in: activeOrderStatuses },
+    }).maxTimeMS(5000); // 5 second timeout for count query
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        activeOrdersCount,
+        hasActiveOrders: activeOrdersCount > 0,
+      },
+    });
   }
-
-  // Active order statuses
-  const activeOrderStatuses = ["Processed", "Waiting Goods", "Delivery"];
-
-  // Count only active orders - much faster than fetching all
-  const activeOrdersCount = await Order.countDocuments({
-    ...restaurantQuery,
-    status: { $in: activeOrderStatuses }
-  }).maxTimeMS(5000); // 5 second timeout for count query
-
-  res.status(200).json({
-    status: "success",
-    data: {
-      activeOrdersCount,
-      hasActiveOrders: activeOrdersCount > 0,
-    },
-  });
-});
+);
 
 // Calculate shipping fee based on addresses
 exports.calculateShippingFee = catchAsync(async (req, res, next) => {
   const { restaurantAddress, deliveryAddress } = req.body;
 
   if (!restaurantAddress || !deliveryAddress) {
-    return next(new AppError("Cần cung cấp địa chỉ nhà hàng và địa chỉ người dùng để tính phí ship", 400));
+    return next(
+      new AppError(
+        "Cần cung cấp địa chỉ nhà hàng và địa chỉ người dùng để tính phí ship",
+        400
+      )
+    );
   }
 
   try {
-    const { calculateShippingFeeByAddress, calculateDistance, geocodeAddress } = require("../utils/shippingFee");
-    
+    const {
+      calculateShippingFeeByAddress,
+      calculateDistance,
+      geocodeAddress,
+    } = require("../utils/shippingFee");
+
     // Convert delivery address to string if needed
     let deliveryAddressStr = deliveryAddress;
     if (typeof deliveryAddress === "object" && deliveryAddress !== null) {
-      if (deliveryAddress.detail && deliveryAddress.ward && deliveryAddress.district && deliveryAddress.province) {
+      if (
+        deliveryAddress.detail &&
+        deliveryAddress.ward &&
+        deliveryAddress.district &&
+        deliveryAddress.province
+      ) {
         deliveryAddressStr = `${deliveryAddress.detail}, ${deliveryAddress.ward}, ${deliveryAddress.district}, ${deliveryAddress.province}`;
       } else if (deliveryAddress.address) {
         deliveryAddressStr = deliveryAddress.address;
@@ -1287,8 +1331,13 @@ exports.calculateShippingFee = catchAsync(async (req, res, next) => {
       },
     });
   } catch (error) {
-    console.error("[Order Controller] Error calculating shipping fee:", error.message);
-    return next(new AppError("Không thể tính phí ship. Vui lòng thử lại sau.", 500));
+    console.error(
+      "[Order Controller] Error calculating shipping fee:",
+      error.message
+    );
+    return next(
+      new AppError("Không thể tính phí ship. Vui lòng thử lại sau.", 500)
+    );
   }
 });
 

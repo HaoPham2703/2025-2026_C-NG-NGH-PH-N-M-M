@@ -133,9 +133,101 @@ const verifyRestaurantToken = async (req, res, next) => {
   }
 };
 
+// Verify user or restaurant token - for order routes that need both
+const verifyUserOrRestaurantToken = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+
+    if (!token) {
+      return res.status(401).json({
+        status: "error",
+        message: "Access token is required",
+      });
+    }
+
+    // Try to verify as user token first
+    try {
+      const response = await axios.get(`${services.user}/verify`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        timeout: 3000,
+      });
+
+      if (response.data.status === "success") {
+        req.user = response.data.data.user;
+        next();
+        return;
+      }
+    } catch (userError) {
+      // User token verification failed, try restaurant token
+      console.log(
+        "[verifyUserOrRestaurantToken] User token verification failed, trying restaurant token"
+      );
+    }
+
+    // Try to verify as restaurant token
+    // Get restaurant info from token (decode JWT to get restaurant ID)
+    try {
+      const jwt = require("jsonwebtoken");
+      const decoded = jwt.decode(token);
+
+      if (decoded && decoded.id) {
+        // Try to get restaurant info from Restaurant Service
+        const restaurantServiceUrl =
+          services.restaurant || "http://localhost:4006";
+
+        try {
+          const restaurantResponse = await axios.get(
+            `${restaurantServiceUrl}/api/v1/restaurant/profile`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+              timeout: 3000,
+            }
+          );
+
+          if (restaurantResponse.data.status === "success") {
+            const restaurant = restaurantResponse.data.data.restaurant;
+            req.user = {
+              id: restaurant._id,
+              _id: restaurant._id,
+              role: "restaurant",
+              restaurantId: restaurant._id,
+            };
+            next();
+            return;
+          }
+        } catch (restaurantError) {
+          // Restaurant verification failed too
+          console.log(
+            "[verifyUserOrRestaurantToken] Restaurant token verification failed"
+          );
+        }
+      }
+    } catch (restaurantTokenError) {
+      // Token decode failed
+      console.log("[verifyUserOrRestaurantToken] Token decode failed");
+    }
+
+    // Both verifications failed
+    return res.status(401).json({
+      status: "error",
+      message: "Invalid token - must be user or restaurant token",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      message: "Authentication error",
+    });
+  }
+};
+
 module.exports = {
   verifyToken,
   verifyRestaurantToken,
+  verifyUserOrRestaurantToken,
   optionalAuth,
   requireAdmin,
 };

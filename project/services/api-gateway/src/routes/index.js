@@ -3,6 +3,7 @@ const { proxies } = require("../middleware/proxy");
 const {
   verifyToken,
   verifyRestaurantToken,
+  verifyUserOrRestaurantToken,
   optionalAuth,
   requireAdmin,
 } = require("../middleware/auth");
@@ -37,9 +38,11 @@ router.use("/api/v1/users", verifyToken, proxies.userProxy);
 router.use("/api/v1/products", optionalAuth, proxies.productProxy);
 router.use("/api/v1/categories", optionalAuth, proxies.productProxy);
 router.use("/api/v1/brands", optionalAuth, proxies.productProxy);
+// Review routes (require authentication for creating/updating/deleting, optional for viewing) - FIXED to product service
+router.use("/api/v1/reviews", optionalAuth, proxies.productProxy);
 
-// Order routes (require authentication) - FIXED to order service
-router.use("/api/v1/orders", verifyToken, proxies.orderProxy);
+// Order routes (require authentication - allow both user and restaurant tokens) - FIXED to order service
+router.use("/api/v1/orders", verifyUserOrRestaurantToken, proxies.orderProxy);
 
 // Payment routes (require authentication) - FIXED to payment service
 router.use("/api/v1/payments", verifyToken, proxies.paymentProxy);

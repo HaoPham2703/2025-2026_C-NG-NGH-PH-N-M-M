@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { restaurantApi } from "../api/restaurantApi";
 import {
@@ -12,6 +12,7 @@ import {
   XCircle,
   Ban,
   Filter,
+  AlertCircle,
 } from "lucide-react";
 import DeleteConfirmModal from "./components/DeleteConfirmModal";
 import RestaurantModal from "./components/RestaurantModal";
@@ -21,6 +22,33 @@ import toast from "react-hot-toast";
 import { orderApi } from "../api";
 
 const RestaurantsManagementPage = () => {
+  console.log("[RestaurantsManagementPage] Component rendering...");
+
+  // Error boundary state
+  const [hasError, setHasError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const [renderError, setRenderError] = useState(null);
+
+  // Catch any uncaught errors
+  useEffect(() => {
+    console.log("[RestaurantsManagementPage] useEffect running...");
+
+    const errorHandler = (event) => {
+      console.error("[RestaurantsManagementPage] Uncaught error:", event);
+      const error = event.error || event.reason || event;
+      setHasError(true);
+      setErrorMessage(error?.message || "Đã xảy ra lỗi không xác định");
+    };
+
+    window.addEventListener("error", errorHandler);
+    window.addEventListener("unhandledrejection", errorHandler);
+
+    return () => {
+      window.removeEventListener("error", errorHandler);
+      window.removeEventListener("unhandledrejection", errorHandler);
+    };
+  }, []);
+
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -35,7 +63,11 @@ const RestaurantsManagementPage = () => {
   const itemsPerPage = 12;
 
   // Fetch restaurants with filters
-  const { data: restaurantsData, isLoading } = useQuery(
+  const {
+    data: restaurantsData,
+    isLoading,
+    error: restaurantsError,
+  } = useQuery(
     ["restaurants", currentPage, statusFilter, searchTerm],
     () =>
       restaurantApi.getRestaurants({
@@ -43,17 +75,52 @@ const RestaurantsManagementPage = () => {
         limit: itemsPerPage,
         status: statusFilter !== "all" ? statusFilter : undefined,
         search: searchTerm || undefined,
-      })
+      }),
+    {
+      keepPreviousData: true,
+      refetchOnWindowFocus: false,
+      retry: (failureCount, error) => {
+        // Không retry nếu request bị abort
+        if (
+          error?.code === "ECONNABORTED" ||
+          error?.message?.includes("aborted")
+        ) {
+          return false;
+        }
+        return failureCount < 2;
+      },
+    }
   );
 
   // Fetch stats
-  const { data: statsData } = useQuery(
+  const { data: statsData, error: statsError } = useQuery(
     "restaurantStats",
-    restaurantApi.getRestaurantStats
+    restaurantApi.getRestaurantStats,
+    {
+      refetchOnWindowFocus: false,
+    }
   );
 
-  const restaurants = restaurantsData?.data?.restaurants || [];
-  const pagination = restaurantsData?.data?.pagination;
+  // Safely extract data with multiple fallbacks
+  const restaurants =
+    restaurantsData?.data?.restaurants ||
+    restaurantsData?.restaurants ||
+    restaurantsData?.data ||
+    [];
+  const pagination =
+    restaurantsData?.data?.pagination || restaurantsData?.pagination || null;
+
+  // Debug logging
+  if (process.env.NODE_ENV === "development") {
+    console.log("[RestaurantsManagementPage] Data:", {
+      restaurantsData,
+      restaurants: restaurants.length,
+      pagination,
+      statsData,
+      isLoading,
+      error: restaurantsError,
+    });
+  }
 
   const handleView = (restaurant) => {
     setSelectedRestaurant(restaurant);
@@ -245,13 +312,81 @@ const RestaurantsManagementPage = () => {
     );
   };
 
-  if (isLoading) {
+  // Hiển thị lỗi nếu có (trừ lỗi request aborted)
+  if (restaurantsError) {
+    const isAborted =
+      restaurantsError?.code === "ECONNABORTED" ||
+      restaurantsError?.message?.includes("aborted");
+
+    // Nếu là lỗi aborted nhưng đã có data, không hiển thị lỗi
+    if (isAborted && restaurantsData) {
+      console.warn(
+        "[RestaurantsManagementPage] Request aborted but data available, continuing..."
+      );
+    } else if (!isAborted) {
+      // Chỉ hiển thị lỗi nếu không phải aborted
+      return (
+        <div className="flex items-center justify-center h-96">
+          <div className="text-center max-w-md mx-auto px-4">
+            <Store className="w-16 h-16 text-red-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Lỗi tải dữ liệu
+            </h3>
+            <p className="text-gray-600 mb-4">
+              {restaurantsError?.response?.data?.message ||
+                restaurantsError?.message ||
+                "Không thể tải danh sách nhà hàng"}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+            >
+              Thử lại
+            </button>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  if (hasError) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center max-w-md mx-auto px-4">
+          <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Đã xảy ra lỗi
+          </h3>
+          <p className="text-gray-600 mb-4">{errorMessage}</p>
+          <button
+            onClick={() => {
+              setHasError(false);
+              setErrorMessage(null);
+              window.location.reload();
+            }}
+            className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+          >
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading && !restaurantsData) {
+    console.log("[RestaurantsManagementPage] Showing loading state...");
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     );
   }
+
+  console.log("[RestaurantsManagementPage] Rendering main content...", {
+    restaurants: restaurants.length,
+    hasError,
+    isLoading,
+  });
 
   return (
     <div className="space-y-6">
@@ -486,12 +621,12 @@ const RestaurantsManagementPage = () => {
       </div>
 
       {/* Pagination */}
-      {pagination && pagination.pages > 1 && (
+      {pagination && (pagination.pages > 1 || pagination.totalPages > 1) && (
         <Pagination
           currentPage={currentPage}
-          totalPages={pagination.pages}
+          totalPages={pagination.pages || pagination.totalPages || 1}
           onPageChange={setCurrentPage}
-          totalItems={pagination.total}
+          totalItems={pagination.total || 0}
           itemsPerPage={itemsPerPage}
         />
       )}

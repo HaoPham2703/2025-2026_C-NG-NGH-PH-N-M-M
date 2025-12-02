@@ -65,7 +65,8 @@ async function reverseGeocode(latitude, longitude) {
     });
 
     const displayName = response.data?.display_name;
-    const addressStr = displayName || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+    const addressStr =
+      displayName || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
     return {
       latitude,
       longitude,
@@ -75,7 +76,9 @@ async function reverseGeocode(latitude, longitude) {
     return {
       latitude,
       longitude,
-      address: `${parseFloat(latitude).toFixed(6)}, ${parseFloat(longitude).toFixed(6)}`,
+      address: `${parseFloat(latitude).toFixed(6)}, ${parseFloat(
+        longitude
+      ).toFixed(6)}`,
     };
   }
 }
@@ -207,20 +210,20 @@ async function getOrderDetails(orderId, authToken = null) {
 
     // Try via API Gateway first
     try {
-      const res = await axios.get(
-        `${apiGatewayUrl}/api/v1/orders/${orderId}`,
-        { headers, timeout: 5000 }
-      );
+      const res = await axios.get(`${apiGatewayUrl}/api/v1/orders/${orderId}`, {
+        headers,
+        timeout: 5000,
+      });
       if (res.data?.status === "success" && res.data.data?.order) {
         return res.data.data.order;
       }
     } catch (_) {}
 
     // Fallback direct
-    const res = await axios.get(
-      `${orderServiceUrl}/api/v1/orders/${orderId}`,
-      { headers, timeout: 5000 }
-    );
+    const res = await axios.get(`${orderServiceUrl}/api/v1/orders/${orderId}`, {
+      headers,
+      timeout: 5000,
+    });
     if (res.data?.status === "success" && res.data.data?.order) {
       return res.data.data.order;
     }
@@ -258,6 +261,98 @@ async function tryGetRestaurantInfo(restaurantId, authToken = null) {
   return null;
 }
 
+/**
+ * Cập nhật trạng thái đơn hàng thành "Success" khi drone hoàn thành giao hàng
+ * @param {string} orderId - ID của đơn hàng
+ * @param {string} authToken - Token xác thực (optional)
+ */
+async function updateOrderStatusToSuccess(orderId, authToken = null) {
+  try {
+    if (!orderId) {
+      console.error("[updateOrderStatusToSuccess] OrderId is required");
+      return { success: false, error: "OrderId is required" };
+    }
+
+    const apiGatewayUrl =
+      process.env.API_GATEWAY_URL || "http://localhost:5001";
+    const orderServiceUrl =
+      process.env.ORDER_SERVICE_URL || "http://localhost:4003";
+
+    const headers = {
+      "Content-Type": "application/json",
+    };
+    if (authToken) {
+      headers.Authorization = `Bearer ${authToken}`;
+    }
+
+    const updateData = { status: "Success" };
+
+    // Try API Gateway first
+    try {
+      const response = await axios.patch(
+        `${apiGatewayUrl}/api/v1/orders/${orderId}/status`,
+        updateData,
+        {
+          headers,
+          timeout: 10000,
+        }
+      );
+
+      if (response.data && response.data.status === "success") {
+        console.log(
+          `[updateOrderStatusToSuccess] ✅ Order ${orderId} status updated to Success via API Gateway`
+        );
+        return { success: true, data: response.data };
+      }
+    } catch (gatewayError) {
+      console.log(
+        `[updateOrderStatusToSuccess] API Gateway failed, trying direct connection... Error: ${gatewayError.message}`
+      );
+    }
+
+    // Fallback to direct order service
+    try {
+      const response = await axios.patch(
+        `${orderServiceUrl}/api/v1/orders/${orderId}/status`,
+        updateData,
+        {
+          headers,
+          timeout: 10000,
+        }
+      );
+
+      if (response.data && response.data.status === "success") {
+        console.log(
+          `[updateOrderStatusToSuccess] ✅ Order ${orderId} status updated to Success via direct service`
+        );
+        return { success: true, data: response.data };
+      }
+    } catch (directError) {
+      console.error(
+        `[updateOrderStatusToSuccess] ❌ Failed to update order status: ${directError.message}`
+      );
+      if (directError.response) {
+        console.error(
+          `[updateOrderStatusToSuccess] Response:`,
+          directError.response.data
+        );
+      }
+      return {
+        success: false,
+        error: directError.message,
+        details: directError.response?.data,
+      };
+    }
+
+    return { success: false, error: "Unknown error" };
+  } catch (error) {
+    console.error(
+      `[updateOrderStatusToSuccess] ❌ Unexpected error: ${error.message}`
+    );
+    return { success: false, error: error.message };
+  }
+}
+
 module.exports = {
   geocodeAddress,
   generateSimulatedCoordinates,
@@ -265,4 +360,5 @@ module.exports = {
   getOrderDetails,
   reverseGeocode,
   tryGetRestaurantInfo,
+  updateOrderStatusToSuccess,
 };

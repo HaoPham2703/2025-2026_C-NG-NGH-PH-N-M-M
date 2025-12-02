@@ -17,6 +17,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import Breadcrumb from "../components/Breadcrumb";
+import ProductReviewSection from "./components/ProductReviewSection";
 
 const OrderDetailPage = () => {
   const { id } = useParams();
@@ -380,6 +381,14 @@ const OrderDetailPage = () => {
                 </div>
               </div>
             </div>
+
+            {/* Product Review Section - Chỉ hiển thị khi order đã thành công */}
+            {orderData.status === "Success" && (
+              <ProductReviewSection
+                orderId={orderData._id}
+                products={orderData.cart || []}
+              />
+            )}
           </div>
 
           {/* Order Summary */}

@@ -10,6 +10,7 @@ const reviewSchema = new mongoose.Schema(
       type: Number,
       min: 1,
       max: 5,
+      required: [true, "Rating is required"],
     },
     createdAt: {
       type: Date,
@@ -21,9 +22,12 @@ const reviewSchema = new mongoose.Schema(
       required: [true, "Review must belong to a product."],
     },
     user: {
-      type: mongoose.Schema.ObjectId,
-      ref: "User",
+      type: String, // User ID as string (in microservices, we don't reference User model)
       required: [true, "Review must belong to a user."],
+    },
+    order: {
+      type: String, // Order ID as string (can be ObjectId string)
+      // Optional: cho phép review không gắn với order (backward compatibility)
     },
   },
   {
@@ -32,17 +36,13 @@ const reviewSchema = new mongoose.Schema(
   }
 );
 
-// Prevent duplicate reviews from same user on same product
-reviewSchema.index({ product: 1, user: 1 }, { unique: true });
+// Prevent duplicate reviews from same user on same product in same order
+// Cho phép review cùng sản phẩm trong các order khác nhau
+// Nếu order là null/undefined, vẫn unique theo product+user (backward compatibility)
+reviewSchema.index({ product: 1, user: 1, order: 1 }, { unique: true });
 
-// Populate user data when querying reviews
-reviewSchema.pre(/^find/, function (next) {
-  this.populate({
-    path: "user",
-    select: "name photo",
-  });
-  next();
-});
+// Note: Không populate user vì trong microservices architecture, User model không có trong product service
+// User info sẽ được fetch từ user service khi cần thiết
 
 // Calculate average rating for a product
 reviewSchema.statics.calcAverageRatings = async function (productId) {

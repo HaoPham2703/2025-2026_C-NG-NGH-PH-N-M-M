@@ -47,6 +47,18 @@ const createErrorInterceptor = (serviceName) => (error) => {
     code: error.code,
   });
 
+  // Handle request aborted (không phải lỗi service, có thể do timeout hoặc component unmount)
+  if (
+    error.code === "ECONNABORTED" ||
+    error.message?.includes("aborted") ||
+    error.message?.includes("request aborted")
+  ) {
+    // Không hiện toast cho request aborted - có thể là do component unmount hoặc timeout
+    // Chỉ log để debug
+    console.warn(`[${serviceName}] Request aborted:`, config?.url);
+    return Promise.reject(error);
+  }
+
   // Handle network errors (service not available)
   if (
     error.code === "ECONNREFUSED" ||
@@ -127,6 +139,7 @@ productClient.interceptors.response.use(
 export const orderClient = axios.create({
   ...baseConfig,
   baseURL: `${API_GATEWAY_URL}/api/v1`,
+  timeout: 30000, // 30 seconds timeout cho order requests (có thể load nhiều data)
 });
 
 orderClient.interceptors.request.use(createRequestInterceptor("Order"));

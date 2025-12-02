@@ -34,6 +34,14 @@ const createServiceProxy = (target, pathRewrite = {}) => {
         proxyReq.setHeader("x-user", userBase64);
       }
 
+      // Forward Authorization header if available (for service-to-service calls)
+      if (req.headers.authorization || req.headers.Authorization) {
+        proxyReq.setHeader(
+          "Authorization",
+          req.headers.authorization || req.headers.Authorization
+        );
+      }
+
       // Fix body forwarding - re-stream the parsed body
       if (req.body && Object.keys(req.body).length > 0) {
         const bodyData = JSON.stringify(req.body);
