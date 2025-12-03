@@ -24,8 +24,12 @@ const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
+  const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAddress, setSelectedAddress] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const socketRef = useRef(null);
+  const notificationRef = useRef(null);
 
   // Lấy địa chỉ đã chọn từ localStorage hoặc dùng địa chỉ mặc định
   useEffect(() => {
@@ -85,6 +89,12 @@ const Header = () => {
       if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setIsUserMenuOpen(false);
       }
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(event.target)
+      ) {
+        setIsNotificationMenuOpen(false);
+      }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -92,6 +102,129 @@ const Header = () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Load notifications from localStorage
+  useEffect(() => {
+    const savedNotifications = localStorage.getItem("notifications");
+    if (savedNotifications) {
+      try {
+        setNotifications(JSON.parse(savedNotifications));
+      } catch (error) {
+        console.error("Error loading notifications:", error);
+      }
+    }
+  }, []);
+
+  // Save notifications to localStorage
+  useEffect(() => {
+    if (notifications.length > 0) {
+      localStorage.setItem("notifications", JSON.stringify(notifications));
+    }
+  }, [notifications]);
+
+  // WebSocket connection for notifications
+  useEffect(() => {
+    if (!user) return;
+
+    // Load Socket.IO if available
+    const loadSocketIO = () => {
+      return new Promise((resolve) => {
+        if (window.io) {
+          resolve();
+          return;
+        }
+        const script = document.createElement("script");
+        script.src = "https://cdn.socket.io/4.6.1/socket.io.min.js";
+        script.onload = resolve;
+        script.onerror = resolve; // Continue even if Socket.IO fails
+        document.head.appendChild(script);
+      });
+    };
+
+    loadSocketIO().then(() => {
+      if (window.io) {
+        const socket = window.io("http://localhost:4007", {
+          transports: ["websocket", "polling"],
+        });
+
+        socket.on("connect", () => {
+          console.log("[Header] Socket.IO connected for notifications");
+          // Join user room for notifications
+          const userId = user._id || user.id;
+          if (userId) {
+            socket.emit("join:user", userId);
+            console.log("[Header] Joined user room:", userId);
+          }
+        });
+
+        // Listen for drone arriving notification
+        socket.on("drone:arriving", (data) => {
+          console.log("[Header] Received drone arriving notification:", data);
+
+          const newNotification = {
+            id: Date.now().toString(),
+            type: "drone_arriving",
+            title: "Drone đang đến gần bạn",
+            message:
+              data.message ||
+              `Drone đang đến gần bạn! Còn khoảng ${
+                data.distance || "1"
+              }km. Vui lòng chuẩn bị nhận hàng.`,
+            orderId: data.orderId,
+            droneId: data.droneId,
+            distance: data.distance,
+            estimatedTime: data.estimatedTime,
+            timestamp: data.timestamp || new Date().toISOString(),
+            read: false,
+          };
+
+          setNotifications((prev) => [newNotification, ...prev]);
+        });
+
+        socket.on("connect_error", (error) => {
+          console.error("[Header] Socket.IO connection error:", error);
+        });
+
+        socketRef.current = socket;
+
+        return () => {
+          if (socketRef.current) {
+            const userId = user._id || user.id;
+            if (userId) {
+              socketRef.current.emit("leave:user", userId);
+            }
+            socketRef.current.disconnect();
+          }
+        };
+      }
+    });
+  }, [user]);
+
+  // Get unread notifications count
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Mark notification as read
+  const markAsRead = (notificationId) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
+    );
+  };
+
+  // Mark all as read
+  const markAllAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  // Delete notification
+  const deleteNotification = (notificationId) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+  };
+
+  // Clear all notifications
+  const clearAllNotifications = () => {
+    setNotifications([]);
+    localStorage.removeItem("notifications");
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -310,10 +443,118 @@ const Header = () => {
                 )}
 
                 {/* Notifications */}
-                <button className="relative p-2 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all duration-200">
-                  <Bell className="w-5 h-5" />
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
-                </button>
+                <div className="relative" ref={notificationRef}>
+                  <button
+                    onClick={() =>
+                      setIsNotificationMenuOpen(!isNotificationMenuOpen)
+                    }
+                    className="relative p-2 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-all duration-200"
+                  >
+                    <Bell className="w-5 h-5" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {isNotificationMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-96 bg-white rounded-xl shadow-xl border border-gray-100 z-50 max-h-[600px] flex flex-col">
+                      {/* Header */}
+                      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white rounded-t-xl">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Thông báo
+                        </h3>
+                        <div className="flex items-center space-x-2">
+                          {unreadCount > 0 && (
+                            <button
+                              onClick={markAllAsRead}
+                              className="text-xs text-orange-600 hover:text-orange-700 font-medium"
+                            >
+                              Đánh dấu tất cả đã đọc
+                            </button>
+                          )}
+                          {notifications.length > 0 && (
+                            <button
+                              onClick={clearAllNotifications}
+                              className="text-xs text-gray-500 hover:text-red-600 font-medium"
+                            >
+                              Xóa tất cả
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Notifications List */}
+                      <div className="overflow-y-auto flex-1">
+                        {notifications.length === 0 ? (
+                          <div className="px-4 py-8 text-center">
+                            <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                            <p className="text-sm text-gray-500">
+                              Chưa có thông báo nào
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="divide-y divide-gray-100">
+                            {notifications.map((notification) => (
+                              <div
+                                key={notification.id}
+                                className={`px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer ${
+                                  !notification.read ? "bg-orange-50/50" : ""
+                                }`}
+                                onClick={() => {
+                                  markAsRead(notification.id);
+                                  if (notification.orderId) {
+                                    navigate(`/orders/${notification.orderId}`);
+                                    setIsNotificationMenuOpen(false);
+                                  }
+                                }}
+                              >
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center space-x-2 mb-1">
+                                      <div className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0 mt-1.5"></div>
+                                      <p className="text-sm font-semibold text-gray-900">
+                                        {notification.title}
+                                      </p>
+                                      {!notification.read && (
+                                        <span className="w-2 h-2 bg-orange-500 rounded-full flex-shrink-0"></span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-gray-600 mb-1">
+                                      {notification.message}
+                                    </p>
+                                    {notification.distance && (
+                                      <p className="text-xs text-gray-500">
+                                        Khoảng cách: {notification.distance}km
+                                        {notification.estimatedTime &&
+                                          ` • Ước tính: ${notification.estimatedTime} phút`}
+                                      </p>
+                                    )}
+                                    <p className="text-xs text-gray-400 mt-1">
+                                      {new Date(
+                                        notification.timestamp
+                                      ).toLocaleString("vi-VN")}
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteNotification(notification.id);
+                                    }}
+                                    className="ml-2 text-gray-400 hover:text-red-600 transition-colors flex-shrink-0"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Cart */}
                 <Link
@@ -470,6 +711,21 @@ const Header = () => {
                   >
                     <span>Đơn hàng</span>
                   </Link>
+                  <button
+                    onClick={() => {
+                      setIsNotificationMenuOpen(!isNotificationMenuOpen);
+                      setIsMenuOpen(false);
+                    }}
+                    className="flex items-center space-x-3 px-4 py-3 text-gray-700 hover:text-orange-600 hover:bg-white rounded-lg transition-all duration-200 font-medium relative w-full text-left"
+                  >
+                    <Bell className="w-5 h-5" />
+                    <span>Thông báo</span>
+                    {unreadCount > 0 && (
+                      <span className="ml-auto w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </button>
                   <Link
                     to="/favorites"
                     onClick={() => setIsMenuOpen(false)}

@@ -53,6 +53,7 @@ const upload = multer({
   },
 });
 
+// Allow optional file uploads for updates
 const uploadFiles = upload.fields([{ name: "images", maxCount: 5 }]);
 
 // Helper function to convert category name to ObjectId
@@ -86,7 +87,19 @@ exports.uploadProductImages = (req, res, next) => {
       if (err.code === "LIMIT_UNEXPECTED_FILE") {
         return next(new AppError("Vượt quá số lượng file quy định.", 400));
       }
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return next(new AppError("Kích thước file quá lớn (tối đa 5MB).", 400));
+      }
     } else if (err) {
+      // Nếu không có file upload (update không có ảnh mới), cho phép tiếp tục
+      if (err.message && err.message.includes("Unexpected field")) {
+        return next(new AppError("Trường file không hợp lệ.", 400));
+      }
+      // Cho phép request không có file (update chỉ giá, không có ảnh)
+      if (!req.files || !req.files.images) {
+        if (req.body.promotion == "") req.body.promotion = req.body.price;
+        return next();
+      }
       return next(new AppError("Upload thất bại.", 400));
     }
     if (req.body.promotion == "") req.body.promotion = req.body.price;
@@ -98,10 +111,20 @@ exports.resizeProductImages = catchAsync(async (req, res, next) => {
   let images = [];
 
   // Handle uploaded files
-  if (req.files && req.files.images) {
+  if (req.files && req.files.images && Array.isArray(req.files.images)) {
     for (const file of req.files.images) {
-      const result = await cloudinary.uploader.upload(file.path);
-      images.push(result.url);
+      try {
+        // Kiểm tra file.path tồn tại trước khi upload
+        if (file.path) {
+          const result = await cloudinary.uploader.upload(file.path);
+          if (result && result.url) {
+            images.push(result.url);
+          }
+        }
+      } catch (error) {
+        console.error("Error uploading image to Cloudinary:", error);
+        // Không throw error, chỉ log để không block update product
+      }
     }
   }
 
@@ -109,13 +132,16 @@ exports.resizeProductImages = catchAsync(async (req, res, next) => {
   if (req.body.urlImages) {
     try {
       const urlImages = JSON.parse(req.body.urlImages);
-      images = [...images, ...urlImages];
+      if (Array.isArray(urlImages)) {
+        images = [...images, ...urlImages];
+      }
     } catch (error) {
       console.error("Error parsing URL images:", error);
     }
   }
 
   // Only update images if we have new images
+  // Nếu không có ảnh mới, giữ nguyên ảnh cũ (không update req.body.images)
   if (images.length > 0) {
     req.body.images = images;
   }
@@ -124,19 +150,44 @@ exports.resizeProductImages = catchAsync(async (req, res, next) => {
 });
 
 exports.deleteImageCloud = catchAsync(async (req, res, next) => {
+  // Chỉ xóa ảnh cũ khi có ảnh mới được upload
+  // Nếu không có ảnh mới (update chỉ giá, không có ảnh), giữ nguyên ảnh cũ
   if (
-    req.body.action == "Edit" &&
-    (req.files === undefined || !req.files.images)
-  )
+    !req.files ||
+    !req.files.images ||
+    !Array.isArray(req.files.images) ||
+    req.files.images.length === 0
+  ) {
+    // Không có ảnh mới, giữ nguyên ảnh cũ
     return next();
-  let product = await Product.findById(req.params.id);
+  }
 
-  // Delete image from cloudinary
-  if (product && product.images) {
-    for (const imageURL of product.images) {
-      const getPublicId = imageURL.split("/").pop().split(".")[0];
-      await cloudinary.uploader.destroy(getPublicId);
+  // Có ảnh mới, xóa ảnh cũ
+  try {
+    const product = await Product.findById(req.params.id);
+
+    // Delete image from cloudinary
+    if (product && product.images && Array.isArray(product.images)) {
+      for (const imageURL of product.images) {
+        try {
+          // Extract public_id from Cloudinary URL
+          // Format: https://res.cloudinary.com/{cloud_name}/image/upload/{version}/{public_id}.{format}
+          const urlParts = imageURL.split("/");
+          const publicIdWithExt = urlParts[urlParts.length - 1];
+          const publicId = publicIdWithExt.split(".")[0];
+
+          if (publicId) {
+            await cloudinary.uploader.destroy(publicId);
+          }
+        } catch (error) {
+          console.error("Error deleting image from Cloudinary:", error);
+          // Không throw error, chỉ log để không block update product
+        }
+      }
     }
+  } catch (error) {
+    console.error("Error in deleteImageCloud:", error);
+    // Không throw error, chỉ log để không block update product
   }
 
   next();
@@ -268,31 +319,110 @@ exports.createProduct = catchAsync(async (req, res, next) => {
 });
 
 exports.updateProduct = catchAsync(async (req, res, next) => {
-  // Convert category name to ObjectId if needed
-  if (req.body.category) {
-    const categoryId = await getCategoryId(req.body.category);
-    if (categoryId) {
-      req.body.category = categoryId;
-    } else {
-      delete req.body.category; // Remove invalid category
+  try {
+    // Convert category name to ObjectId if needed
+    if (req.body.category) {
+      const categoryId = await getCategoryId(req.body.category);
+      if (categoryId) {
+        req.body.category = categoryId;
+      } else {
+        delete req.body.category; // Remove invalid category
+      }
     }
+
+    // Xử lý promotion: nếu promotion rỗng hoặc null, set thành null
+    if (
+      req.body.promotion === "" ||
+      req.body.promotion === null ||
+      req.body.promotion === undefined
+    ) {
+      req.body.promotion = null;
+    }
+
+    // Xử lý price: đảm bảo là số
+    if (req.body.price !== undefined) {
+      req.body.price = Number(req.body.price);
+      if (isNaN(req.body.price) || req.body.price <= 0) {
+        return next(new AppError("Giá sản phẩm phải là số dương", 400));
+      }
+    }
+
+    // Xử lý promotion: đảm bảo là số và nhỏ hơn price
+    if (req.body.promotion !== null && req.body.promotion !== undefined) {
+      req.body.promotion = Number(req.body.promotion);
+      if (isNaN(req.body.promotion)) {
+        req.body.promotion = null;
+      } else if (req.body.price && req.body.promotion >= req.body.price) {
+        return next(new AppError("Giá khuyến mãi phải nhỏ hơn giá gốc", 400));
+      }
+    }
+
+    // Xử lý inventory/stock
+    if (req.body.stock !== undefined) {
+      req.body.inventory = Number(req.body.stock) || 0;
+      delete req.body.stock; // Remove stock field, use inventory instead
+    }
+
+    // Tìm product hiện tại để giữ nguyên các field không được update
+    const existingProduct = await Product.findById(req.params.id);
+    if (!existingProduct) {
+      return next(new AppError("Không tìm thấy sản phẩm với ID này", 404));
+    }
+
+    // Nếu title không thay đổi, không update title để tránh lỗi unique constraint
+    if (req.body.title && req.body.title === existingProduct.title) {
+      delete req.body.title;
+    }
+
+    // Nếu không có ảnh mới, giữ nguyên ảnh cũ
+    if (
+      !req.body.images ||
+      !Array.isArray(req.body.images) ||
+      req.body.images.length === 0
+    ) {
+      delete req.body.images; // Không update images nếu không có ảnh mới
+    }
+
+    // Update product với validation
+    // Sử dụng findOneAndUpdate với upsert: false để tránh lỗi unique khi update
+    const product = await Product.findOneAndUpdate(
+      { _id: req.params.id },
+      req.body,
+      {
+        new: true,
+        runValidators: true,
+        upsert: false,
+      }
+    );
+
+    if (!product) {
+      return next(new AppError("Không tìm thấy sản phẩm với ID này", 404));
+    }
+
+    res.status(200).json({
+      status: "success",
+      data: {
+        product,
+      },
+    });
+  } catch (error) {
+    // Xử lý lỗi validation từ Mongoose
+    if (error.name === "ValidationError") {
+      const messages = Object.values(error.errors).map((err) => err.message);
+      return next(new AppError(messages.join(", "), 400));
+    }
+
+    // Xử lý lỗi duplicate key (unique constraint)
+    if (error.code === 11000) {
+      return next(new AppError("Tên sản phẩm đã tồn tại", 400));
+    }
+
+    // Lỗi khác
+    console.error("[updateProduct] Error:", error);
+    return next(
+      new AppError(error.message || "Cập nhật sản phẩm thất bại", 500)
+    );
   }
-
-  const product = await Product.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
-    runValidators: true,
-  });
-
-  if (!product) {
-    return next(new AppError("No product found with that ID", 404));
-  }
-
-  res.status(200).json({
-    status: "success",
-    data: {
-      product,
-    },
-  });
 });
 
 exports.deleteProduct = catchAsync(async (req, res, next) => {
@@ -416,7 +546,7 @@ exports.checkInventory = catchAsync(async (req, res, next) => {
   // Build detailed error message for products with insufficient inventory
   const failedProducts = results.filter((r) => !r.success);
   let errorMessage = "Some products have insufficient inventory";
-  
+
   if (failedProducts.length > 0) {
     // Get product names for failed products
     const productInfo = [];
@@ -430,7 +560,7 @@ exports.checkInventory = catchAsync(async (req, res, next) => {
         });
       }
     }
-    
+
     if (productInfo.length > 0) {
       const productNames = productInfo.map((p) => p.name).join(", ");
       errorMessage = `Sản phẩm không đủ tồn kho: ${productNames}. `;

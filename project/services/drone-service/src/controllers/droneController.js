@@ -349,6 +349,7 @@ exports.assignDroneToOrder = async (req, res) => {
     // Update drone
     drone.orderId = orderId;
     drone.status = "flying";
+    drone.notificationSent1km = false; // Reset notification flag when assigning new order
     if (startLocation) {
       drone.startLocation = startLocation;
     } else {

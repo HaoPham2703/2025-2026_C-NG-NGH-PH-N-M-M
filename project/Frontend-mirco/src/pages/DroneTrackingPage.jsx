@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "react-query";
 import { droneApi } from "../api/droneApi";
 import { orderApi } from "../api/orderApi";
 import { useAuth } from "../hooks/useAuth";
+import toast from "react-hot-toast";
 import {
   MapPin,
   Navigation,
@@ -31,15 +32,22 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
   const pathRef = useRef(null); // Keep reference to current path
   const mapStateRef = useRef(null); // Keep reference to current map
 
-  // Fetch order data
-  const { data: orderData, isLoading: orderLoading } = useQuery(
-    ["order", orderId],
-    () => orderApi.getOrder(orderId),
-    {
-      enabled: !!orderId,
-      refetchOnWindowFocus: false,
-    }
-  );
+  // Fetch order data (optional - page can work without it)
+  const {
+    data: orderData,
+    isLoading: orderLoading,
+    error: orderError,
+  } = useQuery(["order", orderId], () => orderApi.getOrder(orderId), {
+    enabled: !!orderId,
+    refetchOnWindowFocus: false,
+    retry: 2, // Retry 2 times on failure
+    retryDelay: 1000, // Wait 1 second between retries
+    // Don't throw error - just log it, page can still work with drone data
+    onError: (error) => {
+      console.warn("[DroneTrackingPage] Failed to fetch order data:", error);
+      // Don't show toast here - axiosClients already handles it
+    },
+  });
 
   // Fetch drone data
   // Use useState to keep previous drone data during refetch/updates
@@ -521,6 +529,14 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
       socket.on("connect", () => {
         console.log("Socket.IO connected");
         socket.emit("join:order", orderId);
+
+        // Join user room nếu có user ID để nhận notification
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        if (user?._id || user?.id) {
+          const userId = user._id || user.id;
+          socket.emit("join:user", userId);
+          console.log("[DroneTrackingPage] Joined user room:", userId);
+        }
       });
 
       socket.on("drone:update", (data) => {
@@ -683,6 +699,33 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
         }
       });
 
+      // Listen for drone arriving notification (1km away)
+      socket.on("drone:arriving", (data) => {
+        if (data.orderId === orderId) {
+          console.log(
+            "[DroneTrackingPage] Received drone arriving notification:",
+            data
+          );
+
+          // Hiển thị thông báo cho user
+          const notificationMessage =
+            data.message ||
+            `Drone đang đến gần bạn! Còn khoảng ${
+              data.distance || "1"
+            }km. Vui lòng chuẩn bị nhận hàng.`;
+          toast.success(`🚁 ${notificationMessage}`, {
+            duration: 8000, // Hiển thị 8 giây
+            icon: "🚁",
+            style: {
+              background: "#10b981",
+              color: "white",
+              fontSize: "16px",
+              padding: "16px",
+            },
+          });
+        }
+      });
+
       socket.on("connect_error", (error) => {
         console.error("Socket.IO connection error:", error);
       });
@@ -777,12 +820,13 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
   }
 
   // Show loading only during initial load (first time), not during refetch
-  if ((orderLoading || (droneLoading && !effectiveDroneData)) && !drone) {
+  // Only wait for drone data, order data is optional
+  if (droneLoading && !effectiveDroneData && !drone) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
-          <p className="text-gray-600">Đang tải dữ liệu...</p>
+          <p className="text-gray-600">Đang tải dữ liệu drone...</p>
         </div>
       </div>
     );
@@ -936,6 +980,11 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
                     (Đang cập nhật...)
                   </span>
                 )}
+                {orderError && (
+                  <span className="ml-2 text-xs text-yellow-600">
+                    (Không thể tải thông tin đơn hàng)
+                  </span>
+                )}
               </p>
             </div>
             <Link
@@ -945,6 +994,16 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
               <ArrowLeft className="w-4 h-4" />
               Quay lại
             </Link>
+          </div>
+        )}
+
+        {/* Warning if order data failed to load */}
+        {orderError && !orderLoading && (
+          <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-sm text-yellow-800">
+              <strong>Lưu ý:</strong> Không thể tải thông tin đơn hàng, nhưng
+              bạn vẫn có thể theo dõi drone giao hàng.
+            </p>
           </div>
         )}
 
@@ -1100,10 +1159,14 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
                 <div className="space-y-2">
                   <p className="text-sm text-gray-600">Người nhận</p>
                   <p className="font-semibold text-gray-900">
-                    {order.receiver}
+                    {order?.receiver || "N/A"}
                   </p>
                   <p className="text-sm text-gray-600 mt-3">Địa chỉ</p>
-                  <p className="text-sm text-gray-900">{order.address}</p>
+                  <p className="text-sm text-gray-900">
+                    {order?.address ||
+                      drone?.deliveryDestination?.address ||
+                      "Đang tải..."}
+                  </p>
                 </div>
               </div>
             )}

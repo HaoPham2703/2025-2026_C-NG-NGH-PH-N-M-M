@@ -108,6 +108,11 @@ const droneSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // Track if 1km notification has been sent
+    notificationSent1km: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

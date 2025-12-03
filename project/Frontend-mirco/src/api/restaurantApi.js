@@ -1,4 +1,4 @@
-import { userClient } from "./axiosClients";
+import { userClient, restaurantClient } from "./axiosClients";
 
 export const restaurantApi = {
   // Admin restaurant management
@@ -35,4 +35,11 @@ export const restaurantApi = {
   // Check active orders for restaurant
   checkActiveOrders: (id) =>
     userClient.get(`/api/v1/admin/restaurants/${id}/check-orders`),
+
+  // Restaurant client APIs (uses restaurant token)
+  // Get restaurant analytics
+  getAnalytics: (timeRange = "week") =>
+    restaurantClient.get("/restaurant/analytics", {
+      params: { timeRange },
+    }),
 };

@@ -1,5 +1,8 @@
 const Drone = require("../models/droneModel");
-const { updateOrderStatusToSuccess } = require("../utils/geocoding");
+const {
+  updateOrderStatusToSuccess,
+  getOrderDetails,
+} = require("../utils/geocoding");
 
 class DroneSimulation {
   constructor(io) {
@@ -87,13 +90,89 @@ class DroneSimulation {
     const destLat = drone.destination.latitude;
     const destLon = drone.destination.longitude;
 
-    // Calculate distance to destination
+    // Calculate distance to current destination
     const distance = this.calculateDistance(
       currentLat,
       currentLon,
       destLat,
       destLon
     );
+
+    // Tính khoảng cách đến điểm giao hàng cuối cùng (deliveryDestination)
+    // để kiểm tra khi nào gửi notification cho user
+    let distanceToDelivery = distance;
+    if (
+      drone.deliveryDestination &&
+      drone.deliveryDestination.latitude &&
+      drone.deliveryDestination.longitude
+    ) {
+      distanceToDelivery = this.calculateDistance(
+        currentLat,
+        currentLon,
+        drone.deliveryDestination.latitude,
+        drone.deliveryDestination.longitude
+      );
+    }
+
+    // Kiểm tra và gửi thông báo khi drone còn 1km tới điểm giao hàng cuối cùng
+    // Chỉ gửi khi đang bay đến điểm giao hàng (không phải đang bay đến restaurant)
+    // Và chỉ gửi 1 lần
+    if (
+      drone.orderId &&
+      drone.deliveryDestination &&
+      drone.deliveryDestination.latitude &&
+      drone.deliveryDestination.longitude &&
+      distanceToDelivery <= 1.0 &&
+      distanceToDelivery > 0.1 &&
+      !drone.notificationSent1km &&
+      // Chỉ gửi khi đang bay đến điểm giao hàng (destination là deliveryDestination)
+      Math.abs(destLat - drone.deliveryDestination.latitude) < 0.0001 &&
+      Math.abs(destLon - drone.deliveryDestination.longitude) < 0.0001
+    ) {
+      // Đánh dấu đã gửi notification để không gửi lại
+      drone.notificationSent1km = true;
+      await drone.save();
+
+      // Lấy thông tin order để có user ID
+      try {
+        const order = await getOrderDetails(drone.orderId);
+        const userId = order?.user?.toString() || order?.user;
+
+        if (userId) {
+          // Gửi notification qua WebSocket cho user
+          this.io.to(`user:${userId}`).emit("drone:arriving", {
+            orderId: drone.orderId,
+            droneId: drone.droneId,
+            message:
+              "Drone đang đến gần bạn! Còn khoảng 1km. Vui lòng chuẩn bị nhận hàng.",
+            distance: distanceToDelivery.toFixed(2),
+            estimatedTime: Math.round((distanceToDelivery / drone.speed) * 60), // phút
+            timestamp: new Date().toISOString(),
+          });
+
+          // Cũng emit cho order-specific room
+          this.io.to(`order:${drone.orderId}`).emit("drone:arriving", {
+            orderId: drone.orderId,
+            droneId: drone.droneId,
+            message:
+              "Drone đang đến gần bạn! Còn khoảng 1km. Vui lòng chuẩn bị nhận hàng.",
+            distance: distanceToDelivery.toFixed(2),
+            estimatedTime: Math.round((distanceToDelivery / drone.speed) * 60),
+            timestamp: new Date().toISOString(),
+          });
+
+          console.log(
+            `[DroneSimulation] 📢 Notification sent to user ${userId} for order ${drone.orderId}: Drone arriving in 1km`
+          );
+        }
+      } catch (error) {
+        console.error(
+          `[DroneSimulation] Error sending 1km notification:`,
+          error.message
+        );
+        // Không throw error để không ảnh hưởng đến simulation
+      }
+    }
 
     // If very close to destination (within 100m), mark as arrived
     // Increased threshold for faster simulation
@@ -316,6 +395,7 @@ class DroneSimulation {
       drone.startLocation = undefined;
       drone.assignedAt = null;
       drone.estimatedArrival = null;
+      drone.notificationSent1km = false; // Reset notification flag
 
       // Reset to home location (where drone started)
       drone.currentLocation.latitude = homeLocation.latitude;

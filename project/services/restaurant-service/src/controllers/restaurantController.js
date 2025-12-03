@@ -6,7 +6,9 @@ const AppError = require("../utils/appError");
 // @route   GET /api/v1/restaurants/:id/public
 // @access  Public
 exports.getPublicRestaurantInfo = catchAsync(async (req, res, next) => {
-  const restaurant = await Restaurant.findById(req.params.id).select("restaurantName address");
+  const restaurant = await Restaurant.findById(req.params.id).select(
+    "restaurantName address"
+  );
 
   if (!restaurant) {
     return next(new AppError("Restaurant not found", 404));
@@ -444,6 +446,301 @@ exports.getOrders = catchAsync(async (req, res, next) => {
       data: {
         orders: [],
       },
+    });
+  }
+});
+
+// @desc    Get restaurant analytics
+// @route   GET /api/restaurant/analytics
+// @access  Private
+exports.getAnalytics = catchAsync(async (req, res, next) => {
+  const axios = require("axios");
+  const restaurantId = req.restaurant.id;
+  const { timeRange = "week" } = req.query;
+
+  try {
+    // 1. Get orders from Order Service
+    const orderServiceUrl =
+      process.env.ORDER_SERVICE_URL || "http://localhost:4003";
+    const orderUrl = `${orderServiceUrl}/api/v1/orders/restaurant/${restaurantId}`;
+
+    let orders = [];
+    try {
+      const orderResponse = await axios.get(orderUrl, {
+        headers: {
+          "x-user": Buffer.from(
+            JSON.stringify({
+              id: restaurantId,
+              role: "restaurant",
+            })
+          ).toString("base64"),
+        },
+        timeout: 5000,
+      });
+
+      orders = orderResponse.data?.data?.orders || [];
+    } catch (orderError) {
+      console.error("[getAnalytics] Order Service error:", orderError.message);
+      orders = [];
+    }
+
+    if (!Array.isArray(orders)) {
+      orders = [];
+    }
+
+    // 2. Calculate time range
+    const now = new Date();
+    let startDate, previousStartDate, previousEndDate;
+
+    switch (timeRange) {
+      case "today":
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        previousStartDate = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate() - 1
+        );
+        previousEndDate = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          now.getDate()
+        );
+        break;
+      case "week":
+        const dayOfWeek = now.getDay();
+        startDate = new Date(now);
+        startDate.setDate(now.getDate() - dayOfWeek);
+        startDate.setHours(0, 0, 0, 0);
+        previousStartDate = new Date(startDate);
+        previousStartDate.setDate(previousStartDate.getDate() - 7);
+        previousEndDate = new Date(startDate);
+        break;
+      case "month":
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        previousStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        previousEndDate = new Date(now.getFullYear(), now.getMonth(), 0);
+        break;
+      case "year":
+        startDate = new Date(now.getFullYear(), 0, 1);
+        previousStartDate = new Date(now.getFullYear() - 1, 0, 1);
+        previousEndDate = new Date(now.getFullYear(), 0, 0);
+        break;
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        previousStartDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        previousEndDate = new Date(now.getFullYear(), now.getMonth(), 0);
+    }
+
+    // 3. Filter orders by time range
+    const currentPeriodOrders = orders.filter((o) => {
+      const orderDate = new Date(o.createdAt);
+      return orderDate >= startDate;
+    });
+
+    const previousPeriodOrders = orders.filter((o) => {
+      const orderDate = new Date(o.createdAt);
+      return orderDate >= previousStartDate && orderDate < previousEndDate;
+    });
+
+    // 4. Calculate revenue
+    const currentRevenue = currentPeriodOrders
+      .filter((o) => o.status === "Success")
+      .reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+
+    const previousRevenue = previousPeriodOrders
+      .filter((o) => o.status === "Success")
+      .reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+
+    const revenueGrowth =
+      previousRevenue > 0
+        ? Number(
+            (
+              ((currentRevenue - previousRevenue) / previousRevenue) *
+              100
+            ).toFixed(1)
+          )
+        : currentRevenue > 0
+        ? 100
+        : 0;
+
+    // 5. Calculate orders
+    const currentOrders = currentPeriodOrders.length;
+    const previousOrders = previousPeriodOrders.length;
+    const ordersGrowth =
+      previousOrders > 0
+        ? Number(
+            (((currentOrders - previousOrders) / previousOrders) * 100).toFixed(
+              1
+            )
+          )
+        : currentOrders > 0
+        ? 100
+        : 0;
+
+    // 6. Calculate unique customers
+    const currentCustomers = new Set(
+      currentPeriodOrders.map((o) => o.user?.toString() || o.user)
+    ).size;
+    const previousCustomers = new Set(
+      previousPeriodOrders.map((o) => o.user?.toString() || o.user)
+    ).size;
+    const customersGrowth =
+      previousCustomers > 0
+        ? Number(
+            (
+              ((currentCustomers - previousCustomers) / previousCustomers) *
+              100
+            ).toFixed(1)
+          )
+        : currentCustomers > 0
+        ? 100
+        : 0;
+
+    // 7. Calculate average order value
+    const completedCurrentOrders = currentPeriodOrders.filter(
+      (o) => o.status === "Success"
+    );
+    const avgOrderValue =
+      completedCurrentOrders.length > 0
+        ? currentRevenue / completedCurrentOrders.length
+        : 0;
+
+    const completedPreviousOrders = previousPeriodOrders.filter(
+      (o) => o.status === "Success"
+    );
+    const previousAvgOrderValue =
+      completedPreviousOrders.length > 0
+        ? previousRevenue / completedPreviousOrders.length
+        : 0;
+
+    const avgOrderValueGrowth =
+      previousAvgOrderValue > 0
+        ? Number(
+            (
+              ((avgOrderValue - previousAvgOrderValue) /
+                previousAvgOrderValue) *
+              100
+            ).toFixed(1)
+          )
+        : avgOrderValue > 0
+        ? 100
+        : 0;
+
+    // 8. Calculate top products
+    const productSales = {};
+    currentPeriodOrders
+      .filter((o) => o.status === "Success")
+      .forEach((order) => {
+        if (order.cart && Array.isArray(order.cart)) {
+          order.cart.forEach((item) => {
+            const productName =
+              item.product?.title || item.product?.name || "Unknown";
+            const quantity = item.quantity || 0;
+            const price = item.product?.price || 0;
+            const revenue = quantity * price;
+
+            if (!productSales[productName]) {
+              productSales[productName] = { sold: 0, revenue: 0 };
+            }
+            productSales[productName].sold += quantity;
+            productSales[productName].revenue += revenue;
+          });
+        }
+      });
+
+    const topProducts = Object.entries(productSales)
+      .map(([name, data]) => ({
+        name,
+        sold: data.sold,
+        revenue: data.revenue,
+      }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    // 9. Calculate revenue by day (for week range)
+    const revenueByDay = [];
+    if (timeRange === "week") {
+      const days = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+      for (let i = 0; i < 7; i++) {
+        const dayStart = new Date(startDate);
+        dayStart.setDate(startDate.getDate() + i);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        const dayRevenue = currentPeriodOrders
+          .filter((o) => {
+            const orderDate = new Date(o.createdAt);
+            return (
+              orderDate >= dayStart &&
+              orderDate <= dayEnd &&
+              o.status === "Success"
+            );
+          })
+          .reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+
+        revenueByDay.push({
+          day: days[i],
+          revenue: dayRevenue,
+        });
+      }
+    } else {
+      // For other ranges, return empty or calculate differently
+      revenueByDay.push(
+        { day: "T2", revenue: 0 },
+        { day: "T3", revenue: 0 },
+        { day: "T4", revenue: 0 },
+        { day: "T5", revenue: 0 },
+        { day: "T6", revenue: 0 },
+        { day: "T7", revenue: 0 },
+        { day: "CN", revenue: 0 }
+      );
+    }
+
+    // 10. Calculate orders by status
+    const ordersByStatus = {
+      completed: currentPeriodOrders.filter((o) => o.status === "Success")
+        .length,
+      cancelled: currentPeriodOrders.filter((o) => o.status === "Cancelled")
+        .length,
+      refunded: 0, // TODO: Add refund tracking if needed
+    };
+
+    const analytics = {
+      revenue: {
+        current: currentRevenue,
+        previous: previousRevenue,
+        growth: revenueGrowth,
+      },
+      orders: {
+        current: currentOrders,
+        previous: previousOrders,
+        growth: ordersGrowth,
+      },
+      customers: {
+        current: currentCustomers,
+        previous: previousCustomers,
+        growth: customersGrowth,
+      },
+      avgOrderValue: {
+        current: avgOrderValue,
+        previous: previousAvgOrderValue,
+        growth: avgOrderValueGrowth,
+      },
+      topProducts,
+      revenueByDay,
+      ordersByStatus,
+    };
+
+    res.status(200).json({
+      status: "success",
+      data: analytics,
+    });
+  } catch (error) {
+    console.error("[getAnalytics] Error:", error);
+    res.status(500).json({
+      status: "error",
+      message: error.message || "Lỗi khi lấy dữ liệu thống kê",
     });
   }
 });

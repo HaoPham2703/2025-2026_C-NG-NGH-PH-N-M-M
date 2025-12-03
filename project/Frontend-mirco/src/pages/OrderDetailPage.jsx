@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "react-query";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { orderApi } from "../api/orderApi";
 import { paymentApi2 } from "../api/paymentApi2";
+import { useAuth } from "../hooks/useAuth";
 import {
   Package,
   Clock,
@@ -23,6 +24,8 @@ const OrderDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const socketRef = useRef(null);
 
   const {
     data: order,
@@ -113,6 +116,90 @@ const OrderDetailPage = () => {
       console.error("[OrderDetailPage] Error in useEffect:", err);
     }
   }, [order, transactionData, transactionError]);
+
+  // WebSocket connection for drone notifications
+  useEffect(() => {
+    if (!id || !user) return;
+
+    // Load Socket.IO if available
+    const loadSocketIO = () => {
+      return new Promise((resolve) => {
+        if (window.io) {
+          resolve();
+          return;
+        }
+        const script = document.createElement("script");
+        script.src = "https://cdn.socket.io/4.6.1/socket.io.min.js";
+        script.onload = resolve;
+        script.onerror = resolve; // Continue even if Socket.IO fails
+        document.head.appendChild(script);
+      });
+    };
+
+    loadSocketIO().then(() => {
+      if (window.io) {
+        const socket = window.io("http://localhost:4007", {
+          transports: ["websocket", "polling"],
+        });
+
+        socket.on("connect", () => {
+          console.log("[OrderDetailPage] Socket.IO connected");
+          // Join order room
+          socket.emit("join:order", id);
+          // Join user room for notifications
+          const userId = user._id || user.id;
+          if (userId) {
+            socket.emit("join:user", userId);
+            console.log("[OrderDetailPage] Joined user room:", userId);
+          }
+        });
+
+        // Listen for drone arriving notification (1km away)
+        socket.on("drone:arriving", (data) => {
+          if (data.orderId === id) {
+            console.log(
+              "[OrderDetailPage] Received drone arriving notification:",
+              data
+            );
+
+            // Hiển thị thông báo cho user
+            const notificationMessage =
+              data.message ||
+              `Drone đang đến gần bạn! Còn khoảng ${
+                data.distance || "1"
+              }km. Vui lòng chuẩn bị nhận hàng.`;
+            toast.success(`🚁 ${notificationMessage}`, {
+              duration: 8000, // Hiển thị 8 giây
+              icon: "🚁",
+              style: {
+                background: "#10b981",
+                color: "white",
+                fontSize: "16px",
+                padding: "16px",
+              },
+            });
+          }
+        });
+
+        socket.on("connect_error", (error) => {
+          console.error("[OrderDetailPage] Socket.IO connection error:", error);
+        });
+
+        socketRef.current = socket;
+
+        return () => {
+          if (socketRef.current) {
+            socketRef.current.emit("leave:order", id);
+            const userId = user._id || user.id;
+            if (userId) {
+              socketRef.current.emit("leave:user", userId);
+            }
+            socketRef.current.disconnect();
+          }
+        };
+      }
+    });
+  }, [id, user]);
 
   const getStatusIcon = (status) => {
     switch (status) {

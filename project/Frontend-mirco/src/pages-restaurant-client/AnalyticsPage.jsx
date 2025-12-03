@@ -10,60 +10,37 @@ import {
   BarChart3,
   PieChart,
 } from "lucide-react";
+import { restaurantApi } from "../api/restaurantApi";
 
 const AnalyticsPage = () => {
   const [timeRange, setTimeRange] = useState("week");
 
-  // TODO: Replace with actual API calls
-  const { data: analytics, isLoading } = useQuery(
+  // Fetch analytics data from API
+  const { data: analyticsData, isLoading } = useQuery(
     ["restaurantAnalytics", timeRange],
     async () => {
-      // Placeholder data
-      return {
-        revenue: {
-          current: 45000000,
-          previous: 39000000,
-          growth: 15.4,
-        },
-        orders: {
-          current: 234,
-          previous: 198,
-          growth: 18.2,
-        },
-        customers: {
-          current: 156,
-          previous: 142,
-          growth: 9.9,
-        },
-        avgOrderValue: {
-          current: 192307,
-          previous: 196969,
-          growth: -2.4,
-        },
-        topProducts: [
-          { name: "Phở Bò", sold: 89, revenue: 4450000 },
-          { name: "Bánh Mì", sold: 156, revenue: 3900000 },
-          { name: "Cơm Tấm", sold: 67, revenue: 3015000 },
-          { name: "Bún Chả", sold: 45, revenue: 2250000 },
-          { name: "Gỏi Cuốn", sold: 78, revenue: 1950000 },
-        ],
-        revenueByDay: [
-          { day: "T2", revenue: 6200000 },
-          { day: "T3", revenue: 5800000 },
-          { day: "T4", revenue: 7100000 },
-          { day: "T5", revenue: 6500000 },
-          { day: "T6", revenue: 7800000 },
-          { day: "T7", revenue: 8200000 },
-          { day: "CN", revenue: 7400000 },
-        ],
-        ordersByStatus: {
-          completed: 210,
-          cancelled: 12,
-          refunded: 3,
-        },
-      };
+      const response = await restaurantApi.getAnalytics(timeRange);
+      // Response structure: { status: "success", data: { revenue, orders, ... } }
+      return (
+        response?.data ||
+        response || {
+          revenue: { current: 0, previous: 0, growth: 0 },
+          orders: { current: 0, previous: 0, growth: 0 },
+          customers: { current: 0, previous: 0, growth: 0 },
+          avgOrderValue: { current: 0, previous: 0, growth: 0 },
+          topProducts: [],
+          revenueByDay: [],
+          ordersByStatus: { completed: 0, cancelled: 0, refunded: 0 },
+        }
+      );
+    },
+    {
+      refetchOnWindowFocus: false,
+      enabled: !!localStorage.getItem("restaurant_token"),
     }
   );
+
+  const analytics = analyticsData;
 
   const statCards = [
     {
@@ -114,7 +91,7 @@ const AnalyticsPage = () => {
     alert("Xuất báo cáo (Chức năng đang phát triển)");
   };
 
-  if (isLoading) {
+  if (isLoading || !analytics) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
@@ -122,16 +99,19 @@ const AnalyticsPage = () => {
     );
   }
 
-  const maxRevenue = Math.max(
-    ...analytics.revenueByDay.map((d) => d.revenue)
-  );
+  const maxRevenue =
+    analytics?.revenueByDay?.length > 0
+      ? Math.max(...analytics.revenueByDay.map((d) => d.revenue || 0))
+      : 1;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Thống kê & Phân tích</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Thống kê & Phân tích
+          </h2>
           <p className="text-sm text-gray-600 mt-1">
             Theo dõi hiệu suất kinh doanh của nhà hàng
           </p>
@@ -174,7 +154,8 @@ const AnalyticsPage = () => {
                   card.change >= 0 ? "text-green-600" : "text-red-600"
                 }`}
               >
-                {card.change >= 0 ? "↑" : "↓"} {Math.abs(card.change).toFixed(1)}%
+                {card.change >= 0 ? "↑" : "↓"}{" "}
+                {Math.abs(card.change).toFixed(1)}%
               </span>
             </div>
             <p className="text-sm text-gray-600 mb-1">{card.label}</p>
@@ -242,7 +223,9 @@ const AnalyticsPage = () => {
                   </div>
                   <div>
                     <p className="font-medium text-gray-900">{product.name}</p>
-                    <p className="text-sm text-gray-600">Đã bán: {product.sold}</p>
+                    <p className="text-sm text-gray-600">
+                      Đã bán: {product.sold}
+                    </p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -316,4 +299,3 @@ const AnalyticsPage = () => {
 };
 
 export default AnalyticsPage;
-

@@ -22,5 +22,6 @@ router.put(
 );
 router.get("/stats", restaurantController.getStats);
 router.get("/orders", restaurantController.getOrders);
+router.get("/analytics", restaurantController.getAnalytics);
 
 module.exports = router;

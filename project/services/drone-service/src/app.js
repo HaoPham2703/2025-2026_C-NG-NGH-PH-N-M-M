@@ -141,6 +141,18 @@ io.on("connection", (socket) => {
     console.log(`Socket ${socket.id} left order:${orderId}`);
   });
 
+  // Join user-specific room for notifications
+  socket.on("join:user", (userId) => {
+    socket.join(`user:${userId}`);
+    console.log(`Socket ${socket.id} joined user:${userId}`);
+  });
+
+  // Leave user room
+  socket.on("leave:user", (userId) => {
+    socket.leave(`user:${userId}`);
+    console.log(`Socket ${socket.id} left user:${userId}`);
+  });
+
   // Subscribe to specific drone updates
   socket.on("subscribe:drone", (droneId) => {
     socket.join(`drone:${droneId}`);
