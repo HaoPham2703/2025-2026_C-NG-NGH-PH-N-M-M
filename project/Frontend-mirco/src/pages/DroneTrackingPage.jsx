@@ -386,6 +386,19 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
           drone.currentLocation.longitude
         );
 
+        // Tính khoảng cách đến điểm đến cho popup
+        const distanceForPopup =
+          drone.distanceToDestination !== undefined
+            ? drone.distanceToDestination
+            : finalDest
+            ? calculateDistance(
+                drone.currentLocation.latitude || 0,
+                drone.currentLocation.longitude || 0,
+                finalDest.latitude || 0,
+                finalDest.longitude || 0
+              )
+            : 0;
+
         // Create new marker (same approach as DroneHubPage - recreate on each update)
         const marker = window.L.marker(newLatLng, {
           icon: window.L.divIcon({
@@ -396,11 +409,21 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
           }),
         }).addTo(map);
 
-        marker.bindPopup(
-          `<b>Drone ${drone.name || "N/A"}</b><br/>Trạng thái: ${getStatusText(
-            drone.status || "unknown"
-          )}<br/>Pin: ${parseFloat(drone.batteryLevel || 0).toFixed(2)}%`
-        );
+        // Tạo popup với thông tin khoảng cách
+        let popupContent = `<b>Drone ${
+          drone.name || "N/A"
+        }</b><br/>Trạng thái: ${getStatusText(
+          drone.status || "unknown"
+        )}<br/>Pin: ${parseFloat(drone.batteryLevel || 0).toFixed(2)}%`;
+
+        if (
+          distanceForPopup > 0 &&
+          (drone.status === "flying" || drone.status === "delivering")
+        ) {
+          popupContent += `<br/>📏 Còn lại: ${distanceForPopup.toFixed(2)} km`;
+        }
+
+        marker.bindPopup(popupContent);
 
         setDroneMarker(marker);
       } catch (error) {
@@ -534,18 +557,42 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
                 easeLinearity: 0.25,
               });
 
-              // Update popup with new battery info
-              currentMarker.setPopupContent(
-                `<b>Drone ${
-                  currentDrone?.name || "N/A"
-                }</b><br/>Trạng thái: ${getStatusText(
-                  data.status || currentDrone?.status || "unknown"
-                )}<br/>Pin: ${parseFloat(
-                  data.batteryLevel !== undefined
-                    ? data.batteryLevel
-                    : currentDrone?.batteryLevel || 0
-                ).toFixed(2)}%`
-              );
+              // Tính khoảng cách cho popup
+              const finalDestSocket =
+                currentDrone?.deliveryDestination || currentDrone?.destination;
+              const distanceForPopupSocket =
+                data.distanceToDestination !== undefined
+                  ? data.distanceToDestination
+                  : finalDestSocket && data.location
+                  ? calculateDistance(
+                      data.location.latitude || 0,
+                      data.location.longitude || 0,
+                      finalDestSocket.latitude || 0,
+                      finalDestSocket.longitude || 0
+                    )
+                  : 0;
+
+              // Update popup with new battery info and distance
+              let popupContentSocket = `<b>Drone ${
+                currentDrone?.name || "N/A"
+              }</b><br/>Trạng thái: ${getStatusText(
+                data.status || currentDrone?.status || "unknown"
+              )}<br/>Pin: ${parseFloat(
+                data.batteryLevel !== undefined
+                  ? data.batteryLevel
+                  : currentDrone?.batteryLevel || 0
+              ).toFixed(2)}%`;
+
+              if (
+                distanceForPopupSocket > 0 &&
+                (data.status === "flying" || data.status === "delivering")
+              ) {
+                popupContentSocket += `<br/>📏 Còn lại: ${distanceForPopupSocket.toFixed(
+                  2
+                )} km`;
+              }
+
+              currentMarker.setPopupContent(popupContentSocket);
             } catch (error) {
               console.error(
                 "[DroneTrackingPage] Error updating marker in socket:",
@@ -623,6 +670,11 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
                     ? data.batteryLevel
                     : updatedData.data.batteryLevel,
                 status: data.status || updatedData.data.status,
+                // Cập nhật khoảng cách từ WebSocket nếu có
+                distanceToDestination:
+                  data.distanceToDestination !== undefined
+                    ? data.distanceToDestination
+                    : updatedData.data.distanceToDestination,
               };
             }
 
@@ -781,8 +833,11 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
       ? drone.destination
       : null);
 
+  // Ưu tiên sử dụng distanceToDestination từ API/WebSocket, nếu không có thì tính toán
   const distanceToDestination =
-    drone?.currentLocation && finalDestForInfo
+    drone?.distanceToDestination !== undefined
+      ? drone.distanceToDestination
+      : drone?.currentLocation && finalDestForInfo
       ? calculateDistance(
           drone.currentLocation.latitude || 0,
           drone.currentLocation.longitude || 0,
@@ -1012,18 +1067,22 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
                     </p>
                   </div>
                 )}
-                {distanceToDestination > 0 && (
+                {(distanceToDestination > 0 ||
+                  drone?.status === "flying" ||
+                  drone?.status === "delivering") && (
                   <div className="pt-4 border-t border-gray-200">
                     <p className="text-sm text-gray-600 mb-1 flex items-center gap-2">
                       <Clock className="w-4 h-4" />
-                      Khoảng cách
+                      Khoảng cách còn lại
                     </p>
-                    <p className="font-semibold text-gray-900">
-                      {distanceToDestination.toFixed(2)} km
+                    <p className="font-semibold text-gray-900 text-lg">
+                      {distanceToDestination > 0
+                        ? `${distanceToDestination.toFixed(2)} km`
+                        : "Đang tính toán..."}
                     </p>
                     {estimatedMinutes > 0 && (
                       <p className="text-xs text-gray-500 mt-1">
-                        Ước tính: {estimatedMinutes} phút
+                        Ước tính còn: {estimatedMinutes} phút
                       </p>
                     )}
                   </div>

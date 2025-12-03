@@ -204,6 +204,54 @@ exports.updateRestaurant = catchAsync(async (req, res, next) => {
   });
 });
 
+// Helper function to check if restaurant has any orders (all statuses)
+const checkRestaurantHasOrders = async (restaurantId) => {
+  try {
+    const orderServiceUrl =
+      process.env.ORDER_SERVICE_URL || "http://localhost:4003";
+
+    // Check if restaurant has any orders by fetching with limit=1
+    // This is more efficient than fetching all orders
+    // The response includes pagination.total which gives us the total count
+    const orderUrl = `${orderServiceUrl}/api/v1/orders/restaurant/${restaurantId}?limit=1`;
+
+    const orderResponse = await axios.get(orderUrl, {
+      headers: {
+        "Content-Type": "application/json",
+        "x-user": Buffer.from(
+          JSON.stringify({
+            id: restaurantId,
+            role: "admin",
+          })
+        ).toString("base64"),
+      },
+      timeout: 8000,
+    });
+
+    const orders = orderResponse.data?.data?.orders || [];
+    // Lấy tổng số đơn hàng từ pagination.total (tổng số thực tế, không phải số trong trang)
+    const totalOrders = orderResponse.data?.data?.pagination?.total || 0;
+    const hasOrders = totalOrders > 0 || orders.length > 0;
+
+    return {
+      hasOrders,
+      totalOrders,
+    };
+  } catch (error) {
+    console.error(
+      `[Admin Controller] Error checking orders for restaurant ${restaurantId}:`,
+      error.message
+    );
+    // If we can't check orders, assume there are orders to prevent deletion
+    // This is safer than allowing deletion when we can't verify
+    return {
+      hasOrders: true, // Assume has orders to be safe
+      totalOrders: -1, // Unknown count
+      error: error.message,
+    };
+  }
+};
+
 // Helper function to check and handle orders when deleting restaurant
 const handleRestaurantOrdersOnDelete = async (
   restaurantId,
@@ -410,16 +458,19 @@ exports.deleteRestaurant = catchAsync(async (req, res, next) => {
     return next(new AppError("Restaurant not found", 404));
   }
 
-  // Handle orders and payments before deleting
-  const adminId = req.user?.id || req.admin?.id || null;
-  const authHeader = req.headers.authorization || null;
-  const orderHandlingResult = await handleRestaurantOrdersOnDelete(
-    restaurantId,
-    adminId,
-    authHeader
-  );
+  // Kiểm tra xem nhà hàng có đơn hàng hay không
+  const ordersCheck = await checkRestaurantHasOrders(restaurantId);
 
-  // Delete restaurant
+  if (ordersCheck.hasOrders) {
+    const message =
+      ordersCheck.totalOrders > 0
+        ? `Không thể xóa nhà hàng này. Nhà hàng hiện có ${ordersCheck.totalOrders} đơn hàng. Vui lòng xử lý hoặc xóa các đơn hàng trước khi xóa nhà hàng.`
+        : "Không thể xóa nhà hàng này. Nhà hàng đang có đơn hàng. Vui lòng xử lý hoặc xóa các đơn hàng trước khi xóa nhà hàng.";
+
+    return next(new AppError(message, 400));
+  }
+
+  // Nếu không có đơn hàng, cho phép xóa nhà hàng
   await Restaurant.findByIdAndDelete(restaurantId);
 
   res.status(200).json({
@@ -430,7 +481,6 @@ exports.deleteRestaurant = catchAsync(async (req, res, next) => {
         id: restaurantId,
         name: restaurant.restaurantName,
       },
-      orderHandling: orderHandlingResult,
     },
   });
 });

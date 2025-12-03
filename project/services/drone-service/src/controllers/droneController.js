@@ -56,9 +56,36 @@ exports.getDroneByOrderId = async (req, res) => {
         message: "Không tìm thấy drone cho đơn hàng này",
       });
     }
+
+    // Tính khoảng cách từ vị trí hiện tại đến điểm đến
+    let distanceToDestination = 0;
+    const finalDestination =
+      drone.deliveryDestination ||
+      (drone.destination && drone.destination.latitude
+        ? drone.destination
+        : null);
+
+    if (
+      drone.currentLocation &&
+      finalDestination &&
+      finalDestination.latitude &&
+      finalDestination.longitude
+    ) {
+      distanceToDestination = calculateDistance(
+        drone.currentLocation.latitude,
+        drone.currentLocation.longitude,
+        finalDestination.latitude,
+        finalDestination.longitude
+      );
+    }
+
+    // Tạo response với thông tin distance
+    const droneResponse = drone.toObject();
+    droneResponse.distanceToDestination = distanceToDestination;
+
     res.json({
       status: "success",
-      data: drone,
+      data: droneResponse,
     });
   } catch (error) {
     res.status(500).json({
@@ -87,7 +114,7 @@ exports.createDrone = async (req, res) => {
       longitude: 106.7009,
       altitude: 50,
     };
-    
+
     const finalLocation = currentLocation || defaultLocation;
 
     const drone = await Drone.create({
@@ -191,7 +218,7 @@ exports.assignDroneToOrder = async (req, res) => {
         try {
           const order = await getOrderDetails(orderId, authToken);
           let startLocation = null;
-          
+
           // Priority 1: Use restaurantAddress directly from order if available
           if (order?.restaurantAddress) {
             const geo = await geocodeAddress(order.restaurantAddress);
@@ -199,7 +226,7 @@ exports.assignDroneToOrder = async (req, res) => {
               latitude: geo.latitude,
               longitude: geo.longitude,
               address: order.restaurantAddress,
-              restaurantId: String(order.restaurant || ''),
+              restaurantId: String(order.restaurant || ""),
               restaurantName: order.restaurantName || "Nhà hàng",
             };
           }
@@ -230,7 +257,9 @@ exports.assignDroneToOrder = async (req, res) => {
                 address: addr || "Địa chỉ nhà hàng",
                 restaurantId: String(order.restaurant),
                 restaurantName:
-                  restaurantInfo.restaurantName || restaurantInfo.name || "Nhà hàng",
+                  restaurantInfo.restaurantName ||
+                  restaurantInfo.name ||
+                  "Nhà hàng",
               };
             }
           }
@@ -264,9 +293,10 @@ exports.assignDroneToOrder = async (req, res) => {
     let startLocation = req._startLocation || null;
     if (!startLocation) {
       try {
-        const authToken = req.headers.authorization?.replace("Bearer ", "") || null;
+        const authToken =
+          req.headers.authorization?.replace("Bearer ", "") || null;
         const order = await getOrderDetails(orderId, authToken);
-        
+
         // Try restaurantAddress from order first
         if (order?.restaurantAddress) {
           const geo = await geocodeAddress(order.restaurantAddress);
@@ -274,7 +304,7 @@ exports.assignDroneToOrder = async (req, res) => {
             latitude: geo.latitude,
             longitude: geo.longitude,
             address: order.restaurantAddress,
-            restaurantId: String(order.restaurant || ''),
+            restaurantId: String(order.restaurant || ""),
             restaurantName: order.restaurantName || "Nhà hàng",
           };
         }
