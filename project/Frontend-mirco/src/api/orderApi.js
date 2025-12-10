@@ -4,7 +4,12 @@ import axios from "axios";
 const API_GATEWAY_URL = "http://localhost:5001";
 
 // Restaurant order client - uses restaurant token to call order service through API Gateway
-const createRestaurantOrderRequest = async (method, url, data = null, config = {}) => {
+const createRestaurantOrderRequest = async (
+  method,
+  url,
+  data = null,
+  config = {}
+) => {
   const token = localStorage.getItem("restaurant_token");
   if (!token) {
     throw new Error("Restaurant token not found");
@@ -45,7 +50,10 @@ const createRestaurantOrderRequest = async (method, url, data = null, config = {
     // Return response.data to match the format expected by react-query (same as other clients)
     return response.data;
   } catch (error) {
-    console.error(`[RestaurantOrderClient] Error in ${method.toUpperCase()} ${url}:`, error);
+    console.error(
+      `[RestaurantOrderClient] Error in ${method.toUpperCase()} ${url}:`,
+      error
+    );
     // Re-throw to let react-query handle it
     throw error;
   }
@@ -54,16 +62,58 @@ const createRestaurantOrderRequest = async (method, url, data = null, config = {
 // Restaurant order client - uses restaurant token
 const restaurantOrderClient = {
   get: (url, config) => createRestaurantOrderRequest("get", url, null, config),
-  post: (url, data, config) => createRestaurantOrderRequest("post", url, data, config),
-  patch: (url, data, config) => createRestaurantOrderRequest("patch", url, data, config),
-  put: (url, data, config) => createRestaurantOrderRequest("put", url, data, config),
-  delete: (url, config) => createRestaurantOrderRequest("delete", url, null, config),
+  post: (url, data, config) =>
+    createRestaurantOrderRequest("post", url, data, config),
+  patch: (url, data, config) =>
+    createRestaurantOrderRequest("patch", url, data, config),
+  put: (url, data, config) =>
+    createRestaurantOrderRequest("put", url, data, config),
+  delete: (url, config) =>
+    createRestaurantOrderRequest("delete", url, null, config),
 };
 
 export const orderApi = {
   // Orders
-  getOrders: (params) => orderClient.get("/orders", { params }),
-  getOrder: (id) => orderClient.get(`/orders/${id}`),
+  getOrders: (paramsOrConfig) => {
+    // If no argument or undefined, just call without params/config
+    if (!paramsOrConfig) {
+      return orderClient.get("/orders");
+    }
+
+    // Check if it's a config object (has suppressToast or other axios config keys)
+    // vs params object (has query params like status, etc.)
+    const isConfig =
+      paramsOrConfig.suppressToast !== undefined ||
+      paramsOrConfig.timeout !== undefined ||
+      paramsOrConfig.headers !== undefined ||
+      (!paramsOrConfig.status &&
+        !paramsOrConfig.userId &&
+        !paramsOrConfig.restaurantId);
+
+    if (isConfig) {
+      // It's a config object (like { suppressToast: true })
+      // But if it also has params-like keys, combine them
+      const hasParams =
+        paramsOrConfig.status ||
+        paramsOrConfig.userId ||
+        paramsOrConfig.restaurantId;
+      if (hasParams) {
+        // Extract params and config separately
+        const { suppressToast, timeout, headers, ...params } = paramsOrConfig;
+        return orderClient.get("/orders", {
+          params,
+          suppressToast,
+          timeout,
+          headers,
+        });
+      }
+      return orderClient.get("/orders", paramsOrConfig);
+    }
+
+    // It's a params object (like { status: "Delivery" })
+    return orderClient.get("/orders", { params: paramsOrConfig });
+  },
+  getOrder: (id, config) => orderClient.get(`/orders/${id}`, config),
   createOrder: (data) => orderClient.post("/orders", data),
   updateOrder: (id, data) => orderClient.patch(`/orders/${id}`, data),
   deleteOrder: (id) => orderClient.delete(`/orders/${id}`),
@@ -96,12 +146,12 @@ export const orderApi = {
   getOrderForRestaurant: async (id) => {
     const isRestaurant = !!localStorage.getItem("restaurant_token");
     console.log("[orderApi] getOrderForRestaurant:", { id, isRestaurant });
-    
+
     try {
       const response = isRestaurant
         ? await restaurantOrderClient.get(`/orders/${id}`)
         : await orderClient.get(`/orders/${id}`);
-      
+
       console.log("[orderApi] getOrderForRestaurant response:", response);
       return response;
     } catch (error) {

@@ -77,7 +77,8 @@ const DroneHubPage = ({ hideHeader = false }) => {
       console.log(
         "[DroneHubPage] 🔄 Fetching orders from DATABASE (no cache)..."
       );
-      return orderApi.getOrders();
+      // Suppress toast for order fetching - failures can be handled gracefully
+      return orderApi.getOrders({ suppressToast: true });
     },
     {
       enabled: showAssignModal, // Only fetch when modal is open
@@ -215,7 +216,8 @@ const DroneHubPage = ({ hideHeader = false }) => {
       ["ordersForAutoAssign", autoAssignEnabled],
       () => {
         console.log("[DroneHubPage] 🔄 Fetching orders for auto-assign...");
-        return orderApi.getOrders();
+        // Suppress toast for auto-assign polling - failures are not critical
+        return orderApi.getOrders({ suppressToast: true });
       },
       {
         enabled: autoAssignEnabled, // Chỉ chạy khi auto-assign bật
@@ -234,6 +236,13 @@ const DroneHubPage = ({ hideHeader = false }) => {
             );
             return !hasDrone;
           });
+        },
+        onError: (error) => {
+          // Log error but don't show toast (already suppressed via suppressToast)
+          console.warn(
+            "[DroneHubPage] Error fetching orders for auto-assign (non-critical):",
+            error.message
+          );
         },
       }
     );

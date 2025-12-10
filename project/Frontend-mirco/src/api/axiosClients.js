@@ -47,6 +47,9 @@ const createErrorInterceptor = (serviceName) => (error) => {
     code: error.code,
   });
 
+  // Check if toast should be suppressed for this request
+  const suppressToast = config?.suppressToast === true;
+
   // Handle request aborted (không phải lỗi service, có thể do timeout hoặc component unmount)
   if (
     error.code === "ECONNABORTED" ||
@@ -66,15 +69,18 @@ const createErrorInterceptor = (serviceName) => (error) => {
     error.message?.includes("Network Error") ||
     error.message?.includes("timeout")
   ) {
-    toast.error(
-      `${serviceName} service is not available. Please check if the service is running.`,
-      { duration: 5000 }
-    );
+    if (!suppressToast) {
+      toast.error(
+        `${serviceName} service is not available. Please check if the service is running.`,
+        { duration: 5000 }
+      );
+    }
     return Promise.reject(error);
   }
 
   // Handle different error statuses
   if (response?.status === 401) {
+    // Always show auth errors - they are critical
     // Only redirect to user login if this is NOT a restaurant client
     if (serviceName !== "Restaurant") {
       localStorage.removeItem("token");
@@ -89,20 +95,34 @@ const createErrorInterceptor = (serviceName) => (error) => {
       window.location.href = "/restaurant/login";
     }
   } else if (response?.status === 403) {
-    toast.error("Access denied. You do not have permission.");
+    if (!suppressToast) {
+      toast.error("Access denied. You do not have permission.");
+    }
   } else if (response?.status === 404) {
-    toast.error("Resource not found.");
+    // For 404, only suppress if explicitly requested (e.g., optional data)
+    if (!suppressToast) {
+      toast.error("Resource not found.");
+    }
   } else if (response?.status === 503) {
-    toast.error(
-      `${serviceName} service is temporarily unavailable. Please try again later.`,
-      { duration: 5000 }
-    );
+    // Suppress toast for 503 if requested (e.g., optional order data in DroneTrackingPage)
+    if (!suppressToast) {
+      toast.error(
+        `${serviceName} service is temporarily unavailable. Please try again later.`,
+        { duration: 5000 }
+      );
+    }
   } else if (response?.status === 500) {
-    toast.error("Server error. Please try again later.");
+    if (!suppressToast) {
+      toast.error("Server error. Please try again later.");
+    }
   } else if (response?.data?.message) {
-    toast.error(response.data.message);
+    if (!suppressToast) {
+      toast.error(response.data.message);
+    }
   } else {
-    toast.error("An unexpected error occurred.");
+    if (!suppressToast) {
+      toast.error("An unexpected error occurred.");
+    }
   }
 
   return Promise.reject(error);

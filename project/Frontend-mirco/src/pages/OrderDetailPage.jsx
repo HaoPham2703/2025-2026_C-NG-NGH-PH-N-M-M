@@ -154,6 +154,30 @@ const OrderDetailPage = () => {
           }
         });
 
+        // Listen for drone milestone notifications (1/3 journey)
+        socket.on("drone:milestone", (data) => {
+          if (data.orderId === id) {
+            console.log(
+              "[OrderDetailPage] Received drone milestone notification:",
+              data
+            );
+
+            // Hiển thị thông báo
+            const toastStyle = {
+              background: data.type === "fromRestaurant" ? "#f59e0b" : "#3b82f6",
+              color: "white",
+              fontSize: "16px",
+              padding: "16px",
+            };
+
+            toast.success(data.message || "🚁 Cập nhật drone", {
+              duration: data.type === "fromRestaurant" ? 10000 : 8000,
+              icon: data.type === "fromRestaurant" ? "⚡" : "🚁",
+              style: toastStyle,
+            });
+          }
+        });
+
         // Listen for drone arriving notification (1km away)
         socket.on("drone:arriving", (data) => {
           if (data.orderId === id) {
