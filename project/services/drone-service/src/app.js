@@ -40,9 +40,6 @@ const droneSimulation = new DroneSimulation(io);
 // Trust proxy for rate limiting and X-Forwarded-For headers from API Gateway
 app.set("trust proxy", 1);
 
-// Connect to database
-connectDB();
-
 // Security middleware
 app.use(helmet());
 app.use(
@@ -222,19 +219,33 @@ setInterval(async () => {
   }
 }, 5000); // Check every 5 seconds
 
-// Initialize simulations for existing active drones
-droneSimulation.initializeSimulations();
+// Start server after database connection
+const startServer = async () => {
+  try {
+    // Connect to database first
+    await connectDB();
 
-// Start server
-server.listen(PORT, () => {
-  console.log(`🚁 Drone Service running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(
-    `🔗 Database: ${
-      process.env.DB_URL || "mongodb://127.0.0.1:27017/fastfood_drones"
-    }`
-  );
-  console.log(`🔌 WebSocket server ready for real-time tracking`);
-});
+    // Initialize simulations for existing active drones
+    droneSimulation.initializeSimulations();
+
+    // Start server
+    server.listen(PORT, () => {
+      console.log(`🚁 Drone Service running on port ${PORT}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/health`);
+      console.log(
+        `🔗 Database: ${
+          process.env.DB_URL || "mongodb://127.0.0.1:27017/fastfood_drones"
+        }`
+      );
+      console.log(`🔌 WebSocket server ready for real-time tracking`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error.message);
+    process.exit(1);
+  }
+};
+
+// Start the server
+startServer();
 
 module.exports = { app, io, droneSimulation };

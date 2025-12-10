@@ -10,13 +10,15 @@ const catchAsync = (fn) => {
   };
 };
 
-// Helper function for creating errors
-const AppError = (message, statusCode) => {
-  const error = new Error(message);
-  error.statusCode = statusCode;
-  error.status = `${statusCode}`.startsWith("4") ? "fail" : "error";
-  return error;
-};
+// Helper class for creating errors
+class AppError extends Error {
+  constructor(message, statusCode) {
+    super(message);
+    this.statusCode = statusCode;
+    this.status = `${statusCode}`.startsWith("4") ? "fail" : "error";
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
 
 // Helper function để gọi Order Service API
 const getOrderFromService = async (
@@ -276,7 +278,11 @@ exports.getProductsToReviewInOrder = catchAsync(async (req, res, next) => {
     // Kiểm tra user có phải chủ đơn hàng không
     const orderUserId =
       order.user?.toString() || order.user?._id?.toString() || order.user;
-    if (orderUserId !== userId && orderUserId !== userId.toString()) {
+    if (
+      orderUserId !== userId &&
+      orderUserId !== userId.toString() &&
+      req.user?.role !== "admin"
+    ) {
       return next(new AppError("Bạn không có quyền xem đơn hàng này", 403));
     }
 
