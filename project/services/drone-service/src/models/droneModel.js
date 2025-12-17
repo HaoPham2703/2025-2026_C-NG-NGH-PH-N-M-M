@@ -84,7 +84,7 @@ const droneSchema = new mongoose.Schema(
     },
     speed: {
       type: Number,
-      default: 10, // km/h
+      default: 20, // km/h
     },
     batteryLevel: {
       type: Number,

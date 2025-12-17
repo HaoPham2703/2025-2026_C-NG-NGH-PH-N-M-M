@@ -750,6 +750,29 @@ exports.sumInRange = catchAsync(async (req, res, next) => {
   res.status(200).json(data);
 });
 
+// Get top 5 restaurants by order count
+exports.topRestaurants = catchAsync(async (req, res, next) => {
+  const data = await Order.aggregate([
+    {
+      $match: { 
+        status: "Success",
+        restaurant: { $exists: true, $ne: null }
+      },
+    },
+    {
+      $group: {
+        _id: "$restaurant",
+        orderCount: { $sum: 1 },
+        totalRevenue: { $sum: "$totalPrice" },
+        restaurantName: { $first: "$restaurantName" },
+      },
+    },
+    { $sort: { orderCount: -1 } },
+    { $limit: 5 },
+  ]);
+  res.status(200).json(data);
+});
+
 // ===== NEW METHODS FOR ENHANCED ORDER MANAGEMENT =====
 
 // Update order status specifically

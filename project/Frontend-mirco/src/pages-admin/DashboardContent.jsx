@@ -8,6 +8,7 @@ import {
   Users,
   BarChart3,
   Package,
+  Store,
 } from "lucide-react";
 
 // Import orderApi để lấy dữ liệu
@@ -20,6 +21,9 @@ const DashboardContent = () => {
   );
   const { data: topProducts } = useQuery("topProducts", () =>
     orderApi.getTopProducts({})
+  );
+  const { data: topRestaurants } = useQuery("topRestaurants", () =>
+    orderApi.getTopRestaurants()
   );
   const { data: recentOrders } = useQuery("dashboardRecentOrders", () =>
     orderApi.getOrders()
@@ -166,7 +170,7 @@ const DashboardContent = () => {
       </div>
 
       {/* Bottom Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Orders */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
@@ -316,6 +320,60 @@ const DashboardContent = () => {
               className="text-sm font-medium text-primary-600 hover:text-primary-700"
             >
               Xem tất cả sản phẩm →
+            </Link>
+          </div>
+        </div>
+
+        {/* Top 5 Restaurants */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-800">
+              Top 5 Nhà hàng
+            </h3>
+          </div>
+          <div className="divide-y divide-gray-200">
+            {topRestaurants?.slice(0, 5).map((restaurant, index) => (
+              <div
+                key={restaurant._id}
+                className="p-4 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center space-x-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-bold text-white">
+                      #{index + 1}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {restaurant.restaurantName || "Nhà hàng"}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {restaurant.orderCount} đơn hàng
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-primary-600">
+                      {new Intl.NumberFormat("vi-VN", {
+                        style: "currency",
+                        currency: "VND",
+                      }).format(restaurant.totalRevenue || 0)}
+                    </p>
+                    <p className="text-xs text-gray-500">Doanh thu</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="p-4 bg-gray-50 border-t border-gray-200">
+            <Link
+              to="#"
+              onClick={(e) => {
+                e.preventDefault();
+                // Navigate to restaurants management
+              }}
+              className="text-sm font-medium text-primary-600 hover:text-primary-700"
+            >
+              Xem tất cả nhà hàng →
             </Link>
           </div>
         </div>

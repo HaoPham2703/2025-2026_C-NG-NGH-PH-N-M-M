@@ -87,6 +87,7 @@ export const orderApi = {
   getOrderStats: () => orderClient.get("/orders/count"),
   getRevenueStats: () => orderClient.get("/orders/sum"),
   getTopProducts: (data) => orderClient.post("/orders/topProduct", data),
+  getTopRestaurants: () => orderClient.get("/orders/topRestaurants"),
 
   // Restaurant-specific order operations (uses restaurant token)
   // Check if we're in restaurant context
