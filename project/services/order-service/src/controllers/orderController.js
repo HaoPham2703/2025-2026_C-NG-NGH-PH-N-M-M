@@ -752,11 +752,12 @@ exports.sumInRange = catchAsync(async (req, res, next) => {
 
 // Get top 5 restaurants by order count
 exports.topRestaurants = catchAsync(async (req, res, next) => {
+  const mongoose = require("mongoose");
   const data = await Order.aggregate([
     {
-      $match: { 
+      $match: {
         status: "Success",
-        restaurant: { $exists: true, $ne: null }
+        restaurant: { $exists: true, $ne: null },
       },
     },
     {
@@ -764,13 +765,145 @@ exports.topRestaurants = catchAsync(async (req, res, next) => {
         _id: "$restaurant",
         orderCount: { $sum: 1 },
         totalRevenue: { $sum: "$totalPrice" },
-        restaurantName: { $first: "$restaurantName" },
+        restaurantName: { $first: "$restaurantName" }, // Fallback từ Order
+      },
+    },
+    {
+      // Lookup restaurant name from restaurants collection
+      $lookup: {
+        from: "restaurants",
+        localField: "_id",
+        foreignField: "_id",
+        as: "restaurantInfo",
+      },
+    },
+    {
+      // Unwind restaurant info (will be empty array if restaurant not found)
+      $unwind: {
+        path: "$restaurantInfo",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      // Use restaurant name from lookup, fallback to restaurantName from Order, or default
+      $project: {
+        _id: 1,
+        orderCount: 1,
+        totalRevenue: 1,
+        restaurantName: {
+          $cond: {
+            if: {
+              $and: [
+                { $ne: ["$restaurantInfo", null] },
+                { $ne: ["$restaurantInfo.restaurantName", null] },
+                { $ne: ["$restaurantInfo.restaurantName", ""] },
+              ],
+            },
+            then: "$restaurantInfo.restaurantName",
+            else: {
+              $cond: {
+                if: {
+                  $and: [
+                    { $ne: ["$restaurantName", null] },
+                    { $ne: ["$restaurantName", ""] },
+                  ],
+                },
+                then: "$restaurantName",
+                else: "Nhà hàng",
+              },
+            },
+          },
+        },
       },
     },
     { $sort: { orderCount: -1 } },
     { $limit: 5 },
   ]);
-  res.status(200).json(data);
+
+  // Enrich with restaurant names from restaurant service API
+  // Similar to how restaurant management page calls the API
+  const RESTAURANT_SERVICE_URL =
+    process.env.RESTAURANT_SERVICE_URL || "http://localhost:4006";
+  const API_GATEWAY_URL =
+    process.env.API_GATEWAY_URL || "http://localhost:5001";
+
+  const enrichedData = await Promise.all(
+    data.map(async (item) => {
+      let restaurantName = item.restaurantName || "Nhà hàng";
+
+      // Always try to fetch from restaurant service API to get latest name
+      // Use public endpoint that doesn't require auth
+      try {
+        const restaurantId = item._id.toString();
+
+        // Try public endpoint first (no auth required)
+        // Route: /api/v1/restaurant/:id/public
+        try {
+          const publicResponse = await axios.get(
+            `${RESTAURANT_SERVICE_URL}/api/v1/restaurant/${restaurantId}/public`,
+            {
+              timeout: 2000,
+            }
+          );
+          if (
+            publicResponse.data &&
+            publicResponse.data.data &&
+            publicResponse.data.data.restaurant &&
+            publicResponse.data.data.restaurant.restaurantName
+          ) {
+            restaurantName = publicResponse.data.data.restaurant.restaurantName;
+            console.log(
+              `[topRestaurants] Got restaurant name from public API: ${restaurantName}`
+            );
+          }
+        } catch (publicError) {
+          // If public endpoint fails, try admin endpoint via API Gateway
+          try {
+            const adminResponse = await axios.get(
+              `${API_GATEWAY_URL}/api/v1/admin/restaurants/${restaurantId}`,
+              {
+                timeout: 2000,
+                headers: {
+                  // Pass admin token if available in request
+                  Authorization: req.headers.authorization || "",
+                },
+              }
+            );
+            if (
+              adminResponse.data &&
+              adminResponse.data.data &&
+              adminResponse.data.data.restaurant &&
+              adminResponse.data.data.restaurant.restaurantName
+            ) {
+              restaurantName =
+                adminResponse.data.data.restaurant.restaurantName;
+            }
+          } catch (adminError) {
+            // If both fail, use fallback
+            console.warn(
+              `[topRestaurants] Could not fetch restaurant ${restaurantId} from API:`,
+              publicError.message || adminError.message
+            );
+          }
+        }
+      } catch (error) {
+        // If all API calls fail, use fallback name from Order
+        console.warn(
+          `[topRestaurants] Error fetching restaurant ${item._id}:`,
+          error.message
+        );
+      }
+
+      return {
+        _id: item._id,
+        orderCount: item.orderCount,
+        totalRevenue: item.totalRevenue,
+        restaurantName: restaurantName,
+      };
+    })
+  );
+
+  res.status(200).json(enrichedData);
 });
 
 // ===== NEW METHODS FOR ENHANCED ORDER MANAGEMENT =====

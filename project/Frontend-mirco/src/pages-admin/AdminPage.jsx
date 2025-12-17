@@ -1,22 +1,38 @@
-import { useState } from 'react';
-import { useQuery } from 'react-query';
-import { Link } from 'react-router-dom';
-import { orderApi, productApi } from '../api';
-import { BarChart3, Package, Users, DollarSign, TrendingUp, Activity } from 'lucide-react';
-import Breadcrumb from '../components/Breadcrumb';
+import { useState } from "react";
+import { useQuery } from "react-query";
+import { Link } from "react-router-dom";
+import { orderApi, productApi } from "../api";
+import {
+  BarChart3,
+  Package,
+  Users,
+  DollarSign,
+  TrendingUp,
+  Activity,
+  Store,
+} from "lucide-react";
+import Breadcrumb from "../components/Breadcrumb";
 
 const AdminPage = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState("dashboard");
 
-  const { data: orderStats } = useQuery('orderStats', orderApi.getOrderStats);
-  const { data: revenueStats } = useQuery('revenueStats', orderApi.getRevenueStats);
-  const { data: topProducts } = useQuery('topProducts', () => orderApi.getTopProducts({}));
+  const { data: orderStats } = useQuery("orderStats", orderApi.getOrderStats);
+  const { data: revenueStats } = useQuery(
+    "revenueStats",
+    orderApi.getRevenueStats
+  );
+  const { data: topProducts } = useQuery("topProducts", () =>
+    orderApi.getTopProducts({})
+  );
+  const { data: topRestaurants } = useQuery("topRestaurants", () =>
+    orderApi.getTopRestaurants()
+  );
 
   const tabs = [
-    { id: 'dashboard', name: 'Dashboard', icon: BarChart3 },
-    { id: 'products', name: 'Sản phẩm', icon: Package },
-    { id: 'orders', name: 'Đơn hàng', icon: Activity },
-    { id: 'users', name: 'Người dùng', icon: Users },
+    { id: "dashboard", name: "Dashboard", icon: BarChart3 },
+    { id: "products", name: "Sản phẩm", icon: Package },
+    { id: "orders", name: "Đơn hàng", icon: Activity },
+    { id: "users", name: "Người dùng", icon: Users },
   ];
 
   const DashboardContent = () => (
@@ -45,9 +61,9 @@ const AdminPage = () => {
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Doanh thu</p>
               <p className="text-2xl font-bold text-gray-900">
-                {new Intl.NumberFormat('vi-VN', {
-                  style: 'currency',
-                  currency: 'VND',
+                {new Intl.NumberFormat("vi-VN", {
+                  style: "currency",
+                  currency: "VND",
                 }).format(revenueStats?.[0]?.total_revenue || 0)}
               </p>
             </div>
@@ -80,7 +96,7 @@ const AdminPage = () => {
       </div>
 
       {/* Order Status Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="card">
           <h3 className="text-lg font-semibold mb-4">Trạng thái đơn hàng</h3>
           <div className="space-y-3">
@@ -92,7 +108,14 @@ const AdminPage = () => {
                     <div
                       className="bg-primary-600 h-2 rounded-full"
                       style={{
-                        width: `${(stat.count / orderStats.reduce((sum, item) => sum + item.count, 0)) * 100}%`,
+                        width: `${
+                          (stat.count /
+                            orderStats.reduce(
+                              (sum, item) => sum + item.count,
+                              0
+                            )) *
+                          100
+                        }%`,
                       }}
                     ></div>
                   </div>
@@ -114,11 +137,62 @@ const AdminPage = () => {
                   </div>
                   <div>
                     <p className="text-sm font-medium">{product.title}</p>
-                    <p className="text-xs text-gray-500">Đã bán: {product.quantity}</p>
+                    <p className="text-xs text-gray-500">
+                      Đã bán: {product.quantity}
+                    </p>
                   </div>
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center mb-4">
+            <Store className="w-5 h-5 text-primary-600 mr-2" />
+            <h3 className="text-lg font-semibold">Top 5 Nhà hàng</h3>
+          </div>
+          <div className="space-y-3">
+            {topRestaurants?.slice(0, 5).map((restaurant, index) => (
+              <div
+                key={restaurant._id || index}
+                className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"
+              >
+                <div className="flex items-center space-x-3 flex-1">
+                  <div className="w-8 h-8 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-bold text-white">
+                      {index + 1}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {restaurant.restaurantName ||
+                        restaurant.name ||
+                        "Nhà hàng"}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {restaurant.orderCount || restaurant.count || 0} đơn hàng
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right ml-2">
+                  <p className="text-sm font-semibold text-primary-600">
+                    {new Intl.NumberFormat("vi-VN", {
+                      style: "currency",
+                      currency: "VND",
+                    }).format(
+                      restaurant.totalRevenue || restaurant.revenue || 0
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-500">Doanh thu</p>
+                </div>
+              </div>
+            ))}
+            {(!topRestaurants || topRestaurants.length === 0) && (
+              <div className="text-center py-4 text-sm text-gray-500">
+                Chưa có dữ liệu nhà hàng
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -166,13 +240,13 @@ const AdminPage = () => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard':
+      case "dashboard":
         return <DashboardContent />;
-      case 'products':
+      case "products":
         return <ProductsContent />;
-      case 'orders':
+      case "orders":
         return <OrdersContent />;
-      case 'users':
+      case "users":
         return <UsersContent />;
       default:
         return <DashboardContent />;
@@ -208,8 +282,8 @@ const AdminPage = () => {
                       onClick={() => setActiveTab(tab.id)}
                       className={`w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                         activeTab === tab.id
-                          ? 'bg-primary-100 text-primary-700'
-                          : 'text-gray-600 hover:bg-gray-100'
+                          ? "bg-primary-100 text-primary-700"
+                          : "text-gray-600 hover:bg-gray-100"
                       }`}
                     >
                       <Icon className="w-5 h-5 mr-3" />
@@ -222,9 +296,7 @@ const AdminPage = () => {
           </div>
 
           {/* Main Content */}
-          <div className="flex-1">
-            {renderContent()}
-          </div>
+          <div className="flex-1">{renderContent()}</div>
         </div>
       </div>
     </div>
