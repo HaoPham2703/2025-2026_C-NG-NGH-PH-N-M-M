@@ -10,6 +10,17 @@ import {
   Package,
   Store,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
 
 // Import orderApi để lấy dữ liệu
 
@@ -331,6 +342,103 @@ const DashboardContent = () => {
               Top 5 Nhà hàng
             </h3>
           </div>
+          
+          {/* Chart */}
+          <div className="p-6">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart
+                data={topRestaurants?.slice(0, 5).map((restaurant, index) => ({
+                  name: restaurant.restaurantName || `Nhà hàng ${index + 1}`,
+                  doanhthu: restaurant.totalRevenue || 0,
+                  donhang: restaurant.orderCount || 0,
+                }))}
+                margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis
+                  dataKey="name"
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  tick={{ fontSize: 12 }}
+                />
+                <YAxis
+                  yAxisId="left"
+                  orientation="left"
+                  stroke="#3b82f6"
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(value) => {
+                    if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                    if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
+                    return value;
+                  }}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  stroke="#10b981"
+                  tick={{ fontSize: 12 }}
+                />
+                <Tooltip
+                  formatter={(value, name) => {
+                    if (name === "doanhthu") {
+                      return [
+                        new Intl.NumberFormat("vi-VN", {
+                          style: "currency",
+                          currency: "VND",
+                        }).format(value),
+                        "Doanh thu",
+                      ];
+                    }
+                    return [value, "Số đơn hàng"];
+                  }}
+                  contentStyle={{
+                    backgroundColor: "rgba(255, 255, 255, 0.95)",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "8px",
+                    padding: "12px",
+                  }}
+                />
+                <Legend
+                  wrapperStyle={{ paddingTop: "20px" }}
+                  formatter={(value) => {
+                    if (value === "doanhthu") return "Doanh thu";
+                    return "Số đơn hàng";
+                  }}
+                />
+                <Bar
+                  yAxisId="left"
+                  dataKey="doanhthu"
+                  fill="#3b82f6"
+                  radius={[8, 8, 0, 0]}
+                  name="doanhthu"
+                >
+                  {topRestaurants?.slice(0, 5).map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={`hsl(${220 - index * 10}, 80%, ${55 + index * 5}%)`}
+                    />
+                  ))}
+                </Bar>
+                <Bar
+                  yAxisId="right"
+                  dataKey="donhang"
+                  fill="#10b981"
+                  radius={[8, 8, 0, 0]}
+                  name="donhang"
+                >
+                  {topRestaurants?.slice(0, 5).map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={`hsl(${150 - index * 10}, 70%, ${50 + index * 5}%)`}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* List View */}
           <div className="divide-y divide-gray-200">
             {topRestaurants?.slice(0, 5).map((restaurant, index) => (
               <div
