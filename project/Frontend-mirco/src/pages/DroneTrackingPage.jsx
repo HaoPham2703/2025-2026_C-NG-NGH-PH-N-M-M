@@ -31,23 +31,36 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
   const droneMarkerRef = useRef(null); // Keep reference to current drone marker
   const pathRef = useRef(null); // Keep reference to current path
   const mapStateRef = useRef(null); // Keep reference to current map
+  const notificationShownRef = useRef({
+    toRestaurant: false, // Đã thông báo khi đến 1/3 quãng đường tới nhà hàng
+    fromRestaurant: false, // Đã thông báo khi đến 1/3 quãng đường từ nhà hàng tới khách hàng
+  });
+  const [displaySpeed, setDisplaySpeed] = useState(null); // Tốc độ hiển thị (có thể tăng cho demo)
 
   // Fetch order data (optional - page can work without it)
+  // Suppress toast errors because order data is optional - page works fine with just drone data
   const {
     data: orderData,
     isLoading: orderLoading,
     error: orderError,
-  } = useQuery(["order", orderId], () => orderApi.getOrder(orderId), {
-    enabled: !!orderId,
-    refetchOnWindowFocus: false,
-    retry: 2, // Retry 2 times on failure
-    retryDelay: 1000, // Wait 1 second between retries
-    // Don't throw error - just log it, page can still work with drone data
-    onError: (error) => {
-      console.warn("[DroneTrackingPage] Failed to fetch order data:", error);
-      // Don't show toast here - axiosClients already handles it
-    },
-  });
+  } = useQuery(
+    ["order", orderId],
+    () => orderApi.getOrder(orderId, { suppressToast: true }),
+    {
+      enabled: !!orderId,
+      refetchOnWindowFocus: false,
+      retry: 2, // Retry 2 times on failure
+      retryDelay: 1000, // Wait 1 second between retries
+      // Don't throw error - just log it, page can still work with drone data
+      onError: (error) => {
+        console.warn(
+          "[DroneTrackingPage] Failed to fetch order data (optional):",
+          error
+        );
+        // Toast is suppressed via suppressToast option
+      },
+    }
+  );
 
   // Fetch drone data
   // Use useState to keep previous drone data during refetch/updates
@@ -168,6 +181,15 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
       }
     };
   }, [orderId, effectiveDroneData]);
+
+  // Reset notifications when orderId changes
+  useEffect(() => {
+    notificationShownRef.current = {
+      toRestaurant: false,
+      fromRestaurant: false,
+    };
+    setDisplaySpeed(null);
+  }, [orderId]);
 
   // Update refs when values change (for socket handler access)
   useEffect(() => {
@@ -537,6 +559,13 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
           socket.emit("join:user", userId);
           console.log("[DroneTrackingPage] Joined user room:", userId);
         }
+
+        // Reset notification flags khi kết nối mới
+        notificationShownRef.current = {
+          toRestaurant: false,
+          fromRestaurant: false,
+        };
+        setDisplaySpeed(null);
       });
 
       socket.on("drone:update", (data) => {
@@ -699,6 +728,42 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
         }
       });
 
+      // Listen for drone milestone notifications (1/3 journey)
+      socket.on("drone:milestone", (data) => {
+        if (data.orderId === orderId) {
+          console.log(
+            "[DroneTrackingPage] Received drone milestone notification:",
+            data
+          );
+
+          // Cập nhật display speed nếu là milestone từ restaurant
+          if (data.type === "fromRestaurant" && data.speed) {
+            setDisplaySpeed(data.speed);
+          }
+
+          // Đánh dấu đã nhận notification từ server để tránh hiển thị duplicate
+          if (data.type === "toRestaurant") {
+            notificationShownRef.current.toRestaurant = true;
+          } else if (data.type === "fromRestaurant") {
+            notificationShownRef.current.fromRestaurant = true;
+          }
+
+          // Hiển thị thông báo
+          const toastStyle = {
+            background: data.type === "fromRestaurant" ? "#f59e0b" : "#3b82f6",
+            color: "white",
+            fontSize: "16px",
+            padding: "16px",
+          };
+
+          toast.success(data.message || "🚁 Cập nhật drone", {
+            duration: data.type === "fromRestaurant" ? 10000 : 8000,
+            icon: data.type === "fromRestaurant" ? "⚡" : "🚁",
+            style: toastStyle,
+          });
+        }
+      });
+
       // Listen for drone arriving notification (1km away)
       socket.on("drone:arriving", (data) => {
         if (data.orderId === orderId) {
@@ -781,6 +846,178 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
   };
+
+  // Monitor drone progress and show notifications at 1/3 milestones
+  useEffect(() => {
+    if (!effectiveDroneData) return;
+
+    // Parse drone data
+    let drone = null;
+    try {
+      if (effectiveDroneData.status === "success" && effectiveDroneData.data) {
+        drone = effectiveDroneData.data;
+      } else if (effectiveDroneData.data) {
+        drone = effectiveDroneData.data.drone || effectiveDroneData.data;
+      } else if (!effectiveDroneData.status && effectiveDroneData._id) {
+        drone = effectiveDroneData;
+      }
+    } catch (error) {
+      return;
+    }
+
+    if (!drone || !drone.currentLocation) return;
+
+    // Get start location (restaurant) and final destination (customer)
+    const startLocation = drone.startLocation;
+    const finalDest =
+      (drone.deliveryDestination &&
+      typeof drone.deliveryDestination.latitude === "number" &&
+      typeof drone.deliveryDestination.longitude === "number"
+        ? drone.deliveryDestination
+        : null) ||
+      (drone.destination &&
+      typeof drone.destination.latitude === "number" &&
+      typeof drone.destination.longitude === "number"
+        ? drone.destination
+        : null);
+
+    if (!startLocation || !finalDest) return;
+
+    const currentLoc = drone.currentLocation;
+    if (
+      !currentLoc.latitude ||
+      !currentLoc.longitude ||
+      typeof startLocation.latitude !== "number" ||
+      typeof startLocation.longitude !== "number" ||
+      typeof finalDest.latitude !== "number" ||
+      typeof finalDest.longitude !== "number"
+    ) {
+      return;
+    }
+
+    // Tính khoảng cách từ vị trí hiện tại đến nhà hàng
+    const distanceToRestaurant = calculateDistance(
+      currentLoc.latitude,
+      currentLoc.longitude,
+      startLocation.latitude,
+      startLocation.longitude
+    );
+
+    // Tính khoảng cách từ vị trí hiện tại đến khách hàng
+    const distanceToCustomer = calculateDistance(
+      currentLoc.latitude,
+      currentLoc.longitude,
+      finalDest.latitude,
+      finalDest.longitude
+    );
+
+    // Tính tổng khoảng cách từ nhà hàng đến khách hàng
+    const totalDistanceRestaurantToCustomer = calculateDistance(
+      startLocation.latitude,
+      startLocation.longitude,
+      finalDest.latitude,
+      finalDest.longitude
+    );
+
+    // Xác định drone đang ở giai đoạn nào
+    const isGoingToRestaurant = distanceToRestaurant < distanceToCustomer;
+
+    // THÔNG BÁO 1: Khi drone ở 1/3 quãng đường đầu (đang đến nhà hàng)
+    if (isGoingToRestaurant && !notificationShownRef.current.toRestaurant) {
+      // Tính tổng khoảng cách từ điểm xuất phát đến nhà hàng
+      // Giả sử điểm xuất phát là một vị trí xa hơn (không có trong data)
+      // Ta sẽ dùng heuristic: nếu distanceToRestaurant lớn và distanceToCustomer cũng lớn
+      // thì có thể drone đang ở đầu hành trình
+
+      // Để đơn giản, ta sẽ thông báo khi:
+      // - Drone còn cách nhà hàng một khoảng đáng kể (để đảm bảo đang trong hành trình)
+      // - Và tỷ lệ distanceToRestaurant / distanceToCustomer cho thấy đang gần đầu hành trình
+
+      // Kiểm tra nếu khoảng cách đến nhà hàng còn lớn (chưa đến)
+      // và tỷ lệ cho thấy đang ở 1/3 đầu của tổng hành trình
+      const totalJourneyEstimate =
+        distanceToRestaurant + totalDistanceRestaurantToCustomer;
+      const progressToRestaurant = distanceToRestaurant / totalJourneyEstimate;
+
+      // Thông báo khi còn khoảng 1/3 quãng đường đầu tiên (progress < 0.33)
+      // Nhưng cần đảm bảo đang thực sự trên đường đến nhà hàng
+      if (
+        distanceToRestaurant > 0.3 &&
+        progressToRestaurant < 0.4 &&
+        totalJourneyEstimate > 0
+      ) {
+        notificationShownRef.current.toRestaurant = true;
+        toast.success(
+          `🚁 Drone đang đến nhà hàng! Còn khoảng ${distanceToRestaurant.toFixed(
+            2
+          )} km.`,
+          {
+            duration: 8000,
+            icon: "🏪",
+            style: {
+              background: "#3b82f6",
+              color: "white",
+              fontSize: "16px",
+              padding: "16px",
+            },
+          }
+        );
+      }
+    }
+
+    // THÔNG BÁO 2: Khi drone ở 1/3 quãng đường từ nhà hàng tới khách hàng
+    if (
+      !isGoingToRestaurant &&
+      !notificationShownRef.current.fromRestaurant &&
+      totalDistanceRestaurantToCustomer > 0
+    ) {
+      // Tính khoảng cách đã đi từ nhà hàng đến vị trí hiện tại
+      // Bằng cách: tổng khoảng cách - khoảng cách còn lại đến customer
+      // Nhưng thực tế hơn, ta tính từ restaurant đến current location
+      const distanceFromRestaurant = calculateDistance(
+        startLocation.latitude,
+        startLocation.longitude,
+        currentLoc.latitude,
+        currentLoc.longitude
+      );
+
+      // Tính phần trăm đã đi từ restaurant đến customer
+      const progressFromRestaurant =
+        distanceFromRestaurant / totalDistanceRestaurantToCustomer;
+
+      // Kiểm tra nếu đã đi được khoảng 1/3 quãng đường (progress ≈ 0.33)
+      // Cho phép một khoảng dung sai nhỏ
+      if (
+        progressFromRestaurant >= 0.25 &&
+        progressFromRestaurant <= 0.45 &&
+        distanceFromRestaurant > 0.1
+      ) {
+        // Đánh dấu đã thông báo
+        notificationShownRef.current.fromRestaurant = true;
+
+        // Tăng tốc độ hiển thị cho demo (tăng gấp 2 lần)
+        const currentSpeed = drone.speed || 30;
+        setDisplaySpeed(currentSpeed * 2);
+
+        // Hiển thị thông báo
+        toast.success(
+          `⚡ Drone đang tăng tốc đến khách hàng! Tốc độ: ${(
+            currentSpeed * 2
+          ).toFixed(0)} km/h. Còn khoảng ${distanceToCustomer.toFixed(2)} km.`,
+          {
+            duration: 10000,
+            icon: "⚡",
+            style: {
+              background: "#f59e0b",
+              color: "white",
+              fontSize: "16px",
+              padding: "16px",
+            },
+          }
+        );
+      }
+    }
+  }, [effectiveDroneData]);
 
   const breadcrumbItems = [
     { label: "Trang Chủ", path: "/" },
@@ -1076,7 +1313,15 @@ const DroneTrackingPage = ({ hideHeader = false }) => {
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Tốc độ</p>
                   <p className="font-semibold text-gray-900">
-                    {drone?.speed || 0} km/h
+                    {displaySpeed !== null
+                      ? displaySpeed.toFixed(0)
+                      : drone?.speed || 0}{" "}
+                    km/h
+                    {displaySpeed !== null && (
+                      <span className="ml-2 text-xs text-orange-600 font-normal">
+                        (Tăng tốc demo)
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>

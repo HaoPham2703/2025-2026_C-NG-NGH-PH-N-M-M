@@ -2,6 +2,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useCart } from "../contexts/CartContext";
+import toast from "react-hot-toast";
 import {
   ShoppingCart,
   User,
@@ -157,19 +158,74 @@ const Header = () => {
           }
         });
 
+        // Listen for drone milestone notifications (1/3 journey)
+        socket.on("drone:milestone", (data) => {
+          console.log("[Header] Received drone milestone notification:", data);
+
+          // Hiển thị toast popup
+          const toastStyle = {
+            background: data.type === "fromRestaurant" ? "#f59e0b" : "#3b82f6",
+            color: "white",
+            fontSize: "16px",
+            padding: "16px",
+          };
+
+          toast.success(data.message || "🚁 Cập nhật drone", {
+            duration: data.type === "fromRestaurant" ? 10000 : 8000,
+            icon: data.type === "fromRestaurant" ? "⚡" : "🚁",
+            style: toastStyle,
+          });
+
+          // Thêm vào notification list
+          const newNotification = {
+            id: Date.now().toString(),
+            type:
+              data.type === "fromRestaurant"
+                ? "drone_speeding"
+                : "drone_to_restaurant",
+            title:
+              data.type === "fromRestaurant"
+                ? "Drone đang tăng tốc"
+                : "Drone đang đến nhà hàng",
+            message: data.message || "Cập nhật trạng thái drone",
+            orderId: data.orderId,
+            droneId: data.droneId,
+            distance: data.distance,
+            speed: data.speed,
+            timestamp: data.timestamp || new Date().toISOString(),
+            read: false,
+          };
+
+          setNotifications((prev) => [newNotification, ...prev]);
+        });
+
         // Listen for drone arriving notification
         socket.on("drone:arriving", (data) => {
           console.log("[Header] Received drone arriving notification:", data);
 
+          // Hiển thị toast popup
+          const notificationMessage =
+            data.message ||
+            `Drone đang đến gần bạn! Còn khoảng ${
+              data.distance || "1"
+            }km. Vui lòng chuẩn bị nhận hàng.`;
+          toast.success(`🚁 ${notificationMessage}`, {
+            duration: 8000,
+            icon: "🚁",
+            style: {
+              background: "#10b981",
+              color: "white",
+              fontSize: "16px",
+              padding: "16px",
+            },
+          });
+
+          // Thêm vào notification list
           const newNotification = {
             id: Date.now().toString(),
             type: "drone_arriving",
             title: "Drone đang đến gần bạn",
-            message:
-              data.message ||
-              `Drone đang đến gần bạn! Còn khoảng ${
-                data.distance || "1"
-              }km. Vui lòng chuẩn bị nhận hàng.`,
+            message: notificationMessage,
             orderId: data.orderId,
             droneId: data.droneId,
             distance: data.distance,

@@ -113,6 +113,15 @@ const droneSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // Track if 1/3 milestone notifications have been sent
+    notificationSentToRestaurant: {
+      type: Boolean,
+      default: false,
+    },
+    notificationSentFromRestaurant: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

@@ -114,6 +114,206 @@ class DroneSimulation {
       );
     }
 
+    // Kiểm tra milestone 1/3 quãng đường và gửi thông báo
+    if (drone.orderId && drone.startLocation && drone.deliveryDestination) {
+      const distanceToRestaurant = this.calculateDistance(
+        currentLat,
+        currentLon,
+        drone.startLocation.latitude,
+        drone.startLocation.longitude
+      );
+
+      const distanceToCustomer = this.calculateDistance(
+        currentLat,
+        currentLon,
+        drone.deliveryDestination.latitude,
+        drone.deliveryDestination.longitude
+      );
+
+      const totalDistanceRestaurantToCustomer = this.calculateDistance(
+        drone.startLocation.latitude,
+        drone.startLocation.longitude,
+        drone.deliveryDestination.latitude,
+        drone.deliveryDestination.longitude
+      );
+
+      // Xác định drone đang ở giai đoạn nào
+      const isGoingToRestaurant = distanceToRestaurant < distanceToCustomer;
+
+      // MILESTONE 1: Thông báo khi ở 1/3 quãng đường đầu (đang đến nhà hàng)
+      if (
+        isGoingToRestaurant &&
+        !drone.notificationSentToRestaurant &&
+        drone.startLocation.latitude &&
+        drone.startLocation.longitude
+      ) {
+        // Kiểm tra nếu đang trong 1/3 quãng đường đầu
+        // Tính tổng hành trình ước tính (từ vị trí hiện tại đến restaurant + từ restaurant đến customer)
+        const totalJourneyEstimate =
+          distanceToRestaurant + totalDistanceRestaurantToCustomer;
+
+        if (totalJourneyEstimate > 0) {
+          const progressToRestaurant =
+            distanceToRestaurant / totalJourneyEstimate;
+
+          // Thông báo khi ở 1/3 quãng đường đầu (progress < 0.4 và còn cách restaurant một khoảng đáng kể)
+          if (
+            distanceToRestaurant > 0.3 &&
+            progressToRestaurant < 0.4 &&
+            totalJourneyEstimate > 0
+          ) {
+            drone.notificationSentToRestaurant = true;
+            await drone.save();
+
+            try {
+              const order = await getOrderDetails(drone.orderId);
+              const userId = order?.user?.toString() || order?.user;
+              const restaurantId = drone.startLocation.restaurantId;
+
+              // Gửi notification đến order room (tất cả client đang theo dõi order này)
+              this.io.to(`order:${drone.orderId}`).emit("drone:milestone", {
+                type: "toRestaurant",
+                orderId: drone.orderId,
+                droneId: drone.droneId,
+                message: `🚁 Drone đang đến nhà hàng! Còn khoảng ${distanceToRestaurant.toFixed(
+                  2
+                )} km.`,
+                distance: distanceToRestaurant.toFixed(2),
+                timestamp: new Date().toISOString(),
+              });
+
+              // Cũng gửi đến user room và restaurant room nếu có
+              if (userId) {
+                this.io.to(`user:${userId}`).emit("drone:milestone", {
+                  type: "toRestaurant",
+                  orderId: drone.orderId,
+                  droneId: drone.droneId,
+                  message: `🚁 Drone đang đến nhà hàng! Còn khoảng ${distanceToRestaurant.toFixed(
+                    2
+                  )} km.`,
+                  distance: distanceToRestaurant.toFixed(2),
+                  timestamp: new Date().toISOString(),
+                });
+              }
+
+              if (restaurantId) {
+                this.io.to(`user:${restaurantId}`).emit("drone:milestone", {
+                  type: "toRestaurant",
+                  orderId: drone.orderId,
+                  droneId: drone.droneId,
+                  message: `🚁 Drone đang đến nhà hàng của bạn! Còn khoảng ${distanceToRestaurant.toFixed(
+                    2
+                  )} km.`,
+                  distance: distanceToRestaurant.toFixed(2),
+                  timestamp: new Date().toISOString(),
+                });
+              }
+
+              console.log(
+                `[DroneSimulation] 📢 Milestone notification sent: Drone heading to restaurant (1/3 journey) for order ${drone.orderId}`
+              );
+            } catch (error) {
+              console.error(
+                `[DroneSimulation] Error sending toRestaurant milestone notification:`,
+                error.message
+              );
+            }
+          }
+        }
+      }
+
+      // MILESTONE 2: Thông báo khi ở 1/3 quãng đường từ nhà hàng đến khách hàng
+      if (
+        !isGoingToRestaurant &&
+        !drone.notificationSentFromRestaurant &&
+        totalDistanceRestaurantToCustomer > 0 &&
+        drone.startLocation.latitude &&
+        drone.startLocation.longitude
+      ) {
+        // Tính khoảng cách đã đi từ restaurant
+        const distanceFromRestaurant = this.calculateDistance(
+          drone.startLocation.latitude,
+          drone.startLocation.longitude,
+          currentLat,
+          currentLon
+        );
+
+        const progressFromRestaurant =
+          distanceFromRestaurant / totalDistanceRestaurantToCustomer;
+
+        // Kiểm tra nếu đã đi được khoảng 1/3 quãng đường từ restaurant đến customer
+        if (
+          progressFromRestaurant >= 0.25 &&
+          progressFromRestaurant <= 0.45 &&
+          distanceFromRestaurant > 0.1
+        ) {
+          drone.notificationSentFromRestaurant = true;
+
+          // Tăng tốc độ gấp 2 lần cho demo (chỉ tăng trong response, không lưu vào DB)
+          const increasedSpeed = drone.speed * 2;
+
+          await drone.save();
+
+          try {
+            const order = await getOrderDetails(drone.orderId);
+            const userId = order?.user?.toString() || order?.user;
+            const restaurantId = drone.startLocation.restaurantId;
+
+            // Gửi notification đến order room
+            this.io.to(`order:${drone.orderId}`).emit("drone:milestone", {
+              type: "fromRestaurant",
+              orderId: drone.orderId,
+              droneId: drone.droneId,
+              message: `⚡ Drone đang tăng tốc đến khách hàng! Tốc độ: ${increasedSpeed.toFixed(
+                0
+              )} km/h. Còn khoảng ${distanceToCustomer.toFixed(2)} km.`,
+              distance: distanceToCustomer.toFixed(2),
+              speed: increasedSpeed,
+              timestamp: new Date().toISOString(),
+            });
+
+            // Cũng gửi đến user room và restaurant room nếu có
+            if (userId) {
+              this.io.to(`user:${userId}`).emit("drone:milestone", {
+                type: "fromRestaurant",
+                orderId: drone.orderId,
+                droneId: drone.droneId,
+                message: `⚡ Drone đang tăng tốc đến bạn! Tốc độ: ${increasedSpeed.toFixed(
+                  0
+                )} km/h. Còn khoảng ${distanceToCustomer.toFixed(2)} km.`,
+                distance: distanceToCustomer.toFixed(2),
+                speed: increasedSpeed,
+                timestamp: new Date().toISOString(),
+              });
+            }
+
+            if (restaurantId) {
+              this.io.to(`user:${restaurantId}`).emit("drone:milestone", {
+                type: "fromRestaurant",
+                orderId: drone.orderId,
+                droneId: drone.droneId,
+                message: `⚡ Drone đang tăng tốc đến khách hàng! Tốc độ: ${increasedSpeed.toFixed(
+                  0
+                )} km/h. Còn khoảng ${distanceToCustomer.toFixed(2)} km.`,
+                distance: distanceToCustomer.toFixed(2),
+                speed: increasedSpeed,
+                timestamp: new Date().toISOString(),
+              });
+            }
+
+            console.log(
+              `[DroneSimulation] 📢 Milestone notification sent: Drone speeding up (1/3 from restaurant) for order ${drone.orderId}`
+            );
+          } catch (error) {
+            console.error(
+              `[DroneSimulation] Error sending fromRestaurant milestone notification:`,
+              error.message
+            );
+          }
+        }
+      }
+    }
+
     // Kiểm tra và gửi thông báo khi drone còn 1km tới điểm giao hàng cuối cùng
     // Chỉ gửi khi đang bay đến điểm giao hàng (không phải đang bay đến restaurant)
     // Và chỉ gửi 1 lần
@@ -226,7 +426,73 @@ class DroneSimulation {
     // A 20-minute delivery would consume ~6% battery (realistic for drone delivery)
     drone.batteryLevel = Math.max(0, drone.batteryLevel - 0.015);
 
-    await drone.save();
+    // Save with retry logic to handle VersionError (concurrent updates)
+    try {
+      await drone.save();
+    } catch (saveError) {
+      // Handle VersionError - document was modified by another process
+      if (saveError.name === "VersionError") {
+        console.warn(
+          `[DroneSimulation] VersionError for drone ${droneId}, retrying with fresh document...`
+        );
+        try {
+          // Fetch the latest version of the document
+          const freshDrone = await Drone.findOne({ droneId });
+          if (!freshDrone) {
+            console.error(
+              `[DroneSimulation] Drone ${droneId} not found after VersionError`
+            );
+            this.stopSimulation(droneId);
+            return;
+          }
+
+          // Apply the same updates to the fresh document
+          freshDrone.currentLocation = {
+            latitude: drone.currentLocation.latitude,
+            longitude: drone.currentLocation.longitude,
+            altitude: drone.currentLocation.altitude,
+            updatedAt: new Date(),
+          };
+
+          // Add to flight history if not too long
+          freshDrone.flightHistory.push({
+            latitude: drone.currentLocation.latitude,
+            longitude: drone.currentLocation.longitude,
+            altitude: drone.currentLocation.altitude,
+            timestamp: new Date(),
+          });
+
+          if (freshDrone.flightHistory.length > 100) {
+            freshDrone.flightHistory.shift();
+          }
+
+          // Update battery (use fresh value as base)
+          freshDrone.batteryLevel = Math.max(
+            0,
+            freshDrone.batteryLevel - 0.015
+          );
+
+          // Try saving again with fresh document
+          await freshDrone.save();
+          console.log(
+            `[DroneSimulation] Successfully saved drone ${droneId} after retry`
+          );
+        } catch (retryError) {
+          console.error(
+            `[DroneSimulation] Failed to save drone ${droneId} after retry:`,
+            retryError.message
+          );
+          // Don't stop simulation for version conflicts - just log and continue
+          // The next update cycle will try again
+        }
+      } else {
+        // For other errors, log and continue
+        console.error(
+          `[DroneSimulation] Error saving drone ${droneId}:`,
+          saveError.message
+        );
+      }
+    }
 
     // Emit real-time update via WebSocket
     this.io.emit("drone:update", {
@@ -396,6 +662,8 @@ class DroneSimulation {
       drone.assignedAt = null;
       drone.estimatedArrival = null;
       drone.notificationSent1km = false; // Reset notification flag
+      drone.notificationSentToRestaurant = false; // Reset milestone notification
+      drone.notificationSentFromRestaurant = false; // Reset milestone notification
 
       // Reset to home location (where drone started)
       drone.currentLocation.latitude = homeLocation.latitude;
