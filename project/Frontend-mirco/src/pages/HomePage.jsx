@@ -14,7 +14,7 @@ import {
   Users,
 } from "lucide-react";
 import "../styles/index.css";
-import "../styles/homepage.css";
+import "../styles/HomePage.css";
 
 const HomePage = () => {
   const { data: topProducts, isLoading } = useQuery(
