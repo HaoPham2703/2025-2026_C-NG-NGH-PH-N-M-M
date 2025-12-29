@@ -1,0 +1,1425 @@
+import { useEffect, useState, useRef } from "react";
+import { useParams, Link } from "react-router-dom";
+import { useQuery, useQueryClient } from "react-query";
+import { droneApi } from "../api/droneApi";
+import { orderApi } from "../api/orderApi";
+import { useAuth } from "../hooks/useAuth";
+import toast from "react-hot-toast";
+import {
+  MapPin,
+  Navigation,
+  Battery,
+  Clock,
+  Package,
+  ArrowLeft,
+  Loader,
+} from "lucide-react";
+import Breadcrumb from "../components/Breadcrumb";
+
+const DroneTrackingPage = ({ hideHeader = false }) => {
+  const { orderId } = useParams();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const [map, setMap] = useState(null);
+  const [droneMarker, setDroneMarker] = useState(null);
+  const [destinationMarker, setDestinationMarker] = useState(null);
+  const [startMarker, setStartMarker] = useState(null);
+  const [path, setPath] = useState(null);
+  const mapRef = useRef(null);
+  const socketRef = useRef(null);
+  const initialBoundsSetRef = useRef(false); // Track if initial bounds have been set (same as DroneHubPage)
+  const droneMarkerRef = useRef(null); // Keep reference to current drone marker
+  const pathRef = useRef(null); // Keep reference to current path
+  const mapStateRef = useRef(null); // Keep reference to current map
+  const notificationShownRef = useRef({
+    toRestaurant: false, // Đã thông báo khi đến 1/3 quãng đường tới nhà hàng
+    fromRestaurant: false, // Đã thông báo khi đến 1/3 quãng đường từ nhà hàng tới khách hàng
+  });
+  const [displaySpeed, setDisplaySpeed] = useState(null); // Tốc độ hiển thị (có thể tăng cho demo)
+
+  // Fetch order data (optional - page can work without it)
+  // Suppress toast errors because order data is optional - page works fine with just drone data
+  const {
+    data: orderData,
+    isLoading: orderLoading,
+    error: orderError,
+  } = useQuery(
+    ["order", orderId],
+    () => orderApi.getOrder(orderId, { suppressToast: true }),
+    {
+      enabled: !!orderId,
+      refetchOnWindowFocus: false,
+      retry: 2, // Retry 2 times on failure
+      retryDelay: 1000, // Wait 1 second between retries
+      // Don't throw error - just log it, page can still work with drone data
+      onError: (error) => {
+        console.warn(
+          "[DroneTrackingPage] Failed to fetch order data (optional):",
+          error
+        );
+        // Toast is suppressed via suppressToast option
+      },
+    }
+  );
+
+  // Fetch drone data
+  // Use useState to keep previous drone data during refetch/updates
+  const [previousDroneData, setPreviousDroneData] = useState(null);
+
+  const {
+    data: droneData,
+    isLoading: droneLoading,
+    isFetching: droneFetching,
+    refetch: refetchDrone,
+  } = useQuery(["drone", orderId], () => droneApi.getDroneByOrderId(orderId), {
+    enabled: !!orderId,
+    refetchOnWindowFocus: false,
+    refetchInterval: 5000, // Auto refresh every 5 seconds (same as DroneHubPage)
+    staleTime: 2000, // Consider data fresh for 2 seconds
+    onSuccess: (data) => {
+      // Update previous data when new data arrives (including battery updates)
+      if (data) {
+        setPreviousDroneData(data);
+      }
+    },
+    // Keep previous data during refetch to prevent blank screen
+    keepPreviousData: true,
+  });
+
+  // Use current droneData or fallback to previous data during refetch/updates
+  // This prevents blank screen when battery level updates
+  const effectiveDroneData = droneData || previousDroneData;
+
+  // Update previous data when new data arrives (backup for keepPreviousData)
+  // This ensures we always have data to render even during refetch
+  useEffect(() => {
+    if (droneData) {
+      // Always update previous data when new data arrives
+      setPreviousDroneData(droneData);
+    }
+  }, [droneData]);
+
+  // Initialize map (using simple Leaflet-like approach)
+  useEffect(() => {
+    if (!orderId) return;
+
+    // Load Socket.IO client if available (optional)
+    const loadSocketIO = () => {
+      return new Promise((resolve) => {
+        if (window.io) {
+          resolve();
+          return;
+        }
+        const script = document.createElement("script");
+        script.src = "https://cdn.socket.io/4.6.1/socket.io.min.js";
+        script.onload = resolve;
+        script.onerror = resolve; // Continue even if Socket.IO fails
+        document.head.appendChild(script);
+      });
+    };
+
+    // Load Leaflet CSS and JS dynamically
+    const loadLeaflet = () => {
+      return new Promise((resolve) => {
+        // Check if Leaflet is already loaded
+        if (window.L && document.querySelector('link[href*="leaflet"]')) {
+          resolve();
+          return;
+        }
+
+        // Load CSS
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
+
+        // Load JS
+        const script = document.createElement("script");
+        script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+        script.onload = resolve;
+        document.head.appendChild(script);
+      });
+    };
+
+    loadSocketIO()
+      .then(() => {
+        return loadLeaflet();
+      })
+      .then(() => {
+        if (window.L && !mapRef.current) {
+          // Default location (Ho Chi Minh City)
+          const defaultLat = 10.7769;
+          const defaultLon = 106.7009;
+
+          const mapInstance = window.L.map("map-container").setView(
+            [defaultLat, defaultLon],
+            13
+          );
+
+          // Add tile layer
+          window.L.tileLayer(
+            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            {
+              attribution:
+                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            }
+          ).addTo(mapInstance);
+
+          mapRef.current = mapInstance;
+          setMap(mapInstance);
+
+          // Fit bounds will be handled in useEffect when effectiveDroneData is available
+          // Just initialize map here
+        }
+      });
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        setMap(null);
+      }
+    };
+  }, [orderId, effectiveDroneData]);
+
+  // Reset notifications when orderId changes
+  useEffect(() => {
+    notificationShownRef.current = {
+      toRestaurant: false,
+      fromRestaurant: false,
+    };
+    setDisplaySpeed(null);
+  }, [orderId]);
+
+  // Update refs when values change (for socket handler access)
+  useEffect(() => {
+    droneMarkerRef.current = droneMarker;
+    pathRef.current = path;
+    mapStateRef.current = map;
+  }, [map, droneMarker, path]);
+
+  // Update map markers when drone data changes
+  useEffect(() => {
+    if (!map) return;
+
+    // Use effectiveDroneData to prevent blank screen during refetch/updates
+    if (!effectiveDroneData) {
+      return;
+    }
+
+    // Handle different response structures
+    let drone = null;
+    try {
+      if (effectiveDroneData.status === "success" && effectiveDroneData.data) {
+        drone = effectiveDroneData.data;
+      } else if (effectiveDroneData.data) {
+        drone = effectiveDroneData.data.drone || effectiveDroneData.data;
+      } else if (!effectiveDroneData.status && effectiveDroneData._id) {
+        // Direct drone object (check for _id to ensure it's a drone object)
+        drone = effectiveDroneData;
+      }
+
+      if (!drone || !drone.currentLocation) {
+        console.warn(
+          "[DroneTrackingPage] No drone or currentLocation in effectiveDroneData"
+        );
+        return;
+      }
+    } catch (error) {
+      console.error("[DroneTrackingPage] Error parsing drone data:", error);
+      return;
+    }
+
+    // Determine final destination (prefer deliveryDestination)
+    const finalDest =
+      (drone.deliveryDestination &&
+      typeof drone.deliveryDestination.latitude === "number" &&
+      typeof drone.deliveryDestination.longitude === "number"
+        ? drone.deliveryDestination
+        : null) ||
+      (drone.destination &&
+      typeof drone.destination.latitude === "number" &&
+      typeof drone.destination.longitude === "number"
+        ? drone.destination
+        : null);
+
+    // Fit bounds to show drone, restaurant, and final destination (only on initial load)
+    if (finalDest && drone.currentLocation) {
+      try {
+        // Only fitBounds on initial load, not on every update (same approach as DroneHubPage)
+        if (!initialBoundsSetRef.current) {
+          const bounds = [
+            [drone.currentLocation.latitude, drone.currentLocation.longitude],
+            [finalDest.latitude, finalDest.longitude],
+          ];
+          if (
+            drone.startLocation &&
+            typeof drone.startLocation.latitude === "number" &&
+            typeof drone.startLocation.longitude === "number"
+          ) {
+            bounds.push([
+              drone.startLocation.latitude,
+              drone.startLocation.longitude,
+            ]);
+          }
+          map.fitBounds(bounds, { padding: [50, 50] });
+          initialBoundsSetRef.current = true;
+        }
+      } catch (error) {
+        console.error("[DroneTrackingPage] Error fitting bounds:", error);
+      }
+    }
+
+    // Clear existing markers (same approach as DroneHubPage - recreate on each update)
+    if (droneMarker) {
+      try {
+        map.removeLayer(droneMarker);
+      } catch (error) {
+        console.error(
+          "[DroneTrackingPage] Error removing drone marker:",
+          error
+        );
+      }
+    }
+    setDroneMarker(null);
+
+    // Clear existing destination marker
+    if (destinationMarker) {
+      try {
+        if (map.hasLayer(destinationMarker)) {
+          map.removeLayer(destinationMarker);
+        }
+      } catch (error) {
+        console.error(
+          "[DroneTrackingPage] Error removing destination marker:",
+          error
+        );
+      }
+    }
+    setDestinationMarker(null);
+
+    // Clear existing start marker (restaurant)
+    if (startMarker) {
+      try {
+        if (map.hasLayer(startMarker)) {
+          map.removeLayer(startMarker);
+        }
+      } catch (error) {
+        console.error(
+          "[DroneTrackingPage] Error removing start marker:",
+          error
+        );
+      }
+    }
+    setStartMarker(null);
+
+    // Clear existing path
+    if (path) {
+      try {
+        if (map.hasLayer(path)) {
+          map.removeLayer(path);
+        }
+      } catch (error) {
+        console.error("[DroneTrackingPage] Error removing path:", error);
+      }
+    }
+    setPath(null);
+
+    // Add destination marker (prefer deliveryDestination)
+    if (finalDest) {
+      try {
+        console.log("[DroneTrackingPage] Adding destination marker:", {
+          lat: finalDest.latitude,
+          lng: finalDest.longitude,
+          address: finalDest.address,
+        });
+
+        const destMarker = window.L.marker(
+          [finalDest.latitude, finalDest.longitude],
+          {
+            icon: window.L.divIcon({
+              className: "destination-marker",
+              html: `<div style="background: #ef4444; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 14px;">📍</div>`,
+              iconSize: [24, 24],
+              iconAnchor: [12, 12],
+            }),
+          }
+        ).addTo(map);
+
+        destMarker.bindPopup(
+          `<b>📍 Điểm đến</b><br/>${
+            finalDest.address || "Địa chỉ giao hàng"
+          }<br/><small>${finalDest.latitude.toFixed(
+            6
+          )}, ${finalDest.longitude.toFixed(6)}</small>`
+        );
+
+        setDestinationMarker(destMarker);
+      } catch (error) {
+        console.error(
+          "[DroneTrackingPage] Error adding destination marker:",
+          error
+        );
+      }
+    } else {
+      console.warn("[DroneTrackingPage] No valid destination found:", {
+        hasDeliveryDestination: !!drone.deliveryDestination,
+        hasDestination: !!drone.destination,
+        destination: finalDest,
+      });
+    }
+
+    // Add start marker (restaurant) if present
+    if (
+      drone.startLocation &&
+      typeof drone.startLocation.latitude === "number" &&
+      typeof drone.startLocation.longitude === "number"
+    ) {
+      try {
+        const sMarker = window.L.marker(
+          [drone.startLocation.latitude, drone.startLocation.longitude],
+          {
+            icon: window.L.divIcon({
+              className: "start-marker",
+              html: `<div style=\"background: #10b981; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 12px;\">🏪</div>`,
+              iconSize: [20, 20],
+              iconAnchor: [10, 10],
+            }),
+          }
+        ).addTo(map);
+
+        sMarker.bindPopup(
+          `<b>🏪 Nhà hàng</b><br/>${
+            drone.startLocation.restaurantName || "Nhà hàng"
+          }<br/><small>${
+            drone.startLocation.address || "Địa chỉ nhà hàng"
+          }</small><br/><small>${drone.startLocation.latitude.toFixed(
+            6
+          )}, ${drone.startLocation.longitude.toFixed(6)}</small>`
+        );
+
+        setStartMarker(sMarker);
+      } catch (error) {
+        console.error("[DroneTrackingPage] Error adding start marker:", error);
+      }
+    }
+
+    // Add or update drone marker with smooth animation
+    if (
+      drone.currentLocation &&
+      drone.currentLocation.latitude &&
+      drone.currentLocation.longitude
+    ) {
+      try {
+        const newLatLng = window.L.latLng(
+          drone.currentLocation.latitude,
+          drone.currentLocation.longitude
+        );
+
+        // Tính khoảng cách đến điểm đến cho popup
+        const distanceForPopup =
+          drone.distanceToDestination !== undefined
+            ? drone.distanceToDestination
+            : finalDest
+            ? calculateDistance(
+                drone.currentLocation.latitude || 0,
+                drone.currentLocation.longitude || 0,
+                finalDest.latitude || 0,
+                finalDest.longitude || 0
+              )
+            : 0;
+
+        // Create new marker (same approach as DroneHubPage - recreate on each update)
+        const marker = window.L.marker(newLatLng, {
+          icon: window.L.divIcon({
+            className: "drone-marker",
+            html: `<div style="background: #3b82f6; width: 30px; height: 30px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 18px;">🚁</div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15],
+          }),
+        }).addTo(map);
+
+        // Tạo popup với thông tin khoảng cách
+        let popupContent = `<b>Drone ${
+          drone.name || "N/A"
+        }</b><br/>Trạng thái: ${getStatusText(
+          drone.status || "unknown"
+        )}<br/>Pin: ${parseFloat(drone.batteryLevel || 0).toFixed(2)}%`;
+
+        if (
+          distanceForPopup > 0 &&
+          (drone.status === "flying" || drone.status === "delivering")
+        ) {
+          popupContent += `<br/>📏 Còn lại: ${distanceForPopup.toFixed(2)} km`;
+        }
+
+        marker.bindPopup(popupContent);
+
+        setDroneMarker(marker);
+      } catch (error) {
+        console.error(
+          "[DroneTrackingPage] Error adding/updating drone marker:",
+          error
+        );
+      }
+
+      // Draw or update path line from drone -> (restaurant?) -> final destination
+      if (finalDest && drone.currentLocation) {
+        try {
+          const directPath = [
+            [drone.currentLocation.latitude, drone.currentLocation.longitude],
+          ];
+          if (
+            drone.startLocation &&
+            typeof drone.startLocation.latitude === "number" &&
+            typeof drone.startLocation.longitude === "number"
+          ) {
+            directPath.push([
+              drone.startLocation.latitude,
+              drone.startLocation.longitude,
+            ]);
+          }
+          directPath.push([finalDest.latitude, finalDest.longitude]);
+
+          // Create new path (same approach as DroneHubPage - recreate on each update)
+          const polyline = window.L.polyline(directPath, {
+            color: "#ef4444",
+            weight: 2,
+            opacity: 0.6,
+            dashArray: "5, 10",
+          }).addTo(map);
+
+          setPath(polyline);
+        } catch (error) {
+          console.error(
+            "[DroneTrackingPage] Error drawing path to destination:",
+            error
+          );
+        }
+      }
+
+      // Also draw flight history if available (optional, for tracking path)
+      if (
+        drone.flightHistory &&
+        Array.isArray(drone.flightHistory) &&
+        drone.flightHistory.length > 0
+      ) {
+        try {
+          const flightPath = [
+            ...drone.flightHistory
+              .filter((point) => point && point.latitude && point.longitude)
+              .map((point) => [point.latitude, point.longitude]),
+            [drone.currentLocation.latitude, drone.currentLocation.longitude],
+          ];
+
+          if (flightPath.length >= 2) {
+            const historyPolyline = window.L.polyline(flightPath, {
+              color: "#3b82f6",
+              weight: 2,
+              opacity: 0.4,
+            }).addTo(map);
+            // Store both lines, but we'll just keep the direct path as main path
+          }
+        } catch (error) {
+          console.error(
+            "[DroneTrackingPage] Error drawing flight history:",
+            error
+          );
+        }
+      }
+
+      // Path line from drone to destination is already handled above in the useEffect
+      // No need to duplicate it here
+
+      // Don't reset zoom/view when updating markers
+      // Let user control zoom level - only update marker positions
+      // map.setView([...]) removed to preserve user's zoom level
+    }
+  }, [map, effectiveDroneData]);
+
+  // Socket.IO connection for real-time updates (if socket.io-client is available)
+  // Otherwise, use polling via refetchInterval
+  useEffect(() => {
+    if (!orderId) return;
+
+    // Try to use Socket.IO if available
+    if (window.io) {
+      const socket = window.io("http://localhost:4007", {
+        transports: ["websocket", "polling"],
+      });
+
+      socket.on("connect", () => {
+        console.log("Socket.IO connected");
+        socket.emit("join:order", orderId);
+
+        // Join user room nếu có user ID để nhận notification
+        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        if (user?._id || user?.id) {
+          const userId = user._id || user.id;
+          socket.emit("join:user", userId);
+          console.log("[DroneTrackingPage] Joined user room:", userId);
+        }
+
+        // Reset notification flags khi kết nối mới
+        notificationShownRef.current = {
+          toRestaurant: false,
+          fromRestaurant: false,
+        };
+        setDisplaySpeed(null);
+      });
+
+      socket.on("drone:update", (data) => {
+        if (data.orderId === orderId) {
+          console.log(
+            "[DroneTrackingPage] Received real-time drone update:",
+            data
+          );
+
+          // Update drone marker position in real-time (smooth animation)
+          // Use refs to get current values (avoid stale closures)
+          const currentMarker = droneMarkerRef.current;
+          const currentMap = mapStateRef.current;
+          const currentPath = pathRef.current;
+
+          if (currentMarker && data.location) {
+            try {
+              const newLatLng = window.L.latLng(
+                data.location.latitude,
+                data.location.longitude
+              );
+
+              // Get current drone name from query cache if not available
+              const currentDrone = queryClient.getQueryData([
+                "drone",
+                orderId,
+              ])?.data;
+
+              // Smoothly animate marker to new position
+              // Use shorter duration for more real-time feel (0.5 seconds)
+              currentMarker.setLatLng(newLatLng, {
+                animate: true,
+                duration: 0.5, // 0.5 second animation for smoother real-time feel
+                easeLinearity: 0.25,
+              });
+
+              // Tính khoảng cách cho popup
+              const finalDestSocket =
+                currentDrone?.deliveryDestination || currentDrone?.destination;
+              const distanceForPopupSocket =
+                data.distanceToDestination !== undefined
+                  ? data.distanceToDestination
+                  : finalDestSocket && data.location
+                  ? calculateDistance(
+                      data.location.latitude || 0,
+                      data.location.longitude || 0,
+                      finalDestSocket.latitude || 0,
+                      finalDestSocket.longitude || 0
+                    )
+                  : 0;
+
+              // Update popup with new battery info and distance
+              let popupContentSocket = `<b>Drone ${
+                currentDrone?.name || "N/A"
+              }</b><br/>Trạng thái: ${getStatusText(
+                data.status || currentDrone?.status || "unknown"
+              )}<br/>Pin: ${parseFloat(
+                data.batteryLevel !== undefined
+                  ? data.batteryLevel
+                  : currentDrone?.batteryLevel || 0
+              ).toFixed(2)}%`;
+
+              if (
+                distanceForPopupSocket > 0 &&
+                (data.status === "flying" || data.status === "delivering")
+              ) {
+                popupContentSocket += `<br/>📏 Còn lại: ${distanceForPopupSocket.toFixed(
+                  2
+                )} km`;
+              }
+
+              currentMarker.setPopupContent(popupContentSocket);
+            } catch (error) {
+              console.error(
+                "[DroneTrackingPage] Error updating marker in socket:",
+                error
+              );
+            }
+          }
+
+          // Update path line from drone to destination (smooth update)
+          if (currentPath && currentMap && data.location) {
+            try {
+              // Get destination from query cache
+              const currentDrone = queryClient.getQueryData([
+                "drone",
+                orderId,
+              ])?.data;
+              const finalDestSocket =
+                currentDrone?.deliveryDestination || currentDrone?.destination;
+              if (finalDestSocket) {
+                const newPath = [
+                  [data.location.latitude, data.location.longitude],
+                ];
+                if (
+                  currentDrone?.startLocation &&
+                  typeof currentDrone.startLocation.latitude === "number" &&
+                  typeof currentDrone.startLocation.longitude === "number"
+                ) {
+                  newPath.push([
+                    currentDrone.startLocation.latitude,
+                    currentDrone.startLocation.longitude,
+                  ]);
+                }
+                newPath.push([
+                  finalDestSocket.latitude,
+                  finalDestSocket.longitude,
+                ]);
+
+                if (currentMap.hasLayer(currentPath)) {
+                  // Update existing path smoothly
+                  currentPath.setLatLngs(newPath);
+                } else {
+                  // Create new path if it doesn't exist
+                  const newPolyline = window.L.polyline(newPath, {
+                    color: "#ef4444",
+                    weight: 2,
+                    opacity: 0.6,
+                    dashArray: "5, 10",
+                  }).addTo(currentMap);
+
+                  setPath(newPolyline);
+                }
+              }
+            } catch (error) {
+              console.error(
+                "[DroneTrackingPage] Error updating path in socket:",
+                error
+              );
+            }
+          }
+
+          // Also update query cache to keep data in sync
+          // But don't trigger full refetch to avoid blank screen
+          queryClient.setQueryData(["drone", orderId], (oldData) => {
+            if (!oldData) return oldData;
+
+            // Update the drone data structure with new location
+            const updatedData = { ...oldData };
+            if (updatedData.data) {
+              updatedData.data = {
+                ...updatedData.data,
+                currentLocation:
+                  data.location || updatedData.data.currentLocation,
+                batteryLevel:
+                  data.batteryLevel !== undefined
+                    ? data.batteryLevel
+                    : updatedData.data.batteryLevel,
+                status: data.status || updatedData.data.status,
+                // Cập nhật khoảng cách từ WebSocket nếu có
+                distanceToDestination:
+                  data.distanceToDestination !== undefined
+                    ? data.distanceToDestination
+                    : updatedData.data.distanceToDestination,
+              };
+            }
+
+            return updatedData;
+          });
+        }
+      });
+
+      // Listen for drone milestone notifications (1/3 journey)
+      socket.on("drone:milestone", (data) => {
+        if (data.orderId === orderId) {
+          console.log(
+            "[DroneTrackingPage] Received drone milestone notification:",
+            data
+          );
+
+          // Cập nhật display speed nếu là milestone từ restaurant
+          if (data.type === "fromRestaurant" && data.speed) {
+            setDisplaySpeed(data.speed);
+          }
+
+          // Đánh dấu đã nhận notification từ server để tránh hiển thị duplicate
+          if (data.type === "toRestaurant") {
+            notificationShownRef.current.toRestaurant = true;
+          } else if (data.type === "fromRestaurant") {
+            notificationShownRef.current.fromRestaurant = true;
+          }
+
+          // Hiển thị thông báo
+          const toastStyle = {
+            background: data.type === "fromRestaurant" ? "#f59e0b" : "#3b82f6",
+            color: "white",
+            fontSize: "16px",
+            padding: "16px",
+          };
+
+          toast.success(data.message || "🚁 Cập nhật drone", {
+            duration: data.type === "fromRestaurant" ? 10000 : 8000,
+            icon: data.type === "fromRestaurant" ? "⚡" : "🚁",
+            style: toastStyle,
+          });
+        }
+      });
+
+      // Listen for drone arriving notification (1km away)
+      socket.on("drone:arriving", (data) => {
+        if (data.orderId === orderId) {
+          console.log(
+            "[DroneTrackingPage] Received drone arriving notification:",
+            data
+          );
+
+          // Hiển thị thông báo cho user
+          const notificationMessage =
+            data.message ||
+            `Drone đang đến gần bạn! Còn khoảng ${
+              data.distance || "1"
+            }km. Vui lòng chuẩn bị nhận hàng.`;
+          toast.success(`🚁 ${notificationMessage}`, {
+            duration: 8000, // Hiển thị 8 giây
+            icon: "🚁",
+            style: {
+              background: "#10b981",
+              color: "white",
+              fontSize: "16px",
+              padding: "16px",
+            },
+          });
+        }
+      });
+
+      socket.on("connect_error", (error) => {
+        console.error("Socket.IO connection error:", error);
+      });
+
+      socketRef.current = socket;
+
+      return () => {
+        if (socketRef.current) {
+          socketRef.current.emit("leave:order", orderId);
+          socketRef.current.disconnect();
+        }
+      };
+    }
+    // If Socket.IO is not available, the refetchInterval in useQuery will handle updates
+    // Note: queryClient is stable and doesn't need to be in deps
+    // map, droneMarker, path are accessed via refs to avoid re-creating socket connection
+  }, [orderId, queryClient]);
+
+  const getStatusText = (status) => {
+    const statusMap = {
+      available: "Sẵn sàng",
+      assigned: "Đã gán",
+      flying: "Đang bay",
+      delivering: "Đang giao hàng",
+      returning: "Đang quay về",
+      maintenance: "Bảo trì",
+    };
+    return statusMap[status] || status;
+  };
+
+  const getStatusColor = (status) => {
+    const colorMap = {
+      available: "bg-green-100 text-green-800",
+      assigned: "bg-blue-100 text-blue-800",
+      flying: "bg-purple-100 text-purple-800",
+      delivering: "bg-yellow-100 text-yellow-800",
+      returning: "bg-gray-100 text-gray-800",
+      maintenance: "bg-red-100 text-red-800",
+    };
+    return colorMap[status] || "bg-gray-100 text-gray-800";
+  };
+
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Earth's radius in km
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) *
+        Math.cos((lat2 * Math.PI) / 180) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
+
+  // Monitor drone progress and show notifications at 1/3 milestones
+  useEffect(() => {
+    if (!effectiveDroneData) return;
+
+    // Parse drone data
+    let drone = null;
+    try {
+      if (effectiveDroneData.status === "success" && effectiveDroneData.data) {
+        drone = effectiveDroneData.data;
+      } else if (effectiveDroneData.data) {
+        drone = effectiveDroneData.data.drone || effectiveDroneData.data;
+      } else if (!effectiveDroneData.status && effectiveDroneData._id) {
+        drone = effectiveDroneData;
+      }
+    } catch (error) {
+      return;
+    }
+
+    if (!drone || !drone.currentLocation) return;
+
+    // Get start location (restaurant) and final destination (customer)
+    const startLocation = drone.startLocation;
+    const finalDest =
+      (drone.deliveryDestination &&
+      typeof drone.deliveryDestination.latitude === "number" &&
+      typeof drone.deliveryDestination.longitude === "number"
+        ? drone.deliveryDestination
+        : null) ||
+      (drone.destination &&
+      typeof drone.destination.latitude === "number" &&
+      typeof drone.destination.longitude === "number"
+        ? drone.destination
+        : null);
+
+    if (!startLocation || !finalDest) return;
+
+    const currentLoc = drone.currentLocation;
+    if (
+      !currentLoc.latitude ||
+      !currentLoc.longitude ||
+      typeof startLocation.latitude !== "number" ||
+      typeof startLocation.longitude !== "number" ||
+      typeof finalDest.latitude !== "number" ||
+      typeof finalDest.longitude !== "number"
+    ) {
+      return;
+    }
+
+    // Tính khoảng cách từ vị trí hiện tại đến nhà hàng
+    const distanceToRestaurant = calculateDistance(
+      currentLoc.latitude,
+      currentLoc.longitude,
+      startLocation.latitude,
+      startLocation.longitude
+    );
+
+    // Tính khoảng cách từ vị trí hiện tại đến khách hàng
+    const distanceToCustomer = calculateDistance(
+      currentLoc.latitude,
+      currentLoc.longitude,
+      finalDest.latitude,
+      finalDest.longitude
+    );
+
+    // Tính tổng khoảng cách từ nhà hàng đến khách hàng
+    const totalDistanceRestaurantToCustomer = calculateDistance(
+      startLocation.latitude,
+      startLocation.longitude,
+      finalDest.latitude,
+      finalDest.longitude
+    );
+
+    // Xác định drone đang ở giai đoạn nào
+    const isGoingToRestaurant = distanceToRestaurant < distanceToCustomer;
+
+    // THÔNG BÁO 1: Khi drone ở 1/3 quãng đường đầu (đang đến nhà hàng)
+    if (isGoingToRestaurant && !notificationShownRef.current.toRestaurant) {
+      // Tính tổng khoảng cách từ điểm xuất phát đến nhà hàng
+      // Giả sử điểm xuất phát là một vị trí xa hơn (không có trong data)
+      // Ta sẽ dùng heuristic: nếu distanceToRestaurant lớn và distanceToCustomer cũng lớn
+      // thì có thể drone đang ở đầu hành trình
+
+      // Để đơn giản, ta sẽ thông báo khi:
+      // - Drone còn cách nhà hàng một khoảng đáng kể (để đảm bảo đang trong hành trình)
+      // - Và tỷ lệ distanceToRestaurant / distanceToCustomer cho thấy đang gần đầu hành trình
+
+      // Kiểm tra nếu khoảng cách đến nhà hàng còn lớn (chưa đến)
+      // và tỷ lệ cho thấy đang ở 1/3 đầu của tổng hành trình
+      const totalJourneyEstimate =
+        distanceToRestaurant + totalDistanceRestaurantToCustomer;
+      const progressToRestaurant = distanceToRestaurant / totalJourneyEstimate;
+
+      // Thông báo khi còn khoảng 1/3 quãng đường đầu tiên (progress < 0.33)
+      // Nhưng cần đảm bảo đang thực sự trên đường đến nhà hàng
+      if (
+        distanceToRestaurant > 0.3 &&
+        progressToRestaurant < 0.4 &&
+        totalJourneyEstimate > 0
+      ) {
+        notificationShownRef.current.toRestaurant = true;
+        toast.success(
+          `🚁 Drone đang đến nhà hàng! Còn khoảng ${distanceToRestaurant.toFixed(
+            2
+          )} km.`,
+          {
+            duration: 8000,
+            icon: "🏪",
+            style: {
+              background: "#3b82f6",
+              color: "white",
+              fontSize: "16px",
+              padding: "16px",
+            },
+          }
+        );
+      }
+    }
+
+    // THÔNG BÁO 2: Khi drone ở 1/3 quãng đường từ nhà hàng tới khách hàng
+    if (
+      !isGoingToRestaurant &&
+      !notificationShownRef.current.fromRestaurant &&
+      totalDistanceRestaurantToCustomer > 0
+    ) {
+      // Tính khoảng cách đã đi từ nhà hàng đến vị trí hiện tại
+      // Bằng cách: tổng khoảng cách - khoảng cách còn lại đến customer
+      // Nhưng thực tế hơn, ta tính từ restaurant đến current location
+      const distanceFromRestaurant = calculateDistance(
+        startLocation.latitude,
+        startLocation.longitude,
+        currentLoc.latitude,
+        currentLoc.longitude
+      );
+
+      // Tính phần trăm đã đi từ restaurant đến customer
+      const progressFromRestaurant =
+        distanceFromRestaurant / totalDistanceRestaurantToCustomer;
+
+      // Kiểm tra nếu đã đi được khoảng 1/3 quãng đường (progress ≈ 0.33)
+      // Cho phép một khoảng dung sai nhỏ
+      if (
+        progressFromRestaurant >= 0.25 &&
+        progressFromRestaurant <= 0.45 &&
+        distanceFromRestaurant > 0.1
+      ) {
+        // Đánh dấu đã thông báo
+        notificationShownRef.current.fromRestaurant = true;
+
+        // Tăng tốc độ hiển thị cho demo (tăng gấp 2 lần)
+        const currentSpeed = drone.speed || 30;
+        setDisplaySpeed(currentSpeed * 2);
+
+        // Hiển thị thông báo
+        toast.success(
+          `⚡ Drone đang tăng tốc đến khách hàng! Tốc độ: ${(
+            currentSpeed * 2
+          ).toFixed(0)} km/h. Còn khoảng ${distanceToCustomer.toFixed(2)} km.`,
+          {
+            duration: 10000,
+            icon: "⚡",
+            style: {
+              background: "#f59e0b",
+              color: "white",
+              fontSize: "16px",
+              padding: "16px",
+            },
+          }
+        );
+      }
+    }
+  }, [effectiveDroneData]);
+
+  const breadcrumbItems = [
+    { label: "Trang Chủ", path: "/" },
+    { label: "Đơn Hàng", path: "/orders" },
+    {
+      label: `Theo dõi Drone #${orderId?.slice(-8).toUpperCase()}`,
+      path: `/drone-tracking/${orderId}`,
+    },
+  ];
+
+  // Parse order data
+  const order = orderData?.data?.order;
+
+  // Handle drone data - check different possible response structures
+  // IMPORTANT: Use effectiveDroneData to prevent blank screen during refetch
+  // Also try to parse from previousDroneData as fallback
+  const parseDroneFromData = (data) => {
+    if (!data) return null;
+
+    // Handle different API response structures
+    if (data.status === "success" && data.data) {
+      return data.data;
+    } else if (data.data) {
+      // Some APIs return { data: { drone } }
+      return data.data.drone || data.data;
+    } else if (!data.status && data._id) {
+      // Direct drone object (check for _id to ensure it's a drone object)
+      return data;
+    }
+    return null;
+  };
+
+  // Try to parse from effectiveDroneData first, then fallback to previousDroneData
+  let drone = parseDroneFromData(effectiveDroneData);
+  if (!drone && previousDroneData) {
+    drone = parseDroneFromData(previousDroneData);
+  }
+
+  // Show loading only during initial load (first time), not during refetch
+  // Only wait for drone data, order data is optional
+  if (droneLoading && !effectiveDroneData && !drone) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
+          <p className="text-gray-600">Đang tải dữ liệu drone...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle error case - drone not found or error loading (only after initial load is done)
+  if (
+    !droneLoading &&
+    droneLoading !== undefined &&
+    (!drone || !effectiveDroneData || effectiveDroneData.status === "error") &&
+    !droneFetching
+  ) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Breadcrumb items={breadcrumbItems} />
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-xl shadow-md p-8 text-center">
+            <Package className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">
+              Chưa có drone được gán cho đơn hàng này
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Đơn hàng của bạn chưa có drone được gán để giao hàng.
+            </p>
+            <Link
+              to={`/orders/${orderId}`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Quay lại đơn hàng
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Calculate distance and ETA safely with null checks (prefer deliveryDestination)
+  const finalDestForInfo =
+    (drone?.deliveryDestination &&
+    typeof drone.deliveryDestination.latitude === "number" &&
+    typeof drone.deliveryDestination.longitude === "number"
+      ? drone.deliveryDestination
+      : null) ||
+    (drone?.destination &&
+    typeof drone.destination.latitude === "number" &&
+    typeof drone.destination.longitude === "number"
+      ? drone.destination
+      : null);
+
+  // Ưu tiên sử dụng distanceToDestination từ API/WebSocket, nếu không có thì tính toán
+  const distanceToDestination =
+    drone?.distanceToDestination !== undefined
+      ? drone.distanceToDestination
+      : drone?.currentLocation && finalDestForInfo
+      ? calculateDistance(
+          drone.currentLocation.latitude || 0,
+          drone.currentLocation.longitude || 0,
+          finalDestForInfo.latitude || 0,
+          finalDestForInfo.longitude || 0
+        )
+      : 0;
+
+  const estimatedMinutes =
+    drone?.speed && drone.speed > 0
+      ? Math.round((distanceToDestination / drone.speed) * 60)
+      : 0;
+
+  // Final safety check before render
+  // CRITICAL: Only show loading if we truly don't have drone data AND not fetching
+  // During refetch/update, keep showing the page with previous data
+  if (!drone || !drone.currentLocation) {
+    // Only show loading if:
+    // 1. Initial load (droneLoading = true and no previous data)
+    // 2. Not currently fetching (not updating battery, etc.) AND no previous data
+    if (droneLoading && !previousDroneData) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <Loader className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
+            <p className="text-gray-600">Đang tải thông tin drone...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // If we're fetching (updating battery), continue rendering with previous data
+    // The map useEffect will handle displaying the previous drone data
+    if (!droneFetching && !previousDroneData) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <Loader className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
+            <p className="text-gray-600">Đang tải thông tin drone...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // If we're here during refetch, continue rendering (drone will be null but map has previous data)
+    // Use optional chaining in the render to prevent crashes
+    if (!drone && !previousDroneData) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <Loader className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
+            <p className="text-gray-600">Đang tải thông tin drone...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // If we have previous data but current drone is null, use previous data for rendering
+    // This prevents blank screen during refetch
+    if (!drone && previousDroneData) {
+      drone = parseDroneFromData(previousDroneData);
+    }
+
+    // Final check - if still no drone, show loading
+    if (!drone || !drone.currentLocation) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <Loader className="w-12 h-12 animate-spin text-primary-600 mx-auto mb-4" />
+            <p className="text-gray-600">Đang tải thông tin drone...</p>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  return (
+    <div className={hideHeader ? "" : "min-h-screen bg-gray-50"}>
+      {!hideHeader && <Breadcrumb items={breadcrumbItems} />}
+      <div
+        className={
+          hideHeader ? "p-6" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
+        }
+      >
+        {/* Header */}
+        {!hideHeader && (
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Theo dõi Drone Giao Hàng
+              </h1>
+              <p className="text-gray-600">
+                Đơn hàng #{orderId?.slice(-8).toUpperCase()}
+                {droneFetching && (
+                  <span className="ml-2 text-xs text-gray-500">
+                    (Đang cập nhật...)
+                  </span>
+                )}
+                {orderError && (
+                  <span className="ml-2 text-xs text-yellow-600">
+                    (Không thể tải thông tin đơn hàng)
+                  </span>
+                )}
+              </p>
+            </div>
+            <Link
+              to={`/orders/${orderId}`}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Quay lại
+            </Link>
+          </div>
+        )}
+
+        {/* Warning if order data failed to load */}
+        {orderError && !orderLoading && (
+          <div className="mb-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+            <p className="text-sm text-yellow-800">
+              <strong>Lưu ý:</strong> Không thể tải thông tin đơn hàng, nhưng
+              bạn vẫn có thể theo dõi drone giao hàng.
+            </p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Map */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
+              <div
+                id="map-container"
+                className="w-full h-[600px]"
+                style={{ zIndex: 0 }}
+              />
+            </div>
+          </div>
+
+          {/* Info Panel */}
+          <div className="space-y-6">
+            {/* Drone Status Card */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <Navigation className="w-5 h-5 text-primary-600" />
+                Trạng thái Drone
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Tên Drone</p>
+                  <p className="font-semibold text-gray-900">
+                    {drone?.name || "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Trạng thái</p>
+                  <span
+                    className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(
+                      drone?.status || "unknown"
+                    )}`}
+                  >
+                    {getStatusText(drone?.status || "unknown")}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1 flex items-center gap-2">
+                    <Battery className="w-4 h-4" />
+                    Pin
+                  </p>
+                  <div className="relative pt-1">
+                    <div className="flex mb-2 items-center justify-between">
+                      <div>
+                        <span className="text-xs font-semibold inline-block text-gray-600">
+                          {parseFloat(drone?.batteryLevel || 0).toFixed(2)}%
+                        </span>
+                      </div>
+                    </div>
+                    <div className="overflow h-2 mb-4 flex rounded bg-gray-200">
+                      <div
+                        style={{
+                          width: `${drone?.batteryLevel || 0}%`,
+                        }}
+                        className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center ${
+                          parseFloat(drone?.batteryLevel || 0) > 50
+                            ? "bg-green-500"
+                            : parseFloat(drone?.batteryLevel || 0) > 20
+                            ? "bg-yellow-500"
+                            : "bg-red-500"
+                        }`}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Tốc độ</p>
+                  <p className="font-semibold text-gray-900">
+                    {displaySpeed !== null
+                      ? displaySpeed.toFixed(0)
+                      : drone?.speed || 0}{" "}
+                    km/h
+                    {displaySpeed !== null && (
+                      <span className="ml-2 text-xs text-orange-600 font-normal">
+                        (Tăng tốc demo)
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Location Info */}
+            <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-primary-600" />
+                Vị trí
+              </h2>
+              <div className="space-y-4">
+                {drone?.currentLocation && (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">
+                      Vị trí hiện tại
+                    </p>
+                    <p className="font-semibold text-gray-900 text-sm">
+                      {drone.currentLocation.latitude?.toFixed(6) || "N/A"},
+                      {drone.currentLocation.longitude?.toFixed(6) || "N/A"}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Độ cao: {drone.currentLocation.altitude || 0}m
+                    </p>
+                  </div>
+                )}
+                {finalDestForInfo && (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Điểm đến</p>
+                    <p className="font-semibold text-gray-900 text-sm">
+                      {finalDestForInfo.address || "Địa chỉ giao hàng"}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {finalDestForInfo.latitude?.toFixed(6) || "N/A"},
+                      {finalDestForInfo.longitude?.toFixed(6) || "N/A"}
+                    </p>
+                  </div>
+                )}
+                {drone?.startLocation && (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Nhà hàng</p>
+                    <p className="font-semibold text-gray-900 text-sm">
+                      {drone.startLocation.restaurantName || "Nhà hàng"}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {drone.startLocation.address || "Địa chỉ nhà hàng"}
+                    </p>
+                  </div>
+                )}
+                {(distanceToDestination > 0 ||
+                  drone?.status === "flying" ||
+                  drone?.status === "delivering") && (
+                  <div className="pt-4 border-t border-gray-200">
+                    <p className="text-sm text-gray-600 mb-1 flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      Khoảng cách còn lại
+                    </p>
+                    <p className="font-semibold text-gray-900 text-lg">
+                      {distanceToDestination > 0
+                        ? `${distanceToDestination.toFixed(2)} km`
+                        : "Đang tính toán..."}
+                    </p>
+                    {estimatedMinutes > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Ước tính còn: {estimatedMinutes} phút
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Order Info */}
+            {order && (
+              <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <Package className="w-5 h-5 text-primary-600" />
+                  Đơn hàng
+                </h2>
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600">Người nhận</p>
+                  <p className="font-semibold text-gray-900">
+                    {order?.receiver || "N/A"}
+                  </p>
+                  <p className="text-sm text-gray-600 mt-3">Địa chỉ</p>
+                  <p className="text-sm text-gray-900">
+                    {order?.address ||
+                      drone?.deliveryDestination?.address ||
+                      "Đang tải..."}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default DroneTrackingPage;
